@@ -5,7 +5,11 @@ from simple_automation.actions.package import portage
 
 
 class TaskZsh(Task):
+    identifier = "zsh"
     track = ["/etc/zsh"]
+
+    def set_defaults(self, manager):
+        manager.set(f"tasks.{identifier}.install", True)
 
     def run(self, context):
         # Set defaults
