@@ -1,7 +1,8 @@
 class Task:
-    def __init__(self, context):
-        # Set default variables
-        self.set_defaults(context)
+    def __init__(self, manager):
+        self.manager = manager
+        # Initialize variable defaults
+        self.set_defaults(manager)
 
     def exec(self, context):
         self.run(context)

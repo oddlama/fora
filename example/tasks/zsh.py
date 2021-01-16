@@ -9,11 +9,11 @@ class TaskZsh(Task):
     track = ["/etc/zsh"]
 
     def set_defaults(self, manager):
-        manager.set(f"tasks.{identifier}.install", True)
+        manager.set(f"tasks.{self.identifier}.install", True)
 
     def run(self, context):
         # Set defaults
-        context.defaults(dir_mode=0o755, file_mode=0o655, owner="root", group="root")
+        context.defaults(dir_mode=0o755, file_mode=0o644, owner="root", group="root")
         context.umask(0o022)
 
         # Install zsh

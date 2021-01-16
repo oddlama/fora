@@ -27,11 +27,5 @@ task_zsh = manager.add_task(TaskZsh)
 def run(context):
     task_zsh.exec(context)
 
-    # manager.defaults(dir_mode=0o700, file_mode=0o600, owner="root", group="root")
-
-    # manager.add_group("base")
-    # hosts.add("localhost", "localhost")
-    TaskZsh().run(context)
-
 if __name__ == "__main__":
     manager.main(run)

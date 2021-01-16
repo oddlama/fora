@@ -1,3 +1,7 @@
+from simple_automation.group import Group
+from simple_automation.host import Host
+from simple_automation.task import Task
+from simple_automation.context import Context
 import argparse
 
 class Manager:
@@ -21,10 +25,11 @@ class Manager:
         self.hosts[identifier] = host
         return host
 
-    def add_task(self, task_ctor):
-        task = task_ctor(self)
+    def add_task(self, task_class):
+        identifier = task_class.identifier
         if identifier in self.tasks:
             raise Exception(f"Cannot register task: Duplicate identifier {identifier}")
+        task = task_class(self)
         self.tasks[identifier] = task
         return task
 
