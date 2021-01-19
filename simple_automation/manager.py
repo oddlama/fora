@@ -11,6 +11,7 @@ class Manager(Vars):
         self.groups = {}
         self.hosts = {}
         self.tasks = {}
+        self.set("sima_managed", "This file is managed by sima.")
 
     def add_group(self, identifier):
         group = Group(self, identifier)
@@ -35,4 +36,4 @@ class Manager(Vars):
         return task
 
     def main(self, run):
-        run(Context())
+        run(Context(self.hosts["my_laptop"]))

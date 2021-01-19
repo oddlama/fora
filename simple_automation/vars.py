@@ -3,11 +3,11 @@ from simple_automation.checks import check_valid_key
 
 class Vars:
     def __init__(self):
-        self.vals = {}
+        self.vars = {}
 
     def get(self, key):
         check_valid_key(key)
-        d = self.vals
+        d = self.vars
         cs = []
         for k in key.split('.'):
             cs.append(k)
@@ -29,7 +29,7 @@ class Vars:
 
     def set(self, key, value):
         check_valid_key(key)
-        d = self.vals
+        d = self.vars
         cs = []
         keys = key.split('.')
         for k in keys[:-1]:
@@ -41,3 +41,4 @@ class Vars:
             if not isinstance(d, dict):
                 csname = '.'.join(cs)
                 raise LogicError(f"Cannot set variable '{key}' because existing variable '{csname}' is not a dictionary")
+        d[keys[-1]] = value
