@@ -1,3 +1,4 @@
+from .exception import SimpleAutomationError, LogicError
 from .context import Context
 from .group import Group
 from .host import Host

@@ -35,5 +35,5 @@ class TaskZsh(Task):
 
         # Copy configuration
         create_dir(context, path="/etc/zsh")
-        template(context, src="zsh/zshrc", dst="/etc/zsh/zshrc")
-        template(context, src="zsh/zprofile", dst="/etc/zsh/zprofile")
+        template(context, src="zsh/zshrc.j2", dst="/etc/zsh/zshrc")
+        template(context, src="zsh/zprofile.j2", dst="/etc/zsh/zprofile")

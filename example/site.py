@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from simple_automation import Manager, Context
+from simple_automation import Manager
 from tasks import TaskZsh
 
 # TODO somehow offload definitions into vault
@@ -12,12 +12,12 @@ manager.set("zsh.install", False)
 
 # -------- Define Groups --------
 desktop = manager.add_group("desktop")
-desktop.set("is_desktop", True)
+desktop.set("global.is_desktop", True)
 
 # -------- Define Hosts --------
 my_laptop = manager.add_host("my_laptop", ssh_host="localhost")
 my_laptop.add_group(desktop)
-my_laptop.set("hostname", "chef")
+my_laptop.set("machine.hostname", "chef")
 # TODO my_laptop.set("root_pw", vault_key="")
 
 # -------- Define Tasks --------

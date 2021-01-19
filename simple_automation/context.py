@@ -14,3 +14,6 @@ class Context:
 
     def umask(self, value):
         self.umask_value = value
+
+    def vars(self):
+        return {"simple_automation":"weeeeo", "machine": {"hostname":"a"},"zsh": {"install":False}}

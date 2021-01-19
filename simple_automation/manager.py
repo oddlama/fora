@@ -2,14 +2,15 @@ from simple_automation.group import Group
 from simple_automation.host import Host
 from simple_automation.task import Task
 from simple_automation.context import Context
+from simple_automation.vars import Vars
 import argparse
 
-class Manager:
+class Manager(Vars):
     def __init__(self):
+        super().__init__()
         self.groups = {}
         self.hosts = {}
         self.tasks = {}
-        self.vars = {}
 
     def add_group(self, identifier):
         group = Group(self, identifier)
@@ -32,12 +33,6 @@ class Manager:
         task = task_class(self)
         self.tasks[identifier] = task
         return task
-
-    def get(self, var):
-        return self.vars[var]
-
-    def set(self, var, val):
-        self.vars[var] = val
 
     def main(self, run):
         run(Context())
