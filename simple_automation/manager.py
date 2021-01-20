@@ -60,4 +60,5 @@ class Manager(Vars):
         # TODO ask for vault key, vaultdecrypt = ask = [openssl - ...], gpg = []
         # TODO ask for su key, becomekey=ask,command=[]
         # TODO becomemethod=su, sudo -u root, ...
-        run(Context(self.hosts["my_laptop"]))
+        with Context(self.hosts["my_laptop"]) as c:
+            run(c)
