@@ -1,3 +1,4 @@
+from simple_automation.version import __version__
 from simple_automation.group import Group
 from simple_automation.host import Host
 from simple_automation.task import Task
@@ -5,13 +6,20 @@ from simple_automation.context import Context
 from simple_automation.vars import Vars
 import argparse
 
+class ArgumentParserError(Exception):
+    pass
+
+class ThrowingArgumentParser(argparse.ArgumentParser):
+    def error(self, message):
+        raise ArgumentParserError(message)
+
 class Manager(Vars):
     def __init__(self):
         super().__init__()
         self.groups = {}
         self.hosts = {}
         self.tasks = {}
-        self.set("sima_managed", "This file is managed by sima.")
+        self.set("simple_automation_managed", "This file is managed by simple automation.")
 
     def add_group(self, identifier):
         group = Group(self, identifier)
@@ -36,4 +44,20 @@ class Manager(Vars):
         return task
 
     def main(self, run):
+        parser = ThrowingArgumentParser(description="Runs this simple automation script.")
+
+        # General options
+        parser.add_argument('-H', '--hosts', dest='hosts', default=None, type=list,
+                help="Specifies a subset of hosts to run on. By default all hosts are selected.")
+        parser.add_argument('--version', action='version',
+                version='%(prog)s {version}'.format(version=__version__))
+
+        try:
+            args = parser.parse_args()
+        except ArgumentParserError as e:
+            print("error: " + str(e))
+
+        # TODO ask for vault key, vaultdecrypt = ask = [openssl - ...], gpg = []
+        # TODO ask for su key, becomekey=ask,command=[]
+        # TODO becomemethod=su, sudo -u root, ...
         run(Context(self.hosts["my_laptop"]))

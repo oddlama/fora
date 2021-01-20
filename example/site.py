@@ -17,7 +17,7 @@ desktop.set("global.is_desktop", True)
 # -------- Define Hosts --------
 my_laptop = manager.add_host("my_laptop", ssh_host="localhost")
 my_laptop.add_group(desktop)
-my_laptop.set("machine.hostname", "chef")
+my_laptop.hostname = "chef"
 # TODO my_laptop.set("root_pw", vault_key="")
 
 # -------- Define Tasks --------

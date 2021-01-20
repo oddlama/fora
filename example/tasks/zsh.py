@@ -13,7 +13,7 @@ class TaskZsh(Task):
 
     def run(self, context):
         # Set defaults
-        context.defaults(dir_mode=0o755, file_mode=0o644, owner="root", group="root")
+        context.defaults(user="root", umask=0o022, dir_mode=0o755, file_mode=0o644, owner="root", group="root")
         context.umask(0o022)
 
         # Install zsh
