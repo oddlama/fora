@@ -50,7 +50,7 @@ class Manager(Vars):
         parser.add_argument('-H', '--hosts', dest='hosts', default=None, type=list,
                 help="Specifies a subset of hosts to run on. By default all hosts are selected.")
         parser.add_argument('--version', action='version',
-                version='%(prog)s {version}'.format(version=__version__))
+                version='%(prog)s built with simple_automation version {version}'.format(version=__version__))
 
         try:
             args = parser.parse_args()
