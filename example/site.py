@@ -26,6 +26,8 @@ task_zsh = manager.add_task(TaskZsh)
 
 
 def run(context):
+    x = context.remote_exec(["echo", "blahh"])
+    print(f"{x.return_code=} {x.stdout=} {x.stderr=}")
     task_zsh.exec(context)
 
 if __name__ == "__main__":
