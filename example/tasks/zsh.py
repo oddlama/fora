@@ -1,6 +1,6 @@
 from simple_automation import Task
 from simple_automation.actions import git
-from simple_automation.actions.basic import template, create_dir
+from simple_automation.actions.basic import template, directory
 from simple_automation.actions.package import portage
 
 
@@ -34,6 +34,6 @@ class TaskZsh(Task):
                   update=True)
 
         # Copy configuration
-        create_dir(context, path="/etc/zsh")
+        directory(context, path="/etc/zsh")
         template(context, src="zsh/zshrc.j2", dst="/etc/zsh/zshrc")
         template(context, src="zsh/zprofile.j2", dst="/etc/zsh/zprofile")

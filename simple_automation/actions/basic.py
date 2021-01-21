@@ -10,13 +10,14 @@ def template_str(context: Context, template_str):
     template = Template(template_str)
     return template.render(context.vars())
 
-def create_dir(context: Context, path: str) -> None:
+def directory(context: Context, path: str) -> None:
     path = template_str(context, path)
-    print(f"create_dir {path}")
+    # todo stat
+    context.remote_exec(["mkdir", "-m", oct(context.dir_mode)[2:], path])
 
-def create_dirs(context: Context, paths: list) -> None:
-    paths = [template_str(context, path) for path in paths]
-    print(f"create_dirs {paths}")
+def directories(context: Context, paths: list) -> None:
+    for path in paths:
+        directory(context, path)
 
 def template(context: Context, src: str, dst: str) -> None:
     src = template_str(context, src)

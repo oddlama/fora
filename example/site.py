@@ -18,16 +18,20 @@ desktop.set("global.is_desktop", True)
 my_laptop = manager.add_host("my_laptop", ssh_host="localhost")
 my_laptop.set_ssh_port(2222)
 my_laptop.add_group(desktop)
+# You may set custom variables, which you can access later
+# in any templated string.
 my_laptop.hostname = "chef"
+
 # TODO my_laptop.set("root_pw", vault_key="")
 
 # -------- Define Tasks --------
 task_zsh = manager.add_task(TaskZsh)
 
-
 def run(context):
-    x = context.remote_exec(["echo", "blahh"])
-    print(f"{x.return_code=} {x.stdout=} {x.stderr=}")
+    """
+    This function will be executed for each host context,
+    and is your main customization point.
+    """
     task_zsh.exec(context)
 
 if __name__ == "__main__":

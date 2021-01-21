@@ -26,8 +26,7 @@ def read_len():
     return l
 
 def read_str():
-    x = sys.stdin.read(read_len())
-    return x
+    return sys.stdin.read(read_len())
 
 def read_str_list():
     xs = []
@@ -35,42 +34,64 @@ def read_str_list():
         xs.append(read_str())
     return xs
 
-def main():
-    # Cd into temporary directory
-    os.chdir(os.path.dirname(script_path))
+class Dispatcher:
+    def __init__(self):
+        self.execution_settings = ExecutionSettings()
 
-    while True:
-        mode = sys.stdin.readline()
-        if not mode:
-            # EOF
-            return
+    def handle_set_user(self):
+        # Set the user to become
+        self.execution_settings.user = read_str()
+        write_mode("ok")
 
-        # Strip the newline
-        mode = mode[:-1]
-        if mode == "user":
-            # Set the user to become
-            user = read_str()
-            write_mode("ok")
-        elif mode == "umask":
-            # Set the umask
-            umask = read_str()
-            write_mode("ok")
-        elif mode == "exec":
-            # Execute a command
-            command = read_str_list()
-            completed_command = subprocess.run(command, capture_output=True)
-            write_mode("ok")
-            write_str(completed_command.stdout.decode('utf-8'))
-            write_str(completed_command.stderr.decode('utf-8'))
-            write_str(str(completed_command.returncode))
-        elif mode == "stop":
-            exit(0)
-        elif mode == "":
-            # Skip empty modes
-            continue
-        else:
-            # Invalid mode
-            exit(3)
+    def handle_set_umask(self):
+        # Set the umask
+        self.execution_settings.umask = int(read_str())
+        write_mode("ok")
+
+    def run_command(self, command):
+        print(f"executing {command=}", file=sys.stderr, flush=True)
+        subprocess.run(command, capture_output=True)
+
+    def handle_exec(self):
+        # Execute a command
+        command = read_str_list()
+        completed_command = run_command(command)
+
+        # Return output and status
+        write_mode("ok")
+        write_str(completed_command.stdout.decode('utf-8'))
+        write_str(completed_command.stderr.decode('utf-8'))
+        write_str(str(completed_command.returncode))
+
+        # Reset settings for next command
+        execution_settings = ExecutionSettings()
+
+    def main(self):
+        # Cd into temporary directory
+        os.chdir(os.path.dirname(script_path))
+
+        while True:
+            # Read next mode
+            mode = sys.stdin.readline()
+
+            # End script on EOF
+            if not mode:
+                return
+
+            # Strip the newline
+            mode = mode[:-1]
+            if mode == "user":
+                handle_set_user()
+            elif mode == "umask":
+                handle_set_umask()
+            elif mode == "exec":
+                handle_exec()
+            elif mode == "":
+                # Skip empty modes
+                continue
+            else:
+                # Invalid mode → abort
+                exit(3)
 
 if __name__ == '__main__':
-    main()
+    Dispatcher().main()
