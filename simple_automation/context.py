@@ -7,6 +7,10 @@ import os
 import sys
 
 def _merge(source, destination):
+    """
+    Recursively merges two dictionaries source and destination.
+    The source dictionary will only be read, but the destination dictionary will be overwritten.
+    """
     for key, value in source.items():
         if isinstance(value, dict):
             # get node or create one
@@ -19,53 +23,89 @@ def _merge(source, destination):
 
 
 class CompletedRemoteCommand:
+    """
+    A wrapper for the information returned by a remote command.
+    """
     def __init__(self):
         self.stdout = None
         self.stderr = None
         self.return_code = None
 
 class RemoteDispatcher:
+    """
+    A wrapper class around a process that executes the remote dispatch script.
+    This will usually be an ssh command calling the script on a remote host,
+    allowing us to send commands an receive output and return code information.
+    """
+
     def __init__(self, context, command):
         self.context = context
         self.process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=sys.stderr)
 
-    def stop(self):
+    def stop_and_wait(self):
+        """
+        Stops the remote dispatcher, and waits until it exists.
+        """
         self.process.stdin.close()
         self.process.wait()
         self.process.stdout.close()
 
     def write_data(self, data):
+        """
+        Sends raw data to the remote process.
+        """
         self.process.stdin.write(str(len(data)).encode('utf-8'))
         self.process.stdin.write(b'\n')
         self.process.stdin.write(data)
         self.process.stdin.flush()
 
     def write_line(self, s):
+        """
+        Sends a line to the remote process.
+        """
         self.process.stdin.write(s.encode('utf-8'))
         self.process.stdin.write(b'\n')
         self.process.stdin.flush()
 
     def write_str(self, s):
+        """
+        Sends the given string to the remote process.
+        """
         self.write_data(s.encode('utf-8'))
 
     def write_str_list(self, xs):
+        """
+        Sends the given list of strings to the remote process.
+        """
         self.write_line(str(len(xs)))
         for x in xs:
             self.write_str(x)
 
     def write_mode(self, mode):
+        """
+        Sends a mode to the remote dispatch process.
+        """
         self.write_line(mode)
 
     def read_len(self):
+        """
+        Reads a length parameter from the remote process.
+        """
         l = int(self.process.stdout.readline())
         if l < 0 or l > 16*1024*1024*1024:
             exit(2)
         return l
 
     def read_str(self):
+        """
+        Reads a string from the remote process.
+        """
         return self.process.stdout.read(self.read_len()).decode('utf-8')
 
     def expect(self, s):
+        """
+        Waits until the given string is sent by the remote side.
+        """
         self.process.stdin.flush()
         line = self.process.stdout.readline().decode('utf-8')
         if not line:
@@ -75,6 +115,10 @@ class RemoteDispatcher:
             raise Exception(f"expected '{s}' but got '{line}'")
 
     def exec(self, command):
+        """
+        Executes the given command on the remote machine as the
+        user and with the umask given by the attached context.
+        """
         # Set user to execute as
         self.write_mode("user")
         self.write_str(self.context.as_user)
@@ -113,22 +157,35 @@ class Context:
     def __exit__(self, type, value, traceback):
         # Remove temporary files, and also do a safety check in
         # case anything goes horribly wrong.
-        self.remote_dispatcher.stop()
+        self.remote_dispatcher.stop_and_wait()
         if self.remote_temp_dir.startswith("/tmp"):
             self.exec_ssh_raw(["rm", "-rf", self.remote_temp_dir])
 
     def defaults(self, user, umask, dir_mode, file_mode, owner, group):
+        """
+        Overwrite the defaults for command execution on the remote machine.
+        """
         self.user(user)
         self.umask(umask)
         self.mode(dir_mode, file_mode, owner, group)
 
     def umask(self, value):
+        """
+        Sets the umask for executed commands on the remote machine.
+        """
         self.umask_value = value
 
     def user(self, user):
+        """
+        Sets the user to execute commands on the remote machine.
+        """
         self.as_user = user
 
     def mode(self, dir_mode, file_mode, owner, group):
+        """
+        Sets default modes for created directories and files,
+        as well as default owner and group
+        """
         self.dir_mode = dir_mode
         self.file_mode = file_mode
         self.owner = owner
