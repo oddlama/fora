@@ -4,5 +4,5 @@ class SimpleAutomationError(Exception):
 class LogicError(SimpleAutomationError):
     pass
 
-class LogicError(SimpleAutomationError):
+class RemoteExecError(SimpleAutomationError):
     pass

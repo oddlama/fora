@@ -1,4 +1,4 @@
-from simple_automation.exception import LogicError
+from simple_automation.exceptions import LogicError
 
 def check_valid_key(key):
     if not key:

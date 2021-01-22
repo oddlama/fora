@@ -1,5 +1,6 @@
 from simple_automation.vars import Vars
 from simple_automation.remote_dispatch import script_path as local_remote_dispatch_script_path
+from simple_automation.exceptions import RemoteExecError
 
 from subprocess import CalledProcessError
 import subprocess
@@ -191,6 +192,23 @@ class Context:
         self.owner = owner
         self.group = group
 
+    def transaction(self, name):
+        """
+        Begins a new transaction. Intended to be used in a 'with' statement.
+        Each transaction will be shown to the user as a distinct unit.
+
+        A transaction must record an initial state and a final state, and may
+        return success or failure (+reason).
+
+        A transaction should not actually alter the state of the remote,
+        if context.pretend is set to True. In this case it should only examine
+        and record what would be done.
+
+        A transaction may give additional variables to success() and failure(),
+        which will be stored for later use.
+        """
+        return Transaction(self, name)
+
     def _vars(self):
         """
         Merges all vars from inherited contexts (manager, groups, host) to
@@ -264,13 +282,18 @@ class Context:
         subprocess.run(self._base_scp_command(file, remote_file_path), check=True)
         return remote_file_path
 
-    def remote_exec(self, command):
+    def remote_exec(self, command, checked=False):
         """
         Execute ssh to execute the given command on the remote host,
-        via our built-in remote dispatch script.
+        via our built-in remote dispatch script. If checked is True,
+        it will throw an exception if the remote command returns an
+        unsuccessful exit status.
         """
         # Execute the command via our existing remote session. Commands
         # are passed with NUL-terminated parameters, so we don't have to worry
         # about any quoting. This therefore ensures that there is no command
         # injection possible.
-        return self.remote_dispatcher.exec(command)
+        ret = self.remote_dispatcher.exec(command)
+        if checked and ret.return_code != 0:
+            raise RemoteExecError(f"Remote command {command} was unsuccessful (code {ret.return_code})")
+        return ret
