@@ -65,33 +65,8 @@ class ActiveTransaction:
         if set(self.result.initial_state.keys()) != set(self.result.final_state.keys()):
             raise LogicError("Both initial and final transaction state must have the same keys.")
 
-        # TODO nicer column based renderer
-        if self.result.success:
-            if self.result.changed:
-                status_char = "[32m+[m"
-            else:
-                status_char = "[34m·[m"
-        else:
-            status_char = "[1;31m![m"
-
-        # Print key=value pairs with changes
-        print(f"[{status_char}] {transaction.name}", end="")
-        for k,final_v in self.result.final_state.items():
-            initial_v = self.result.initial_state[k]
-
-            # Add ellipsis on long strings
-            str_initial_v = str(initial_v)
-            str_final_v = str(final_v)
-            if len(str_initial_v) > 16:
-                str_initial_v = str_initial_v[:16] + "…"
-            if len(str_final_v) > 16:
-                str_final_v = str_final_v[:16] + "…"
-
-            if initial_v == final_v:
-                print(f"  [37m{k}: {str_initial_v} (unchanged)[m", end="")
-            else:
-                print(f"  [33m{k}: {str_initial_v} → {str_final_v}[m", end="")
-        print()
+        self.result.name = transaction.name
+        context.print_transaction(self.result)
 
         if not self.result.success:
             raise TransactionError(self.result)

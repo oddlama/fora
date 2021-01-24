@@ -3,7 +3,7 @@ from simple_automation.group import Group
 from simple_automation.host import Host
 from simple_automation.task import Task
 from simple_automation.context import Context
-from simple_automation.exceptions import TransactionError
+from simple_automation.exceptions import SimpleAutomationError, TransactionError
 from simple_automation.vars import Vars
 import argparse
 
@@ -50,7 +50,7 @@ class Manager(Vars):
         # General options
         parser.add_argument('-H', '--hosts', dest='hosts', default=None, type=list,
                 help="Specifies a subset of hosts to run on. By default all hosts are selected.")
-        parser.add_argument('-p', '--pretend', dest='pretend', default=False, type=list,
+        parser.add_argument('-p', '--pretend', dest='pretend', action='store_true',
                 help="Print what would be done instead of performing the actions.")
         parser.add_argument('--version', action='version',
                 version='%(prog)s built with simple_automation version {version}'.format(version=__version__))
@@ -59,6 +59,7 @@ class Manager(Vars):
             args = parser.parse_args()
         except ArgumentParserError as e:
             print("error: " + str(e))
+            exit(1)
 
         # TODO ask for vault key, vaultdecrypt = ask = [openssl - ...], gpg = []
         # TODO ask for su key, becomekey=ask,command=[]
@@ -69,6 +70,6 @@ class Manager(Vars):
                 run(c)
         except TransactionError as e:
             print(f"[1;31merror:[m {str(e)}")
-        except Exception as e:
+        except SimpleAutomationError as e:
             print(f"[1;31merror:[m {str(e)}")
             raise e

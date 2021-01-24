@@ -3,6 +3,8 @@
 from simple_automation import Manager
 from tasks import TaskZsh
 
+# TODO -vv to print stdout of all executed commands
+
 # TODO somehow offload definitions into vault
 #vault = Vault("myvault.enc", type='gpg')
 

@@ -305,3 +305,32 @@ class Context:
         if checked and ret.return_code != 0:
             raise RemoteExecError(f"Remote command {command} was unsuccessful (code {ret.return_code})")
         return ret
+
+    def print_transaction(self, transaction):
+        # TODO nicer column based renderer
+        if transaction.success:
+            if transaction.changed:
+                status_char = "[32m+[m"
+            else:
+                status_char = "[34m·[m"
+        else:
+            status_char = "[1;31m![m"
+
+        # Print key=value pairs with changes
+        print(f"[{status_char}] {transaction.name}", end="")
+        for k,final_v in transaction.final_state.items():
+            initial_v = transaction.initial_state[k]
+
+            # Add ellipsis on long strings
+            str_initial_v = str(initial_v)
+            str_final_v = str(final_v)
+            if len(str_initial_v) > 16:
+                str_initial_v = str_initial_v[:16] + "…"
+            if len(str_final_v) > 16:
+                str_final_v = str_final_v[:16] + "…"
+
+            if initial_v == final_v:
+                print(f"  [37m{k}: {str_initial_v} (unchanged)[m", end="")
+            else:
+                print(f"  [33m{k}: [31m{str_initial_v}[33m → [32m{str_final_v}[m", end="")
+        print()

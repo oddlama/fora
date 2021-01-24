@@ -16,7 +16,7 @@ class TaskZsh(Task):
         context.defaults(user="root", umask=0o022, dir_mode=0o755, file_mode=0o644, owner="root", group="root")
 
         # Install zsh
-        portage.package(context, name="app-shells/zsh", state="present")
+        portage.package(context, name="app-shells/zsh")
 
         # Clone or update plugin repositories
         git.clone(context,

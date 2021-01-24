@@ -139,7 +139,7 @@ def template(context: Context, src: str, dst: str, mode=None, owner=None, group=
                 context.remote_exec(["chown", f"{owner}:{group}", dst], checked=True)
                 context.remote_exec(["chmod", mode, dst], checked=True)
             except RemoteExecError as e:
-                return action.failure(str(e))
+                return action.failure(f"{str(type(e))}: {str(e)}")
 
         # Return success
         return action.success()
