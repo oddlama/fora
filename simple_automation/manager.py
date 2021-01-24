@@ -49,6 +49,8 @@ class Manager(Vars):
         # General options
         parser.add_argument('-H', '--hosts', dest='hosts', default=None, type=list,
                 help="Specifies a subset of hosts to run on. By default all hosts are selected.")
+        parser.add_argument('-p', '--pretend', dest='pretend', default=False, type=list,
+                help="Print what would be done instead of performing the actions.")
         parser.add_argument('--version', action='version',
                 version='%(prog)s built with simple_automation version {version}'.format(version=__version__))
 
@@ -61,4 +63,5 @@ class Manager(Vars):
         # TODO ask for su key, becomekey=ask,command=[]
         # TODO becomemethod=su, sudo -u root, ...
         with Context(self.hosts["my_laptop"]) as c:
+            c.pretend = args.pretend
             run(c)

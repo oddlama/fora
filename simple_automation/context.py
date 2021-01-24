@@ -1,6 +1,7 @@
-from simple_automation.vars import Vars
-from simple_automation.remote_dispatch import script_path as local_remote_dispatch_script_path
 from simple_automation.exceptions import RemoteExecError
+from simple_automation.remote_dispatch import script_path as local_remote_dispatch_script_path
+from simple_automation.transaction import Transaction
+from simple_automation.vars import Vars
 
 from subprocess import CalledProcessError
 import subprocess
@@ -146,6 +147,7 @@ class Context:
         self.host = host
         self.precomputed_vars = self._vars()
         self.remote_dispatcher = None
+        self.pretend = False
 
         # Defaults for remote actions
         self.defaults(user="root", umask=0o022, dir_mode=0o700, file_mode=0o600, owner="root", group="root")

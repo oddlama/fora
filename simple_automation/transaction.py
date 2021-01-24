@@ -12,19 +12,21 @@ class CompletedTransaction:
         self.failure_reason = failure_reason
         self.initial_state = transaction.initial_state_dict
         self.final_state = transaction.final_state_dict
-        self.changed = (self.initial_state == self.final_state)
+        self.changed = (self.initial_state != self.final_state)
 
         # Set additional return variables
-        # TODO for k,v in ...:
-        # TODO     setvar(k, v)
+        for k,v in store.items():
+            setattr(self, k, v)
 
 class Transaction:
     """
     A wrapper around a transaction context that enforces usage of the
     'with' statement to modify the transaction.
     """
-    def __init__(self, context):
+    def __init__(self, context, name):
         self.context = context
+        self.name = name
+        self.transaction_context = None
 
     def __enter__(self):
         """
@@ -39,7 +41,7 @@ class Transaction:
         """
         Finalizes the transaction and logs its status.
         """
-        self.transaction_context.finalize()
+        self.transaction_context.finalize(self.context, self)
 
 class ActiveTransaction:
     """
@@ -53,16 +55,33 @@ class ActiveTransaction:
         self.final_state_dict = None
         self.result = None
 
-    def finalize(self, context):
-        if self.initial_state_dict is None:
-            raise LogicError("A transaction cannot be completed without an initial state.")
-        if self.final_state_dict is None:
-            raise LogicError("A transaction cannot be completed without a final state.")
+    def finalize(self, context, transaction):
         if self.result is None:
             raise LogicError("A transaction cannot be completed without a result status.")
-        # TODO Ensure all required states are set
-        # TODO Log differences
-        pass
+        if self.result.initial_state is None:
+            raise LogicError("A transaction cannot be completed without an initial state.")
+        if self.result.final_state is None:
+            raise LogicError("A transaction cannot be completed without a final state.")
+        if set(self.result.initial_state.keys()) != set(self.result.final_state.keys()):
+            raise LogicError("Both initial and final transaction state must have the same keys.")
+
+        # TODO nicer column based renderer
+        if self.result.success:
+            if self.result.changed:
+                status_char = "[32m+[m"
+            else:
+                status_char = "[34m·[m"
+        else:
+            status_char = "[1;31m![m"
+
+        print(f"[{status_char}] {transaction.name}", end="")
+        for k,final_v in self.result.final_state.items():
+            initial_v = self.result.initial_state[k]
+            if initial_v == final_v:
+                print(f"  [37m{k}: {initial_v} (unchanged)[m", end="")
+            else:
+                print(f"  [33m{k}: {initial_v} → {final_v}[m", end="")
+        print()
 
     def initial_state(self, **kwargs):
         """
@@ -79,6 +98,10 @@ class ActiveTransaction:
         if self.result is not None:
             raise LogicError("A transaction cannot be altered after it is completed")
         self.final_state_dict = dict(kwargs)
+
+    def unchanged(self, **kwargs):
+        self.final_state(**self.initial_state_dict)
+        return self.success()
 
     def success(self, **kwargs):
         """

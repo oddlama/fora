@@ -34,6 +34,11 @@ def read_str_list():
         xs.append(read_str())
     return xs
 
+class ExecutionSettings:
+    def __init__(self):
+        self.user = "root"
+        self.umask = 0o077
+
 class Dispatcher:
     def __init__(self):
         self.execution_settings = ExecutionSettings()
@@ -49,13 +54,15 @@ class Dispatcher:
         write_mode("ok")
 
     def run_command(self, command):
-        print(f"executing {command=}", file=sys.stderr, flush=True)
-        subprocess.run(command, capture_output=True)
+        #print(f"executing command={command} umask={self.execution_settings.umask} user={self.execution_settings.user}", file=sys.stderr, flush=True)
+        # TODO become user
+        os.umask(self.execution_settings.umask)
+        return subprocess.run(command, capture_output=True)
 
     def handle_exec(self):
         # Execute a command
         command = read_str_list()
-        completed_command = run_command(command)
+        completed_command = self.run_command(command)
 
         # Return output and status
         write_mode("ok")
@@ -81,11 +88,11 @@ class Dispatcher:
             # Strip the newline
             mode = mode[:-1]
             if mode == "user":
-                handle_set_user()
+                self.handle_set_user()
             elif mode == "umask":
-                handle_set_umask()
+                self.handle_set_umask()
             elif mode == "exec":
-                handle_exec()
+                self.handle_exec()
             elif mode == "":
                 # Skip empty modes
                 continue

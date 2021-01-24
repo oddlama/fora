@@ -15,45 +15,45 @@ def mode_to_str(mode):
 
 def resolve_mode_owner_group(context: Context, mode, owner, group):
     # Resolve mode to string
-    resolved_mode = mode_to_str(mode if mode is None else context.dir_mode)
+    resolved_mode = mode_to_str(context.dir_mode if mode is None else mode)
 
     # Resolve owner name/uid to name
-    owner = owner if owner is None else context.owner
+    owner = context.owner if owner is None else owner
     remote_cmd_owner_id = context.remote_exec(["id", "-nu", owner])
     if remote_cmd_owner_id.return_code != 0:
         raise LogicError(f"Could not resolve remote user '{owner}'")
-    resolved_owner = int(remote_cmd_owner_id.stdout)
+    resolved_owner = remote_cmd_owner_id.stdout.strip()
 
     # Resolve group name/gid to name
-    group = group if group is None else context.group
+    group = context.group if group is None else group
     remote_cmd_group_id = context.remote_exec(["id", "-ng", group])
     if remote_cmd_group_id.return_code != 0:
         raise LogicError(f"Could not resolve remote group '{group}'")
-    resolved_group = int(remote_cmd_group_id.stdout)
+    resolved_group = remote_cmd_group_id.stdout.strip()
 
     # Return resolved tuple
     return (resolved_mode, resolved_owner, resolved_group)
 
-def directory(context: Context, path: str, mode=None, owner=None, group=None) -> None:
+def directory(context: Context, path: str, mode=None, owner=None, group=None):
     """
     Creates the given directory on the remote. Will use the context default
     permissions if not explicitly given.
     """
     path = _template_str(context, path)
     with context.transaction(f"[dir] {path}") as action:
-        mode, owner, group = resolve_mode_owner_group(mode, owner, group)
+        mode, owner, group = resolve_mode_owner_group(context, mode, owner, group)
 
         # Get previous state
         stat = context.remote_exec(["stat", "-c", "%a %u %g", path])
         if stat.return_code == 0:
             # Parse and canonicalize output
-            cur_mode, cur_owner, cur_group = stat.stdout.split(" ")
-            cur_mode, cur_owner, cur_group = resolve_mode_owner_group(int(cur_mode, 8), cur_owner, cur_group)
+            cur_mode, cur_owner, cur_group = stat.stdout.strip().split(" ")
+            cur_mode, cur_owner, cur_group = resolve_mode_owner_group(context, int(cur_mode, 8), cur_owner, cur_group)
 
             # Record the initial state
             action.initial_state(exists=True, mode=cur_mode, owner=cur_owner, group=cur_group)
             if mode == cur_mode and owner == cur_owner and group == cur_group:
-                return action.success()
+                return action.unchanged()
         else:
             # Record the initial state
             action.initial_state(exists=False, mode=None, owner=None, group=None)
@@ -76,11 +76,11 @@ def directory(context: Context, path: str, mode=None, owner=None, group=None) ->
         # Return success
         return action.success()
 
-def directories(context: Context, paths: list) -> None:
+def directories(context: Context, paths: list, mode=None, owner=None, group=None):
     for path in paths:
-        directory(context, path)
+        directory(context, path, mode, owner, group)
 
-def template(context: Context, src: str, dst: str) -> None:
+def template(context: Context, src: str, dst: str, mode=None, owner=None, group=None):
     src = _template_str(context, src)
     dst = _template_str(context, dst)
 

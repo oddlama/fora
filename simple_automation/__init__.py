@@ -1,4 +1,4 @@
-from .exception import SimpleAutomationError, LogicError, RemoteExecError
+from .exceptions import SimpleAutomationError, LogicError, RemoteExecError
 from .context import Context
 from .group import Group
 from .host import Host
