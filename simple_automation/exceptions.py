@@ -6,3 +6,8 @@ class LogicError(SimpleAutomationError):
 
 class RemoteExecError(SimpleAutomationError):
     pass
+
+class TransactionError(SimpleAutomationError):
+    def __init__(self, result):
+        super().__init__(result.failure_reason)
+        self.result = result

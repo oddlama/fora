@@ -1,4 +1,4 @@
-from simple_automation.exceptions import LogicError
+from simple_automation.exceptions import LogicError, TransactionError
 
 class CompletedTransaction:
     """
@@ -74,14 +74,27 @@ class ActiveTransaction:
         else:
             status_char = "[1;31m![m"
 
+        # Print key=value pairs with changes
         print(f"[{status_char}] {transaction.name}", end="")
         for k,final_v in self.result.final_state.items():
             initial_v = self.result.initial_state[k]
+
+            # Add ellipsis on long strings
+            str_initial_v = str(initial_v)
+            str_final_v = str(final_v)
+            if len(str_initial_v) > 16:
+                str_initial_v = str_initial_v[:16] + "…"
+            if len(str_final_v) > 16:
+                str_final_v = str_final_v[:16] + "…"
+
             if initial_v == final_v:
-                print(f"  [37m{k}: {initial_v} (unchanged)[m", end="")
+                print(f"  [37m{k}: {str_initial_v} (unchanged)[m", end="")
             else:
-                print(f"  [33m{k}: {initial_v} → {final_v}[m", end="")
+                print(f"  [33m{k}: {str_initial_v} → {str_final_v}[m", end="")
         print()
+
+        if not self.result.success:
+            raise TransactionError(self.result)
 
     def initial_state(self, **kwargs):
         """

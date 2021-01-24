@@ -3,6 +3,7 @@ from simple_automation.group import Group
 from simple_automation.host import Host
 from simple_automation.task import Task
 from simple_automation.context import Context
+from simple_automation.exceptions import TransactionError
 from simple_automation.vars import Vars
 import argparse
 
@@ -62,6 +63,12 @@ class Manager(Vars):
         # TODO ask for vault key, vaultdecrypt = ask = [openssl - ...], gpg = []
         # TODO ask for su key, becomekey=ask,command=[]
         # TODO becomemethod=su, sudo -u root, ...
-        with Context(self.hosts["my_laptop"]) as c:
-            c.pretend = args.pretend
-            run(c)
+        try:
+            with Context(self.hosts["my_laptop"]) as c:
+                c.pretend = args.pretend
+                run(c)
+        except TransactionError as e:
+            print(f"[1;31merror:[m {str(e)}")
+        except Exception as e:
+            print(f"[1;31merror:[m {str(e)}")
+            raise e

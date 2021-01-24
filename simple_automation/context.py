@@ -116,7 +116,7 @@ class RemoteDispatcher:
         if line != s:
             raise Exception(f"expected '{s}' but got '{line}'")
 
-    def exec(self, command):
+    def exec(self, command, input=None):
         """
         Executes the given command on the remote machine as the
         user and with the umask given by the attached context.
@@ -130,6 +130,12 @@ class RemoteDispatcher:
         self.write_mode("umask")
         self.write_str(str(self.context.umask_value))
         self.expect("ok")
+
+        # Set input value
+        if input is not None:
+            self.write_mode("input")
+            self.write_str(str(input))
+            self.expect("ok")
 
         # Execute command and get output
         self.write_mode("exec")
@@ -284,7 +290,7 @@ class Context:
         subprocess.run(self._base_scp_command(file, remote_file_path), check=True)
         return remote_file_path
 
-    def remote_exec(self, command, checked=False):
+    def remote_exec(self, command, checked=False, input=None):
         """
         Execute ssh to execute the given command on the remote host,
         via our built-in remote dispatch script. If checked is True,
@@ -295,7 +301,7 @@ class Context:
         # are passed with NUL-terminated parameters, so we don't have to worry
         # about any quoting. This therefore ensures that there is no command
         # injection possible.
-        ret = self.remote_dispatcher.exec(command)
+        ret = self.remote_dispatcher.exec(command, input)
         if checked and ret.return_code != 0:
             raise RemoteExecError(f"Remote command {command} was unsuccessful (code {ret.return_code})")
         return ret
