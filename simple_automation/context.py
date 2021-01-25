@@ -292,7 +292,6 @@ class Context:
         return ret
 
     def print_transaction(self, transaction):
-        # TODO nicer column based renderer
         if transaction.success:
             if transaction.changed:
                 status_char = "[32m+[m"
@@ -301,10 +300,12 @@ class Context:
         else:
             status_char = "[1;31m![m"
 
-        # Print key=value pairs with changes
+        # Print title and name
         title = align_ellipsis(transaction.title, 10)
-        name = align_ellipsis(transaction.name, 20)
+        name = align_ellipsis(transaction.name, 30)
         print(f"[{status_char}] [1;34m{title}[m {name}", end="")
+
+        # Print key: value pairs with changes
         extras = []
         for k,final_v in transaction.final_state.items():
             initial_v = transaction.initial_state[k]
