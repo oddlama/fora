@@ -6,6 +6,7 @@ from simple_automation.actions.package import portage
 
 class TaskZsh(Task):
     identifier = "zsh"
+    description = "Installs zsh and a global configuration"
     track = ["/etc/zsh"]
 
     def set_defaults(self, manager):

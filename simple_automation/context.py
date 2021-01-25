@@ -2,27 +2,12 @@ from simple_automation.exceptions import RemoteExecError
 from simple_automation.remote_dispatch import script_path as local_remote_dispatch_script_path
 from simple_automation.transaction import Transaction
 from simple_automation.vars import Vars
+from simple_automation.utils import merge_dicts, align_ellipsis, ellipsis
 
 from subprocess import CalledProcessError
 import subprocess
 import os
 import sys
-
-def _merge(source, destination):
-    """
-    Recursively merges two dictionaries source and destination.
-    The source dictionary will only be read, but the destination dictionary will be overwritten.
-    """
-    for key, value in source.items():
-        if isinstance(value, dict):
-            # get node or create one
-            node = destination.setdefault(key, {})
-            _merge(value, node)
-        else:
-            destination[key] = value
-
-    return destination
-
 
 class CompletedRemoteCommand:
     """
@@ -200,7 +185,7 @@ class Context:
         self.owner = owner
         self.group = group
 
-    def transaction(self, name):
+    def transaction(self, title, name):
         """
         Begins a new transaction. Intended to be used in a 'with' statement.
         Each transaction will be shown to the user as a distinct unit.
@@ -215,7 +200,7 @@ class Context:
         A transaction may give additional variables to success() and failure(),
         which will be stored for later use.
         """
-        return Transaction(self, name)
+        return Transaction(self, title, name)
 
     def _vars(self):
         """
@@ -225,8 +210,8 @@ class Context:
         # Create merged dictionary
         d = self.host.manager.vars.copy()
         for group in self.host.groups:
-            _merge(group.vars, d)
-        _merge(self.host.vars, d)
+            merge_dicts(group.vars, d)
+        merge_dicts(self.host.vars, d)
 
         # Add procedural entries
         temp = Vars()
@@ -266,7 +251,7 @@ class Context:
         Initialize environment on the remote host (temporary directory, remote exec script),
         so we can more easily execute commands on the remote.
         """
-        print(f"Establishing ssh connection to {self.host.ssh_host}")
+        print(f"[[32m>[m] Establishing ssh connection to {self.host.ssh_host}")
         # Create temporary directory
         self.remote_temp_dir = self.exec_ssh_raw(["mktemp", "-d"]).stdout.decode("utf-8").split('\n')[0]
         # Upload remote dispatch script
@@ -317,20 +302,21 @@ class Context:
             status_char = "[1;31m![m"
 
         # Print key=value pairs with changes
-        print(f"[{status_char}] {transaction.name}", end="")
+        title = align_ellipsis(transaction.title, 10)
+        name = align_ellipsis(transaction.name, 20)
+        print(f"[{status_char}] [1;34m{title}[m {name}", end="")
+        extras = []
         for k,final_v in transaction.final_state.items():
             initial_v = transaction.initial_state[k]
 
             # Add ellipsis on long strings
-            str_initial_v = str(initial_v)
-            str_final_v = str(final_v)
-            if len(str_initial_v) > 16:
-                str_initial_v = str_initial_v[:16] + "…"
-            if len(str_final_v) > 16:
-                str_final_v = str_final_v[:16] + "…"
+            str_k = ellipsis(k, 12)
+            str_initial_v = ellipsis(str(initial_v), 9)
+            str_final_v = ellipsis(str(final_v), 9)
 
             if initial_v == final_v:
-                print(f"  [37m{k}: {str_initial_v} (unchanged)[m", end="")
+                entry_str = f" [37m{str_k}: {str_initial_v}[m"
             else:
-                print(f"  [33m{k}: [31m{str_initial_v}[33m → [32m{str_final_v}[m", end="")
-        print()
+                entry_str = f" [33m{str_k}: [31m{str_initial_v}[33m → [32m{str_final_v}[m"
+            extras.append(entry_str)
+        print("[37m,[m".join(extras))

@@ -1,3 +1,5 @@
+from simple_automation.utils import ellipsis
+
 class Task:
     def __init__(self, manager):
         self.manager = manager
@@ -5,6 +7,11 @@ class Task:
         self.set_defaults(manager)
 
     def exec(self, context):
+        # Print title
+        title = f">>>> Task: {ellipsis(self.identifier, 24)} <<<<"
+        description = ellipsis(self.description, 80)
+        print(f"[[33m*[m] [1m{title}[m [37m({description})[m")
+
         self.run(context)
         self._checkin_tracked_paths(context)
 

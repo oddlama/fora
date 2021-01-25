@@ -59,7 +59,7 @@ def directory(context: Context, path: str, mode=None, owner=None, group=None):
     permissions if not explicitly given.
     """
     path = _template_str(context, path)
-    with context.transaction(f"[dir] {path}") as action:
+    with context.transaction(title="dir", name=path) as action:
         mode, owner, group = _resolve_mode_owner_group(context, mode, owner, group)
 
         # Get current state
@@ -100,7 +100,7 @@ def template(context: Context, src: str, dst: str, mode=None, owner=None, group=
     src = _template_str(context, src)
     dst = _template_str(context, dst)
 
-    with context.transaction(f"[template] {dst}") as action:
+    with context.transaction(title="template", name=dst) as action:
         mode, owner, group = _resolve_mode_owner_group(context, mode, owner, group)
 
         # Query current state

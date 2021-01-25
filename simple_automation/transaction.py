@@ -23,8 +23,9 @@ class Transaction:
     A wrapper around a transaction context that enforces usage of the
     'with' statement to modify the transaction.
     """
-    def __init__(self, context, name):
+    def __init__(self, context, title, name):
         self.context = context
+        self.title = title
         self.name = name
         self.transaction_context = None
 
@@ -65,6 +66,7 @@ class ActiveTransaction:
         if set(self.result.initial_state.keys()) != set(self.result.final_state.keys()):
             raise LogicError("Both initial and final transaction state must have the same keys.")
 
+        self.result.title = transaction.title
         self.result.name = transaction.name
         context.print_transaction(self.result)
 

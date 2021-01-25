@@ -5,7 +5,7 @@ It is intended for administrating a small set of machines, or even as a more pow
 
 with support for encrypted configuration files and 
 
-* Simple, not hard.
+* Simple, not complex.
 * Supports encrypted variable storage.
 * Executes commands over a single ssh connection (→ fast execution)
 * Concicse, readable output
