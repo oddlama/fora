@@ -12,6 +12,7 @@ class CompletedTransaction:
         self.failure_reason = failure_reason
         self.initial_state = transaction.initial_state_dict
         self.final_state = transaction.final_state_dict
+        self.extra_info = transaction.extra_info_dict
         self.changed = (self.initial_state != self.final_state)
 
         # Set additional return variables
@@ -54,6 +55,7 @@ class ActiveTransaction:
     def __init__(self):
         self.initial_state_dict = None
         self.final_state_dict = None
+        self.extra_info_dict = None
         self.result = None
 
     def finalize(self, context, transaction):
@@ -88,6 +90,12 @@ class ActiveTransaction:
         if self.result is not None:
             raise LogicError("A transaction cannot be altered after it is completed")
         self.final_state_dict = dict(kwargs)
+
+    def extra_info(self, **kwargs):
+        """
+        Purely extraneous information that will be shown additionally to the user.
+        """
+        self.extra_info_dict = dict(kwargs)
 
     def unchanged(self, **kwargs):
         self.final_state(**self.initial_state_dict)

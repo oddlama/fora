@@ -10,10 +10,11 @@ def checkout(context: Context, url: str, dst: str, update: bool = False, depth=N
     with context.transaction(title="checkout", name=dst) as action:
         # Query current state
         # Record this initial state
-        action.initial_state(url=url, commit=False)
+        action.extra_info(url=url)
+        action.initial_state(commit=False)
 
         # Record the final state
-        action.final_state(url=url, commit="aaaa")
+        action.final_state(commit="aaaa")
         # Apply actions to reach new state, if we aren't in pretend mode
         if not context.pretend:
             pass

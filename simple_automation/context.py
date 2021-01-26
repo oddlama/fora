@@ -238,7 +238,7 @@ class Context:
         Constructs the base scp command using the options supplied from the respective
         host that this context is bound to.
         """
-        scp_command = ["scp"]
+        scp_command = ["scp", "-q"]
         if recursive:
             scp_command.append("-r")
         scp_command.extend(self.host.ssh_scp_params)
@@ -302,11 +302,12 @@ class Context:
 
         # Print title and name
         title = align_ellipsis(transaction.title, 10)
-        name = align_ellipsis(transaction.name, 30)
+        name_align_at = 30 * (1 + (len(transaction.name) // 30))
+        name = f"{transaction.name:<{name_align_at}}"
         print(f"[{status_char}] [1;34m{title}[m {name}", end="")
 
         # Print key: value pairs with changes
-        extras = []
+        state_infos = []
         for k,final_v in transaction.final_state.items():
             initial_v = transaction.initial_state[k]
 
@@ -316,8 +317,14 @@ class Context:
             str_final_v = ellipsis(str(final_v), 9)
 
             if initial_v == final_v:
-                entry_str = f" [37m{str_k}: {str_initial_v}[m"
+                entry_str = f"[37m{str_k}: {str_initial_v}[m"
             else:
-                entry_str = f" [33m{str_k}: [31m{str_initial_v}[33m → [32m{str_final_v}[m"
-            extras.append(entry_str)
-        print("[37m,[m".join(extras))
+                entry_str = f"[33m{str_k}: [31m{str_initial_v}[33m → [32m{str_final_v}[m"
+            state_infos.append(entry_str)
+        print("[37m,[m ".join(state_infos))
+
+        if transaction.extra_info is not None:
+            extra_infos = []
+            for k,v in transaction.extra_info.items():
+                extra_infos.append(f"[37m{str(k)}: {str(v)}[m")
+            print(" " * 15 + "[37m,[m ".join(extra_infos))
