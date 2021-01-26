@@ -5,7 +5,10 @@ class LogicError(SimpleAutomationError):
     pass
 
 class RemoteExecError(SimpleAutomationError):
-    pass
+    def __init__(self, command, ret):
+        super().__init__(f"Remote command {command} was unsuccessful (code {ret.return_code})")
+        self.command = command
+        self.ret = ret
 
 class TransactionError(SimpleAutomationError):
     def __init__(self, result):

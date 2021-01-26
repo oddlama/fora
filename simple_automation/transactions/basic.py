@@ -1,22 +1,35 @@
 from simple_automation import Context, LogicError, RemoteExecError
+from simple_automation.checks import check_valid_path
+
 from jinja2.exceptions import TemplateNotFound
 from jinja2 import Template, Environment, FileSystemLoader
 
 import hashlib
 import base64
 
+# The jinja2 templating environment
 jinja2_env = Environment(
     loader=FileSystemLoader('templates', followlinks=True),
     autoescape=False)
 
 def _template_str(context: Context, template_str):
+    """
+    Renders the given string template.
+    """
     template = Template(template_str)
     return template.render(context.vars())
 
 def _mode_to_str(mode):
+    """
+    Stringifies a given octal mode.
+    """
     return f"{mode:>03o}"
 
 def _resolve_mode_owner_group(context: Context, mode, owner, group):
+    """
+    Canonicalize mode, owner and group. If any of them is None, the respective
+    variable will be replaced with the context default.
+    """
     # Resolve mode to string
     resolved_mode = _mode_to_str(context.dir_mode if mode is None else mode)
 
@@ -38,6 +51,9 @@ def _resolve_mode_owner_group(context: Context, mode, owner, group):
     return (resolved_mode, resolved_owner, resolved_group)
 
 def _remote_stat(context, path):
+    """
+    Returns (file_type, mode, owner, group) tuple for a given remote path.
+    """
     stat = context.remote_exec(["stat", "-c", "%F;%a;%u;%g", path])
     if stat.return_code == 0:
         file_type, mode, owner, group = stat.stdout.strip().split(";")
@@ -47,6 +63,10 @@ def _remote_stat(context, path):
         return (None, None, None, None)
 
 def _remote_sha512sum(context: Context, path: str):
+    """
+    Returns the hexlified sha512sum of the path on the remote host,
+    or None if an error occurred.
+    """
     sha512sum = context.remote_exec(["sha512sum", "-b", path])
     if sha512sum.return_code == 0:
         return sha512sum.stdout.strip().split(" ")[0]
@@ -59,6 +79,7 @@ def directory(context: Context, path: str, mode=None, owner=None, group=None):
     permissions if not explicitly given.
     """
     path = _template_str(context, path)
+    check_valid_path(path)
     with context.transaction(title="dir", name=path) as action:
         mode, owner, group = _resolve_mode_owner_group(context, mode, owner, group)
 
@@ -87,18 +108,27 @@ def directory(context: Context, path: str, mode=None, owner=None, group=None):
                 context.remote_exec(["chown", f"{owner}:{group}", path], checked=True)
                 context.remote_exec(["chmod", mode, path], checked=True)
             except RemoteExecError as e:
-                return action.failure(str(e))
+                return action.failure(e)
 
         # Return success
         return action.success()
 
 def directories(context: Context, paths: list, mode=None, owner=None, group=None):
+    """
+    Creates the given directories as if directory() was called for each of them.
+    """
     for path in paths:
         directory(context, path, mode, owner, group)
 
 def template(context: Context, src: str, dst: str, mode=None, owner=None, group=None):
+    """
+    Templates the given src file (relative to templates/ in your project directory),
+    and copies the output to the remote host at dst. Optionally accepts file mode, owner and group,
+    if not given, context defaults are used.
+    """
     src = _template_str(context, src)
     dst = _template_str(context, dst)
+    check_valid_path(dst)
 
     with context.transaction(title="template", name=dst) as action:
         mode, owner, group = _resolve_mode_owner_group(context, mode, owner, group)
@@ -139,7 +169,7 @@ def template(context: Context, src: str, dst: str, mode=None, owner=None, group=
                 context.remote_exec(["chown", f"{owner}:{group}", dst], checked=True)
                 context.remote_exec(["chmod", mode, dst], checked=True)
             except RemoteExecError as e:
-                return action.failure(f"{str(type(e))}: {str(e)}")
+                return action.failure(e)
 
         # Return success
         return action.success()

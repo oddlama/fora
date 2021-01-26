@@ -14,7 +14,8 @@ class TaskZsh(Task):
 
     def run(self, context):
         # Set defaults
-        context.defaults(user="root", umask=0o022, dir_mode=0o755, file_mode=0o644, owner="root", group="root")
+        context.defaults(user="root", umask=0o022, dir_mode=0o755, file_mode=0o644,
+                         owner="root", group="root")
 
         # Install zsh
         portage.package(context, atom="app-shells/zsh", oneshot=True)
@@ -23,15 +24,13 @@ class TaskZsh(Task):
         git.checkout(context,
                   url="https://github.com/romkatv/powerlevel10k",
                   dst="/usr/share/zsh/repos/romkatv/powerlevel10k",
-                  update=True, depth=1)
+                  depth=1)
         git.checkout(context,
                   url="https://github.com/Aloxaf/fzf-tab",
-                  dst="/usr/share/zsh/repos/Aloxaf/fzf-tab",
-                  update=True)
+                  dst="/usr/share/zsh/repos/Aloxaf/fzf-tab")
         git.checkout(context,
                   url="https://github.com/zdharma/fast-syntax-highlighting",
-                  dst="/usr/share/zsh/repos/zdharma/fast-syntax-highlighting",
-                  update=True)
+                  dst="/usr/share/zsh/repos/zdharma/fast-syntax-highlighting")
 
         # Copy configuration
         directory(context, path="/etc/zsh")

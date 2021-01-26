@@ -10,3 +10,4 @@ with support for encrypted configuration files and
 * Executes commands over a single ssh connection (→ fast execution)
 * Concicse, readable output
 * Easily keep track of changes on your system by automatically committing changes to a git repository.
+* Use python to write your configuration and don't be limited by a domain specific language.

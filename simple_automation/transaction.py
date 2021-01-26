@@ -1,4 +1,4 @@
-from simple_automation.exceptions import LogicError, TransactionError
+from simple_automation.exceptions import RemoteExecError, LogicError, TransactionError
 
 class CompletedTransaction:
     """
@@ -113,7 +113,13 @@ class ActiveTransaction:
     def failure(self, reason, **kwargs):
         """
         Completes the transaction, marking it as failed with the given reason.
+        If reason is a RemoteExecError, additional information will be printed.
         """
+        if type(reason) is RemoteExecError:
+            e = reason
+            reason = f"{type(e).__name__}: {str(e)}\n"
+            reason += e.ret.stderr
+
         if self.result is not None:
             raise LogicError("A transaction cannot be completed multiple times.")
         self.result = CompletedTransaction(self, success=False, failure_reason=reason, store=kwargs)

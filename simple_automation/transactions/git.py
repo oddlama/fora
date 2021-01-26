@@ -1,23 +1,73 @@
-from simple_automation import Context
-from simple_automation.checks import check_valid_dir
-from simple_automation.transactions.basic import _template_str
+from simple_automation import Context, LogicError, RemoteExecError
+from simple_automation.checks import check_valid_path
+from simple_automation.transactions.basic import _template_str, _remote_stat
 
-def checkout(context: Context, url: str, dst: str, update: bool = False, depth=None):
+def clone(context: Context, url: str, dst: str, depth=None):
+    """
+    Clone a git repository, without updating it, if it is already cloned.
+    """
+    return checkout(context, url, dst, update=False, depth=depth)
+
+def checkout(context: Context, url: str, dst: str, update: bool = True, depth=None):
+    """
+    Checkout (and optionally update) the given git repository to dst.
+    """
     url = _template_str(context, url)
     dst = _template_str(context, dst)
-    check_valid_dir(dst)
+    check_valid_path(dst)
 
     with context.transaction(title="checkout", name=dst) as action:
-        # Query current state
-        # Record this initial state
+        # Add url as extra info
         action.extra_info(url=url)
-        action.initial_state(commit=False)
+
+        # Query current state
+        (cur_ft, cur_mode, cur_owner, cur_group) = _remote_stat(context, dst)
+
+        # Record this initial state
+        if cur_ft is None:
+            action.initial_state(cloned=False, commit=None)
+            cloned = False
+        elif cur_ft == "directory":
+            # Assert that is is a git directory
+            (cur_git_ft, _, _, _) = _remote_stat(context, dst + "/.git")
+            if cur_git_ft != 'directory':
+                raise LogicError("Cannot checkout git repository on remote: Directory already exists and is not a git repository")
+
+            remote_commit = context.remote_exec(["git", "-C", dst, "rev-parse", "HEAD"])
+            if remote_commit.return_code != 0:
+                raise LogicError("Cannot checkout git repository on remote: Directory already exists but 'git rev-parse HEAD' failed")
+
+            cur_commit = remote_commit.stdout.strip()
+            action.initial_state(cloned=True, commit=cur_commit)
+            cloned = True
+        else:
+            raise LogicError("Cannot checkout git repository on remote: Path already exists but isn't a directory")
+
+        # If the repository is already cloned but we shouldn't update,
+        # nothing will change and we are done.
+        if cloned and not update:
+            return action.unchanged()
+
+        # Check the newest available commit
+        remote_newest_commit = context.remote_exec(["git", "ls-remote", "--exit-code", url, "HEAD"], checked=True)
+        newest_commit = remote_newest_commit.stdout.strip().split()[0]
 
         # Record the final state
-        action.final_state(commit="aaaa")
+        action.final_state(cloned=True, commit=newest_commit)
+
         # Apply actions to reach new state, if we aren't in pretend mode
         if not context.pretend:
-            pass
+            try:
+                if not cloned:
+                    additional_clone_parameters = []
+                    if depth is not None:
+                        additional_clone_parameters += ["--depth", str(depth)]
+
+                    context.remote_exec(["git", "clone"] + additional_clone_parameters + [url, dst], checked=True)
+
+                context.remote_exec(["git", "-C", dst, "pull", "--ff-only"], checked=True)
+            except RemoteExecError as e:
+                return action.failure(e)
 
         # Return success
         return action.success()

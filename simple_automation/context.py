@@ -288,7 +288,7 @@ class Context:
         # injection possible.
         ret = self.remote_dispatcher.exec(command, input)
         if checked and ret.return_code != 0:
-            raise RemoteExecError(f"Remote command {command} was unsuccessful (code {ret.return_code})")
+            raise RemoteExecError(command, ret)
         return ret
 
     def print_transaction(self, transaction):
