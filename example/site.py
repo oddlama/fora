@@ -17,7 +17,7 @@ desktop = manager.add_group("desktop")
 desktop.set("global.is_desktop", True)
 
 # -------- Define Hosts --------
-my_laptop = manager.add_host("my_laptop", ssh_host="localhost")
+my_laptop = manager.add_host("my_laptop", ssh_host="root@localhost")
 my_laptop.set_ssh_port(2222)
 my_laptop.add_group(desktop)
 # You may set custom variables, which you can access later

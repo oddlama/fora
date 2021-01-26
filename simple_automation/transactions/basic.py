@@ -25,13 +25,13 @@ def _mode_to_str(mode):
     """
     return f"{mode:>03o}"
 
-def _resolve_mode_owner_group(context: Context, mode, owner, group):
+def _resolve_mode_owner_group(context: Context, mode, owner, group, fallback_mode):
     """
     Canonicalize mode, owner and group. If any of them is None, the respective
     variable will be replaced with the context default.
     """
     # Resolve mode to string
-    resolved_mode = _mode_to_str(context.dir_mode if mode is None else mode)
+    resolved_mode = _mode_to_str(fallback_mode if mode is None else mode)
 
     # Resolve owner name/uid to name
     owner = context.owner if owner is None else owner
@@ -57,7 +57,7 @@ def _remote_stat(context, path):
     stat = context.remote_exec(["stat", "-c", "%F;%a;%u;%g", path])
     if stat.return_code == 0:
         file_type, mode, owner, group = stat.stdout.strip().split(";")
-        mode, owner, group = _resolve_mode_owner_group(context, int(mode, 8), owner, group)
+        mode, owner, group = _resolve_mode_owner_group(context, int(mode, 8), owner, group, None)
         return (file_type, mode, owner, group)
     else:
         return (None, None, None, None)
@@ -81,7 +81,7 @@ def directory(context: Context, path: str, mode=None, owner=None, group=None):
     path = _template_str(context, path)
     check_valid_path(path)
     with context.transaction(title="dir", name=path) as action:
-        mode, owner, group = _resolve_mode_owner_group(context, mode, owner, group)
+        mode, owner, group = _resolve_mode_owner_group(context, mode, owner, group, context.dir_mode)
 
         # Get current state
         (cur_ft, cur_mode, cur_owner, cur_group) = _remote_stat(context, path)
@@ -131,7 +131,7 @@ def template(context: Context, src: str, dst: str, mode=None, owner=None, group=
     check_valid_path(dst)
 
     with context.transaction(title="template", name=dst) as action:
-        mode, owner, group = _resolve_mode_owner_group(context, mode, owner, group)
+        mode, owner, group = _resolve_mode_owner_group(context, mode, owner, group, context.file_mode)
 
         # Query current state
         (cur_ft, cur_mode, cur_owner, cur_group) = _remote_stat(context, dst)
