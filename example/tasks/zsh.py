@@ -6,7 +6,7 @@ from simple_automation.transactions.package import portage
 
 class TaskZsh(Task):
     identifier = "zsh"
-    description = "Installs zsh and a global configuration"
+    description = "Installs zsh and a global zsh configuration"
     track = ["/etc/zsh"]
 
     def set_defaults(self, manager):
@@ -18,7 +18,7 @@ class TaskZsh(Task):
                          owner="root", group="root")
 
         # Install zsh
-        portage.package(context, atom="media-sound/spotify", oneshot=True)
+        portage.package(context, atom="app-shells/zsh", oneshot=True)
 
         # Clone or update plugin repositories
         git.checkout(context,
@@ -34,5 +34,5 @@ class TaskZsh(Task):
 
         # Copy configuration
         directory(context, path="/etc/zsh")
-        template(context, src="zsh/zshrc.j2", dst="/etc/zsh/zshrc")
-        template(context, src="zsh/zprofile.j2", dst="/etc/zsh/zprofile")
+        template(context, src="templates/zsh/zshrc.j2", dst="/etc/zsh/zshrc")
+        template(context, src="templates/zsh/zprofile.j2", dst="/etc/zsh/zprofile")

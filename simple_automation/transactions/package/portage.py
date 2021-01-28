@@ -45,12 +45,13 @@ def package(context: Context, atom: str, state="present", oneshot=False, opts=[]
     """
     Installs or uninstalls (depending if state == "present" or "absent") the given
     package atom. Additional options to emerge can be passed via opts, and will be appended
-    before the package atom.
+    before the package atom. opts will be templated.
     """
     if state not in ["present", "absent"]:
         raise LogicError(f"Invalid package state '{state}'")
 
     atom = _template_str(context, atom)
+    opts = [_template_str(context, o) for o in opts]
 
     with context.transaction(title="package", name=atom) as action:
         # Query current state

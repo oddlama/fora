@@ -3,6 +3,8 @@
 from simple_automation import Manager
 from tasks import TaskZsh
 
+import os
+
 # TODO -vv to print stdout of all executed commands
 
 # TODO - somehow offload definitions into vault
@@ -12,7 +14,7 @@ from tasks import TaskZsh
 #vault = Vault("myvault.enc", type='gpg')
 
 # -------- Create Manager --------
-manager = Manager()
+manager = Manager(os.path.dirname(__file__))
 manager.set("zsh.install", False)
 
 # -------- Define Groups --------

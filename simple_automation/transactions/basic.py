@@ -6,11 +6,7 @@ from jinja2 import Template, Environment, FileSystemLoader
 
 import hashlib
 import base64
-
-# The jinja2 templating environment
-jinja2_env = Environment(
-    loader=FileSystemLoader('templates', followlinks=True),
-    autoescape=False)
+import os
 
 def _template_str(context: Context, template_str):
     """
@@ -113,7 +109,7 @@ def directory(context: Context, path: str, mode=None, owner=None, group=None):
         # Return success
         return action.success()
 
-def directories(context: Context, paths: list, mode=None, owner=None, group=None):
+def directory_all(context: Context, paths: list, mode=None, owner=None, group=None):
     """
     Creates the given directories as if directory() was called for each of them.
     """
@@ -122,7 +118,7 @@ def directories(context: Context, paths: list, mode=None, owner=None, group=None
 
 def template(context: Context, src: str, dst: str, mode=None, owner=None, group=None):
     """
-    Templates the given src file (relative to templates/ in your project directory),
+    Templates the given src file (relative to your project directory),
     and copies the output to the remote host at dst. Optionally accepts file mode, owner and group,
     if not given, context defaults are used.
     """
@@ -139,7 +135,7 @@ def template(context: Context, src: str, dst: str, mode=None, owner=None, group=
 
         # Prepare templated version
         try:
-            template = jinja2_env.get_template(src)
+            template = context.host.manager.jinja2_env.get_template(src)
         except TemplateNotFound as e:
             raise LogicError("template not found: " + str(e))
         content = template.render(context.vars())
@@ -174,9 +170,66 @@ def template(context: Context, src: str, dst: str, mode=None, owner=None, group=
         # Return success
         return action.success()
 
-def templates(context: Context, src_dst_pairs: list, mode=None, owner=None, group=None):
+def template_all(context: Context, src_dst_pairs: list, mode=None, owner=None, group=None):
     """
     Templates each (src, dst) list entry, as if template() was called for each of them.
     """
     for src,dst in src_dst_pairs:
         template(context, src, dst, mode, owner, group)
+
+def copy(context: Context, src: str, dst: str, mode=None, owner=None, group=None):
+    """
+    Copies the given src file (relative to your project directory) to the remote host at dst.
+    Optionally accepts file mode, owner and group, if not given, context defaults are used.
+    """
+    src = _template_str(context, src)
+    dst = _template_str(context, dst)
+    check_valid_path(dst)
+
+    with context.transaction(title="copy", name=dst) as action:
+        mode, owner, group = _resolve_mode_owner_group(context, mode, owner, group, context.file_mode)
+
+        # Query current state
+        (cur_ft, cur_mode, cur_owner, cur_group) = _remote_stat(context, dst)
+        cur_sha512sum = _remote_sha512sum(context, dst)
+
+        # Prepare templated version
+        with open(os.path.join(context.host.manager.main_directory, src), 'r') as f:
+            content = f.read()
+        sha512sum = hashlib.sha512(content.encode("utf-8")).hexdigest()
+
+        # Record this initial state
+        if cur_ft is None:
+            action.initial_state(exists=False, sha512sum=None, mode=None, owner=None, group=None)
+        elif cur_ft == "regular file":
+            action.initial_state(exists=True, sha512sum=cur_sha512sum, mode=cur_mode, owner=cur_owner, group=cur_group)
+            if sha512sum == cur_sha512sum and mode == cur_mode and owner == cur_owner and group == cur_group:
+                return action.unchanged()
+        else:
+            raise LogicError("Cannot create file on remote: Path already exists and is not a file")
+
+        # Record the final state
+        action.final_state(exists=True, sha512sum=sha512sum, mode=mode, owner=owner, group=group)
+        # Apply actions to reach new state, if we aren't in pretend mode
+        if not context.pretend:
+            try:
+                # Replace file
+                content_base64 = base64.b64encode(content.encode('utf-8')).decode('utf-8')
+                dst_base64 = base64.b64encode(dst.encode('utf-8')).decode('utf-8')
+                context.remote_exec(["sh", "-c", f"cat > \"$(echo '{dst_base64}' | base64 -d)\""], checked=True, input=content)
+
+                # Set permissions
+                context.remote_exec(["chown", f"{owner}:{group}", dst], checked=True)
+                context.remote_exec(["chmod", mode, dst], checked=True)
+            except RemoteExecError as e:
+                return action.failure(e)
+
+        # Return success
+        return action.success()
+
+def copy_all(context: Context, src_dst_pairs: list, mode=None, owner=None, group=None):
+    """
+    Copies each (src, dst) list entry, as if copy() was called for each of them.
+    """
+    for src,dst in src_dst_pairs:
+        copy(context, src, dst, mode, owner, group)

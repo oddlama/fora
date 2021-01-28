@@ -5,6 +5,9 @@ from simple_automation.task import Task
 from simple_automation.context import Context
 from simple_automation.exceptions import SimpleAutomationError, TransactionError
 from simple_automation.vars import Vars
+
+from jinja2 import Environment, FileSystemLoader
+
 import argparse
 
 class ArgumentParserError(Exception):
@@ -15,11 +18,15 @@ class ThrowingArgumentParser(argparse.ArgumentParser):
         raise ArgumentParserError(message)
 
 class Manager(Vars):
-    def __init__(self):
+    def __init__(self, main_directory):
         super().__init__()
         self.groups = {}
         self.hosts = {}
         self.tasks = {}
+        self.main_directory = main_directory
+        self.jinja2_env = Environment(
+            loader=FileSystemLoader(self.main_directory, followlinks=True),
+            autoescape=False)
         self.set("simple_automation_managed", "This file is managed by simple automation.")
 
     def add_group(self, identifier):
