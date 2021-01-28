@@ -59,13 +59,20 @@ def checkout(context: Context, url: str, dst: str, update: bool = True, depth=No
         if not context.pretend:
             try:
                 if not cloned:
-                    additional_clone_parameters = []
+                    clone_cmd = ["git", "clone"]
                     if depth is not None:
-                        additional_clone_parameters += ["--depth", str(depth)]
+                        clone_cmd.append("--depth")
+                        clone_cmd.append(str(depth))
+                    clone_cmd.append(url)
+                    clone_cmd.append(dst)
 
-                    context.remote_exec(["git", "clone"] + additional_clone_parameters + [url, dst], checked=True)
-
-                context.remote_exec(["git", "-C", dst, "pull", "--ff-only"], checked=True)
+                    context.remote_exec(clone_cmd, checked=True)
+                else:
+                    pull_cmd = ["git", "-C", dst, "pull", "--ff-only"]
+                    if depth is not None:
+                        pull_cmd.append("--depth")
+                        pull_cmd.append(str(depth))
+                    context.remote_exec(pull_cmd, checked=True)
             except RemoteExecError as e:
                 return action.failure(e)
 
