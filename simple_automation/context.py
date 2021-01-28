@@ -275,20 +275,45 @@ class Context:
         subprocess.run(self._base_scp_command(file, remote_file_path), check=True)
         return remote_file_path
 
-    def remote_exec(self, command, checked=False, input=None):
+    def remote_exec(self, command, checked=False, input=None, error_verbosity=None, verbosity=None):
         """
         Execute ssh to execute the given command on the remote host,
         via our built-in remote dispatch script. If checked is True,
         it will throw an exception if the remote command returns an
         unsuccessful exit status.
+
+        If verbosity is not None and self.verbose >= verbosity, the command
+        output will be printed. Read: verbosity is the number of -v flags
+        needed so that the command's output will be shown. If verbosity is not given,
+        the output will never be shown.
+
+        error_verbosity is the same as verbosity, but only triggers when the
+        command failed. E.g. calling with error_verbosity=1 causes both stdout
+        and stderr to be printed, if the command fails and at least -v was given.
+
+        If both verbosity and error_verbosity trigger, the output will only be printed once.
         """
         # Execute the command via our existing remote session. Commands
         # are passed with NUL-terminated parameters, so we don't have to worry
         # about any quoting. This therefore ensures that there is no command
         # injection possible.
         ret = self.remote_dispatcher.exec(command, input)
+
+        do_print_verbosity = verbosity is not None and self.verbose >= verbosity
+        do_print_error_verbosity = ret.return_code != 0 and (error_verbosity is not None and self.verbose >= error_verbosity)
+
+        # Show the output if the verbosity demands it
+        if do_print_verbosity or do_print_error_verbosity:
+            print(f"[[31m>[m] ---- REMOTE COMMAND: {command} ----")
+            print("[[31m>[m] ---- STDOUT ----")
+            print(ret.stdout)
+            print("[[31m>[m] ---- STDERR ----")
+            print(ret.stderr)
+
+        # Check the output
         if checked and ret.return_code != 0:
             raise RemoteExecError(command, ret)
+
         return ret
 
     def print_transaction(self, transaction):

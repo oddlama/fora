@@ -5,7 +5,10 @@ from tasks import TaskZsh
 
 # TODO -vv to print stdout of all executed commands
 
-# TODO somehow offload definitions into vault
+# TODO - somehow offload definitions into vault
+# TODO - track installed packages qlist -I in git
+# TODO - error on using unbound variables in templates
+
 #vault = Vault("myvault.enc", type='gpg')
 
 # -------- Create Manager --------

@@ -52,6 +52,7 @@ class Manager(Vars):
                 help="Specifies a subset of hosts to run on. By default all hosts are selected.")
         parser.add_argument('-p', '--pretend', dest='pretend', action='store_true',
                 help="Print what would be done instead of performing the actions.")
+        parser.add_argument('-v', '--verbose', dest='verbose', action='count', default=0)
         parser.add_argument('--version', action='version',
                 version='%(prog)s built with simple_automation version {version}'.format(version=__version__))
 
@@ -67,6 +68,7 @@ class Manager(Vars):
         try:
             with Context(self.hosts["my_laptop"]) as c:
                 c.pretend = args.pretend
+                c.verbose = args.verbose
                 run(c)
         except TransactionError as e:
             print(f"[1;31merror:[m {str(e)}")

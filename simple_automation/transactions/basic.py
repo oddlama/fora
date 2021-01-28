@@ -173,3 +173,10 @@ def template(context: Context, src: str, dst: str, mode=None, owner=None, group=
 
         # Return success
         return action.success()
+
+def templates(context: Context, src_dst_pairs: list, mode=None, owner=None, group=None):
+    """
+    Templates each (src, dst) list entry, as if template() was called for each of them.
+    """
+    for src,dst in src_dst_pairs:
+        template(context, src, dst, mode, owner, group)

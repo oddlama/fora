@@ -18,7 +18,7 @@ class TaskZsh(Task):
                          owner="root", group="root")
 
         # Install zsh
-        portage.package(context, atom="app-shells/zsh", oneshot=True)
+        portage.package(context, atom="media-sound/spotify", oneshot=True)
 
         # Clone or update plugin repositories
         git.checkout(context,
