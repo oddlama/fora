@@ -27,10 +27,12 @@ class TaskZsh(Task):
                   depth=1)
         git.checkout(context,
                   url="https://github.com/Aloxaf/fzf-tab",
-                  dst="/usr/share/zsh/repos/Aloxaf/fzf-tab")
+                  dst="/usr/share/zsh/repos/Aloxaf/fzf-tab",
+                  depth=1)
         git.checkout(context,
                   url="https://github.com/zdharma/fast-syntax-highlighting",
-                  dst="/usr/share/zsh/repos/zdharma/fast-syntax-highlighting")
+                  dst="/usr/share/zsh/repos/zdharma/fast-syntax-highlighting",
+                  depth=1)
 
         # Copy configuration
         directory(context, path="/etc/zsh")

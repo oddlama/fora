@@ -319,17 +319,20 @@ class Context:
     def print_transaction(self, transaction):
         if transaction.success:
             if transaction.changed:
+                title_color = "[1;34m"
                 status_char = "[32m+[m"
             else:
+                title_color = "[1m"
                 status_char = "[34m·[m"
         else:
+            title_color = "[1;31m"
             status_char = "[1;31m![m"
 
         # Print title and name
         title = align_ellipsis(transaction.title, 10)
         name_align_at = 30 * (1 + (len(transaction.name) // 30))
         name = f"{transaction.name:<{name_align_at}}"
-        print(f"[{status_char}] [1;34m{title}[m {name}", end="")
+        print(f"[{status_char}] {title_color}{title}[m {name}", end="")
 
         # Print key: value pairs with changes
         state_infos = []
