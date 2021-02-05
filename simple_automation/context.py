@@ -28,6 +28,8 @@ class RemoteDispatcher:
     def __init__(self, context, command):
         self.context = context
         self.process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=sys.stderr)
+        # A cache for internal purposes only.
+        self.cache = {}
 
     def stop_and_wait(self):
         """
@@ -217,6 +219,7 @@ class Context:
         temp = Vars()
         temp.vars = d
         temp.set("context.host", self.host)
+        temp.set("context.manager", self.host.manager)
         return d
 
     def vars(self):

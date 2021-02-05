@@ -4,7 +4,7 @@ from simple_automation.transactions.basic import template, directory
 from simple_automation.transactions.package import portage
 
 
-class TaskZsh(Task):
+class TaskZsh(TrackedTask):
     identifier = "zsh"
     description = "Installs zsh and a global zsh configuration"
     track = ["/etc/zsh"]

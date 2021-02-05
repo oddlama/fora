@@ -11,3 +11,9 @@ def check_valid_path(path):
         raise Error("Path must be non-empty")
     if path[0] != "/":
         raise Error("Path must be absolute")
+
+def check_valid_relative_path(path):
+    if not path:
+        raise Error("Path must be non-empty")
+    if path[0] == "/":
+        raise Error("Path must be relative")

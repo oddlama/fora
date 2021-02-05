@@ -1,7 +1,6 @@
 from simple_automation import Context
 from simple_automation.transactions.basic import _template_str
 
-
 ATOMS = ['category', 'name', 'version', 'ebuild_revision', 'slots', 'prefixes', 'sufixes']
 INFO_ATOMS = ['version', 'ebuild_revision', 'slots', 'prefixes', 'sufixes']
 
