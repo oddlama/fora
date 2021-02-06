@@ -151,8 +151,8 @@ class Context:
         return self
 
     def __exit__(self, type, value, traceback):
-        # Remove temporary files, and also do a safety check in
-        # case anything goes horribly wrong.
+        # Remove temporary files, and also do a safety check, so
+        # this will never go horribly wrong.
         self.remote_dispatcher.stop_and_wait()
         if self.remote_temp_dir.startswith("/tmp"):
             self.exec_ssh_raw(["rm", "-rf", self.remote_temp_dir])
@@ -346,7 +346,7 @@ class Context:
                 status_char = "[32m+[m"
             else:
                 title_color = "[1m"
-                status_char = "[34m·[m"
+                status_char = "[37m.[m"
         else:
             title_color = "[1;31m"
             status_char = "[1;31m![m"

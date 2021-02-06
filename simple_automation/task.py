@@ -28,11 +28,17 @@ class Task:
         # Print title
         title = f">>>> Task: {ellipsis(self.identifier, 24)} <<<<"
         description = ellipsis(self.description, 80)
-        print(f"[[33m*[m] [1m{title}[m [37m({description})[m")
+        print(f"\n[[33m*[m] [1;32m{title}[m [37m({description})[m")
 
     def post_run(self, context):
         """
         Called after self.run() is called.
+        """
+        pass
+
+    def run(self, context):
+        """
+        To be overwritten by a subclass.
         """
         pass
 
@@ -106,7 +112,7 @@ class TrackedTask(Task):
         """
         A sub-task used to initialize the tracking repository.
         """
-        identifier = "tracking"
+        identifier = "Initialize tracking"
         description = "Initialize the tracking repository"
 
         def __init__(self, tracked_task):
