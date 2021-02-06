@@ -55,7 +55,13 @@ class ExecutionSettings:
 
 class Dispatcher:
     def __init__(self):
+        self.debug = False
         self.execution_settings = ExecutionSettings()
+
+    def handle_set_debug(self):
+        # Set the user to become
+        self.debug = read_str() == "true"
+        write_mode("ok")
 
     def handle_set_user(self):
         # Set the user to become
@@ -73,8 +79,9 @@ class Dispatcher:
         write_mode("ok")
 
     def run_command(self, command):
-        # TODO -vv should enable this
-        #print(f"executing command={command} umask={self.execution_settings.umask} user={self.execution_settings.user}", file=sys.stderr, flush=True)
+        if self.debug:
+            print(f"executing command={command} umask={self.execution_settings.umask} user={self.execution_settings.user}", file=sys.stderr, flush=True)
+
         # TODO become user
         os.umask(self.execution_settings.umask)
         input = None if self.execution_settings.input is None else self.execution_settings.input
@@ -88,21 +95,33 @@ class Dispatcher:
         # Return output and status
         write_mode("ok")
         write_str(completed_command.stdout.decode('utf-8'))
-        # TODO -vvv should enable this too
-        #print(f"stdout: {completed_command.stdout}", file=sys.stderr, flush=True)
         write_str(completed_command.stderr.decode('utf-8'))
-        # TODO -vvv should enable this too
-        #print(f"stderr: {completed_command.stderr}", file=sys.stderr, flush=True)
         write_str(str(completed_command.returncode))
-        # TODO -vvv should enable this too
-        #print(f"rc: {str(completed_command.returncode)}", file=sys.stderr, flush=True)
+
+        if self.debug:
+            print(f"stdout: {completed_command.stdout}", file=sys.stderr, flush=True)
+            print(f"stderr: {completed_command.stderr}", file=sys.stderr, flush=True)
+            print(f"rc: {str(completed_command.returncode)}", file=sys.stderr, flush=True)
 
         # Reset settings for next command
         execution_settings = ExecutionSettings()
 
+    def handle_invalid_mode(self):
+        # Invalid mode → abort
+        print(f"Remote dispatcher received invalid mode '{mode}'. Aborting.", file=sys.stderr, flush=True)
+        exit(3)
+
     def main(self):
         # Cd into temporary directory
         os.chdir(os.path.dirname(script_path))
+
+        handler = {
+            "debug": self.handle_set_debug,
+            "user": self.handle_set_user,
+            "umask": self.handle_set_umask,
+            "input": self.handle_set_input,
+            "exec": self.handle_exec,
+            }
 
         while True:
             # Read next mode, but end script on EOF
@@ -110,20 +129,7 @@ class Dispatcher:
             if not mode:
                 return
 
-            if mode == "user":
-                self.handle_set_user()
-            elif mode == "umask":
-                self.handle_set_umask()
-            elif mode == "input":
-                self.handle_set_input()
-            elif mode == "exec":
-                self.handle_exec()
-            elif mode == "":
-                # Skip empty modes
-                continue
-            else:
-                # Invalid mode → abort
-                exit(3)
+            handler.get(mode, self.handle_invalid_mode)()
 
 if __name__ == '__main__':
     Dispatcher().main()

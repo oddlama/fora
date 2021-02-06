@@ -8,6 +8,7 @@ from subprocess import CalledProcessError
 import subprocess
 import os
 import sys
+import time
 
 class CompletedRemoteCommand:
     """
@@ -28,6 +29,11 @@ class RemoteDispatcher:
     def __init__(self, context, command):
         self.context = context
         self.process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=sys.stderr)
+
+        # Set debugging mode
+        self.write_mode("debug")
+        self.write_str(str(self.context.debug).lower())
+        self.expect("ok")
 
     def stop_and_wait(self):
         """
@@ -134,11 +140,16 @@ class RemoteDispatcher:
 
 
 class Context:
-    def __init__(self, host):
+    def __init__(self, host, pretend, verbose, debug):
         self.host = host
         self.precomputed_vars = self._vars()
         self.remote_dispatcher = None
-        self.pretend = False
+
+        # Variables overwritten by manager
+        self.pretend = pretend
+        self.verbose = verbose
+        self.debug = debug
+
         # A cache for internal purposes only.
         self.cache = {}
 
@@ -154,6 +165,8 @@ class Context:
         # Remove temporary files, and also do a safety check, so
         # this will never go horribly wrong.
         self.remote_dispatcher.stop_and_wait()
+        # Give the process some time to die
+        time.sleep(0.1)
         if self.remote_temp_dir.startswith("/tmp"):
             self.exec_ssh_raw(["rm", "-rf", self.remote_temp_dir])
 
@@ -284,7 +297,7 @@ class Context:
         via our built-in remote dispatch script. If checked is True,
         it will throw an exception if the remote command returns an
         unsuccessful exit status. checked=True also implies a default error_verbosity=0
-        and verbosity=1
+        and verbosity=2
 
         If verbosity is not None and self.verbose >= verbosity, the command
         output will be printed. Read: verbosity is the number of -v flags
@@ -307,18 +320,18 @@ class Context:
             if error_verbosity is None:
                 error_verbosity = 0
             if verbosity is None:
-                verbosity = 1
+                verbosity = 2
 
         do_print_verbosity = verbosity is not None and self.verbose >= verbosity
         do_print_error_verbosity = ret.return_code != 0 and (error_verbosity is not None and self.verbose >= error_verbosity)
 
         # Show the output if the verbosity demands it
         if do_print_verbosity or do_print_error_verbosity:
-            print(f"[[31m>[m] ---- REMOTE COMMAND: {command} ----")
+            print(f"\n[[31m>[m] ---- REMOTE COMMAND: {command} ----")
             print("[[31m>[m] ---- STDOUT ----")
-            print(ret.stdout)
+            print(ret.stdout, end="")
             print("[[31m>[m] ---- STDERR ----")
-            print(ret.stderr)
+            print(ret.stderr, end="")
 
         # Check the output
         if checked and ret.return_code != 0:

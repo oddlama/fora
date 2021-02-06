@@ -59,7 +59,10 @@ class Manager(Vars):
                 help="Specifies a subset of hosts to run on. By default all hosts are selected.")
         parser.add_argument('-p', '--pretend', dest='pretend', action='store_true',
                 help="Print what would be done instead of performing the actions.")
-        parser.add_argument('-v', '--verbose', dest='verbose', action='count', default=0)
+        parser.add_argument('-v', '--verbose', dest='verbose', action='count', default=0,
+                help="Increase output verbosity. Can be given multiple times. Typically, no information will be filtered with -vvv.")
+        parser.add_argument('--debug', dest='debug', action='store_true',
+                help="Enable debugging output.")
         parser.add_argument('--version', action='version',
                 version='%(prog)s built with simple_automation version {version}'.format(version=__version__))
 
@@ -73,9 +76,10 @@ class Manager(Vars):
         # TODO ask for su key, becomekey=ask,command=[]
         # TODO becomemethod=su, sudo -u root, ...
         try:
-            with Context(self.hosts["my_laptop"]) as c:
-                c.pretend = args.pretend
-                c.verbose = args.verbose
+            with Context(self.hosts["my_laptop"],
+                         pretend=args.pretend,
+                         verbose=args.verbose,
+                         debug=args.debug) as c:
                 run(c)
         except TransactionError as e:
             print(f"[1;31merror:[m {str(e)}")
