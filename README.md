@@ -1,13 +1,40 @@
 # simple_automation
 
 An ansible-inspired infrastructure and configuration management tool, but with a focus on minimalism and simplicity.
-It is intended for administrating a small set of machines, or even as a more powerful alternative to a dotfiles install script.
+Intended uses are small-scale machine administation, system configuration tracking, or even just dotfiles management.
 
-with support for encrypted configuration files and 
+The main features are:
 
 * Simple, not complex.
+* Almost self-contained, except for jinja2 for templating.
+* Minimal. This library consists of only ~1000 LOC.
 * Supports encrypted variable storage.
 * Executes commands over a single ssh connection (→ fast execution)
-* Concicse, readable output
-* Easily keep track of changes on your system by automatically committing changes to a git repository.
+* Concicse, readable output (and optionally more verbose but still compact)
+* Easily keep track of your system's state by automatically committing changed files to a git repository.
 * Use python to write your configuration and don't be limited by a domain specific language.
+* Uses a single ssh connection per host.
+
+## Minimal Example (Configure zsh)
+
+...
+
+## Minimal Example (Tracking only)
+
+## Good to know
+
+* Context defaults. Best practice: Always set them yourself.
+  context.defaults(user="root", umask=0o077, dir_mode=0o700, file_mode=0o600,
+                   owner="root", group="root")
+* Writing your own transactions.
+* Which transactions are already avaiable?
+* Your tracking repo must already have a commit!
+* Manage packages on hosts with different distributions
+* Conditionals based on transaction results
+* Using vault variables
+* Check if host is in group
+* Only track a directory without doing anything else. Useful for externally modified directories,
+  or even to use this just for system tracking.
+* Variable inheritance order
+* Special jinja2 variables
+* Secrets: Don't put secrets where they are printed. Ideally only in templated files, then you are safe.
