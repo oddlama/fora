@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 
 from simple_automation import Manager
-from tasks import TaskZsh
+from tasks import TaskZsh, TaskTrackPortage
 
 import os
-
-# TODO -vv to print stdout of all executed commands
 
 # TODO - somehow offload definitions into vault
 # TODO - track installed packages qlist -I in git
@@ -33,6 +31,7 @@ my_laptop.hostname = "chef"
 
 # -------- Define Tasks --------
 task_zsh = manager.add_task(TaskZsh)
+task_track_portage = manager.add_task(TaskTrackPortage)
 
 def run(context):
     """
@@ -40,6 +39,7 @@ def run(context):
     and is your main customization point.
     """
     task_zsh.exec(context)
+    task_track_portage.exec(context)
 
 if __name__ == "__main__":
     manager.main(run)
