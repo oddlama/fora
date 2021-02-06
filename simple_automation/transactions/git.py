@@ -33,7 +33,7 @@ def checkout(context: Context, url: str, dst: str, update: bool = True, depth=No
             if cur_git_ft != 'directory':
                 raise LogicError("Cannot checkout git repository on remote: Directory already exists and is not a git repository")
 
-            remote_commit = context.remote_exec(["git", "-C", dst, "rev-parse", "HEAD"])
+            remote_commit = context.remote_exec(["git", "-C", dst, "rev-parse", "HEAD"], error_verbosity=0, verbosity=2)
             if remote_commit.return_code != 0:
                 raise LogicError("Cannot checkout git repository on remote: Directory already exists but 'git rev-parse HEAD' failed")
 

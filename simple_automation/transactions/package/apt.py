@@ -38,9 +38,9 @@ def package(context: Context, atom: str, state="present", oneshot=False, opts=[]
                 apt_cmd.extend(opts)
                 apt_cmd.append(atom)
 
-                context.remote_exec(apt_cmd, checked=True, error_verbosity=0, verbosity=1)
+                context.remote_exec(apt_cmd, checked=True)
             else:
-                context.remote_exec(["apt-get", "remove"] + opts + [atom], checked=True, error_verbosity=0, verbosity=1)
+                context.remote_exec(["apt-get", "remove"] + opts + [atom], checked=True)
 
         # Return success
         return action.success()

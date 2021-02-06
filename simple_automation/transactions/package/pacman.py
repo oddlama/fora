@@ -34,13 +34,13 @@ def package(context: Context, atom: str, state="present", opts=[]):
         # Apply actions to reach new state, if we aren't in pretend mode
         if not context.pretend:
             if should_install:
-                pacman_cmd = ["pacman", "--color", "always"]
+                pacman_cmd = ["pacman", "--color", "always", "--noconfirm"]
                 pacman_cmd.extend(opts)
                 pacman_cmd.append(atom)
 
-                context.remote_exec(pacman_cmd, checked=True, error_verbosity=0, verbosity=1)
+                context.remote_exec(pacman_cmd, checked=True)
             else:
-                context.remote_exec(["pacman", "--color", "always", "-Rs"] + opts + [atom], checked=True, error_verbosity=0, verbosity=1)
+                context.remote_exec(["pacman", "--color", "always", "--noconfirm", "-Rs"] + opts + [atom], checked=True)
 
         # Return success
         return action.success()

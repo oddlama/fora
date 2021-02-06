@@ -75,9 +75,9 @@ def package(context: Context, atom: str, state="present", oneshot=False, opts=[]
                 emerge_cmd.extend(opts)
                 emerge_cmd.append(atom)
 
-                context.remote_exec(emerge_cmd, checked=True, error_verbosity=0, verbosity=1)
+                context.remote_exec(emerge_cmd, checked=True)
             else:
-                context.remote_exec(["emerge", "--color=y", "--verbose", "--depclean"] + opts + [atom], checked=True, error_verbosity=0, verbosity=1)
+                context.remote_exec(["emerge", "--color=y", "--verbose", "--depclean"] + opts + [atom], checked=True)
 
         # Return success
         return action.success()

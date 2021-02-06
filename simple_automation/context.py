@@ -28,8 +28,6 @@ class RemoteDispatcher:
     def __init__(self, context, command):
         self.context = context
         self.process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=sys.stderr)
-        # A cache for internal purposes only.
-        self.cache = {}
 
     def stop_and_wait(self):
         """
@@ -80,7 +78,7 @@ class RemoteDispatcher:
         """
         Reads a length parameter from the remote process.
         """
-        l = int(self.process.stdout.readline())
+        l = int(self.process.stdout.readline().decode('utf-8'))
         if l < 0 or l > 16*1024*1024*1024:
             exit(2)
         return l
@@ -141,6 +139,8 @@ class Context:
         self.precomputed_vars = self._vars()
         self.remote_dispatcher = None
         self.pretend = False
+        # A cache for internal purposes only.
+        self.cache = {}
 
         # Defaults for remote actions
         self.defaults(user="root", umask=0o022, dir_mode=0o700, file_mode=0o600, owner="root", group="root")
@@ -283,7 +283,8 @@ class Context:
         Execute ssh to execute the given command on the remote host,
         via our built-in remote dispatch script. If checked is True,
         it will throw an exception if the remote command returns an
-        unsuccessful exit status.
+        unsuccessful exit status. checked=True also implies a default error_verbosity=0
+        and verbosity=1
 
         If verbosity is not None and self.verbose >= verbosity, the command
         output will be printed. Read: verbosity is the number of -v flags
@@ -302,6 +303,12 @@ class Context:
         # injection possible.
         ret = self.remote_dispatcher.exec(command, input)
 
+        if checked:
+            if error_verbosity is None:
+                error_verbosity = 0
+            if verbosity is None:
+                verbosity = 1
+
         do_print_verbosity = verbosity is not None and self.verbose >= verbosity
         do_print_error_verbosity = ret.return_code != 0 and (error_verbosity is not None and self.verbose >= error_verbosity)
 
@@ -319,6 +326,19 @@ class Context:
 
         return ret
 
+    def print_transaction_title(self, transaction, title_color, status_char):
+        title = align_ellipsis(transaction.title, 10)
+        name_align_at = 30 * (1 + (len(transaction.name) // 30))
+        name = f"{transaction.name:<{name_align_at}}"
+        print(f"[{status_char}] {title_color}{title}[m {name}", end="", flush=True)
+
+    def print_transaction_early(self, transaction):
+        title_color = "[1;33m"
+        status_char = "[33m?[m"
+
+        # Print title and name
+        self.print_transaction_title(transaction, title_color, status_char)
+
     def print_transaction(self, transaction):
         if transaction.success:
             if transaction.changed:
@@ -331,11 +351,9 @@ class Context:
             title_color = "[1;31m"
             status_char = "[1;31m![m"
 
-        # Print title and name
-        title = align_ellipsis(transaction.title, 10)
-        name_align_at = 30 * (1 + (len(transaction.name) // 30))
-        name = f"{transaction.name:<{name_align_at}}"
-        print(f"[{status_char}] {title_color}{title}[m {name}", end="")
+        # Print title and name, overwriting the transitive status
+        print("\r", end="")
+        self.print_transaction_title(transaction, title_color, status_char)
 
         # Print key: value pairs with changes
         state_infos = []

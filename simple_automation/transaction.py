@@ -37,6 +37,7 @@ class Transaction:
         if self.transaction_context is not None:
             raise LogicError("A transaction may only be started once.")
         self.transaction_context = ActiveTransaction()
+        self.context.print_transaction_early(self)
         return self.transaction_context
 
     def __exit__(self, exc_type, exc_value, trace):

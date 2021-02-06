@@ -1,7 +1,11 @@
-from simple_automation.utils import ellipsis
 from simple_automation.checks import check_valid_path, check_valid_relative_path
-from simple_automation.transactions.basic import _template_str, _remote_stat
+from simple_automation.exceptions import LogicError
 from simple_automation.transactions import git
+from simple_automation.transactions.basic import _template_str, _remote_stat, _resolve_mode_owner_group
+from simple_automation.utils import ellipsis
+
+import os
+from pathlib import PurePosixPath
 
 class Task:
     """
@@ -51,8 +55,14 @@ class TrackedTask(Task):
     """
     The remote url to the repository which will be used as the tracking repo.
     Will be templated by the currently executed context.
+
+    For example:
+      - (via ssh)   "git@github.com:myuser/tracked-system-settings"
+      - (via https) "https://{{ personal_access_token }}@github.com/myuser/tracked-system-settings"
+    Remember to put secrets into a vault so they aren't checked into your repository in plain text.
+    We recommend using ssh, as secrets in the url will be printed to the terminal when executed.
     """
-    tracking_repo_url = None # e.g. "git@github.com:{}/system_settings",
+    tracking_repo_url = None
 
     """
     The path where the local clone of the repository will be.
@@ -67,6 +77,31 @@ class TrackedTask(Task):
     """
     tracking_subpath = "{{ context.host.identifier }}" # e.g. "desktops/mymachine"
 
+    """
+    A list of directories and/or files that should be tracked.
+    Will be templated by the currently executed context.
+    """
+    tracking_paths = None
+
+    """
+    A dictionary of git configs to be set locally when the repository is first created.
+    Values will be templated by the currently executed context.
+
+    By default, it sets user.name to the host identifier, and user.email to root@localhost.
+    (for each entry, 'git config --local {key} {value}' is executed). Useful to set
+    name and email, and maybe a gpg signing key.
+    """
+    tracking_repo_configs = {
+        "user.name": "{{ context.host.identifier }}",
+        "user.email": "root@localhost" }
+
+    """
+    Extra options to 'git commit'.
+    Will be templated by the currently executed context.
+    """
+    tracking_git_commit_opts = []
+
+
     class TaskInitializeTracking(Task):
         """
         A sub-task used to initialize the tracking repository.
@@ -74,12 +109,12 @@ class TrackedTask(Task):
         identifier = "tracking"
         description = "Initialize the tracking repository"
 
-        def __init__(self, tracking_id):
+        def __init__(self, tracked_task):
             """
-            Initialize this tracking initialization task and remember the tracking
-            id, so so we have access to the tracking specific variables later.
+            Initialize this tracking initialization task and remember the tracked
+            parent task, so so we have access to the tracking specific variables later.
             """
-            self.tracking_id = tracking_id
+            self.tracked_task = tracked_task
 
         def run(self, context):
             # Set defaults
@@ -87,11 +122,27 @@ class TrackedTask(Task):
                              owner="root", group="root")
 
             # Get tracking specific variables
-            (url, dst, sub) = context.cache["tracking"][self.tracking_id]
+            (url, dst, sub) = context.cache["tracking"][self.tracked_task.tracking_id]
 
             # Clone or update remote tracking repository
             git.checkout(context, url, dst)
 
+            if not context.pretend:
+                # Set given git repo configs
+                for k,v in self.tracked_task.tracking_repo_configs.items():
+                    v = _template_str(context, v)
+                    context.remote_exec(["git", "-C", dst, "config", "--local", k, v], checked=True)
+
+
+    def __init__(self, manager):
+        super().__init__(manager)
+        if self.tracking_repo_url is None:
+            raise LogicError("A tracked task must override the variable 'tracking_repo_url'")
+        if self.tracking_local_dst is None:
+            raise LogicError("A tracked task must override the variable 'tracking_local_dst'")
+        if self.tracking_paths is None:
+            raise LogicError("A tracked task must override the variable 'tracking_paths'")
+        self.tracking_id = None
 
     def _resolve_variables(self, context):
         """
@@ -105,13 +156,6 @@ class TrackedTask(Task):
         check_valid_relative_path(sub)
         return (tracking_id, url, dst, sub)
 
-    def __init__(self, manager):
-        super().__init__(manager)
-        if self.tracking_repo_url is None:
-            raise LogicError("A tracked task must override the variable 'tracking_repo_url'")
-        if self.tracking_local_dst is None:
-            raise LogicError("A tracked task must override the variable 'tracking_local_dst'")
-
     def pre_run(self, context):
         self._initialize_tracking(context)
         super().pre_run(context)
@@ -119,36 +163,102 @@ class TrackedTask(Task):
 
     def post_run(self, context):
         super().post_run(context)
+        self._track(context)
 
     def _initialize_tracking(self, context):
+        if self.tracking_id is not None:
+            return
+
         if "tracking" not in context.cache:
             # Create tracking cache
             context.cache["tracking"] = {}
 
         # Resolve templated variables
-        (tid, url, dst, sub) = self._resolve_variables(context)
+        (self.tracking_id, url, dst, sub) = self._resolve_variables(context)
 
         # Check if tracking has been initialized for this context
-        if tid not in context.cache["tracking"]:
-            context.cache["tracking"][tid] = (url, dst, sub)
+        if self.tracking_id not in context.cache["tracking"]:
+            context.cache["tracking"][self.tracking_id] = (url, dst, sub)
             # Initialize now
-            TaskInitializeTracking(self).exec(context)
+            TrackedTask.TaskInitializeTracking(self).exec(context)
 
     def _assert_tracking_repo_clean(self, context):
-        dst = context.cache["tracking"]["dst"]
+        (_, dst, _) = context.cache["tracking"][self.tracking_id]
 
-        # Assert that the repository is clean
-        remote_status = context.remote_exec(["git", "-C", dst, "status", "--porcelain"])
-        if remote_status.return_code != 0:
-            raise LogicError("Cannot query git repository status on remote: Command 'git status --porcelain' failed")
-
-        if remote_status.stdout.strip() != "":
-            raise LogicError("Refusing operation: Tracking repository is not clean!")
+        if not context.pretend:
+            # Assert that the repository is clean
+            remote_status = context.remote_exec(["git", "-C", dst, "status", "--porcelain"], checked=True)
+            if remote_status.stdout.strip() != "":
+                raise LogicError("Refusing operation: Tracking repository is not clean!")
 
     def _track(self, context):
-        # TODO as a transaction pls for logging and shit
-        # TODO: rsync all tracked paths to the tracking version control directory
-        self._rsync_tracked_paths(context)
-        # TODO: if anything changed make a commit based on the task's name
-        # TODO: git add all self.tracked in destination
-        # TODO: if there are changes, commit.
+        context.defaults(user="root", umask=0o077, dir_mode=0o700, file_mode=0o600,
+                         owner="root", group="root")
+        (_, dst, sub) = context.cache["tracking"][self.tracking_id]
+
+        # Check source paths
+        srcs = []
+        for src in self.tracking_paths:
+            src = _template_str(context, src)
+            check_valid_path(src)
+            srcs.append(src)
+
+        # Begin transaction
+        with context.transaction(title="track", name=f"{srcs}") as action:
+            action.initial_state(added=0, modified=0, deleted=0)
+
+            if not context.pretend:
+                mode, owner, group = _resolve_mode_owner_group(context, None, None, None, context.dir_mode)
+                rsync_dst = f"{dst}/{sub}/"
+                base_parts = PurePosixPath(dst).parts
+                parts = PurePosixPath(rsync_dst).parts
+
+                # Create tracking destination subdirectories if they don't exist
+                cur = dst
+                for p in parts[len(base_parts):]:
+                    cur = os.path.join(cur, p)
+                    context.remote_exec(["mkdir", "-p", "--", cur], checked=True)
+                    context.remote_exec(["chown", f"{owner}:{group}", cur], checked=True)
+                    context.remote_exec(["chmod", mode, cur], checked=True)
+
+                # Use rsync to backup all paths into the repository
+                for src in srcs:
+                    import time
+                    time.sleep(1)
+                    context.remote_exec(["rsync", "--quiet", "--recursive", "--one-file-system",
+                                         "--links", "--times", "--relative", str(PurePosixPath(src)), rsync_dst],
+                                        checked=True)
+
+                # Add all changes
+                context.remote_exec(["git", "-C", dst, "add", "--all"], checked=True)
+
+                # Query changes for message
+                remote_status = context.remote_exec(["git", "-C", dst, "status", "--porcelain"], checked=True)
+                if remote_status.stdout.strip() != "":
+                    # We have changes
+                    added = 0
+                    modified = 0
+                    deleted = 0
+                    for line in remote_status.stdout.splitlines():
+                        if line.startswith("A"):
+                            added += 1
+                        elif line.startswith("M"):
+                            modified += 1
+                        elif line.startswith("D"):
+                            deleted += 1
+                    action.final_state(added=added, modified=modified, deleted=deleted)
+
+                    # Create commit
+                    commit_opts = [_template_str(context, o) for o in self.tracking_git_commit_opts]
+                    context.remote_exec(["git", "-C", dst, "commit"] + commit_opts + ["--message", f"Track: {added=}, {modified=}, {deleted=}"], checked=True)
+
+                    # Push commit
+                    context.remote_exec(["git", "-C", dst, "push", "origin", "master"], checked=True)
+
+                    action.success()
+                else:
+                    # Repo is still clean
+                    action.unchanged()
+            else:
+                action.final_state(added="? (pretend)", modified="? (pretend)", deleted="? (pretend)")
+                action.success()
