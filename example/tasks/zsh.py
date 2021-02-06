@@ -1,14 +1,10 @@
-from simple_automation import TrackedTask
 from simple_automation.transactions import git
 from simple_automation.transactions.basic import template, directory
 from simple_automation.transactions.package import portage
 
+from tasks.tracking import TrackedTask
 
-class MyTrackedTask(TrackedTask):
-    tracking_repo_url = "{{ tracking.repo_url }}"
-    tracking_local_dst = "/tmp/avctest"
-
-class TaskZsh(MyTrackedTask):
+class TaskZsh(TrackedTask):
     identifier = "zsh"
     description = "Installs zsh and a global zsh configuration"
     tracking_paths = ["/etc/zsh"]
