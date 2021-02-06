@@ -145,7 +145,7 @@ class Context:
         self.precomputed_vars = self._vars()
         self.remote_dispatcher = None
 
-        # Variables overwritten by manager
+        # Variables given by manager
         self.pretend = pretend
         self.verbose = verbose
         self.debug = debug
@@ -153,7 +153,7 @@ class Context:
         # A cache for internal purposes only.
         self.cache = {}
 
-        # Defaults for remote actions
+        # Initial defaults for remote actions. Should be called by every task.
         self.defaults(user="root", umask=0o022, dir_mode=0o700, file_mode=0o600, owner="root", group="root")
 
     def __enter__(self):
@@ -379,13 +379,15 @@ class Context:
             str_final_v = ellipsis(str(final_v), 9)
 
             if initial_v == final_v:
-                entry_str = f"[37m{str_k}: {str_initial_v}[m"
+                if self.verbose >= 1:
+                    entry_str = f"[37m{str_k}: {str_initial_v}[m"
+                    state_infos.append(entry_str)
             else:
                 entry_str = f"[33m{str_k}: [31m{str_initial_v}[33m → [32m{str_final_v}[m"
-            state_infos.append(entry_str)
+                state_infos.append(entry_str)
         print("[37m,[m ".join(state_infos))
 
-        if transaction.extra_info is not None:
+        if self.verbose >= 1 and transaction.extra_info is not None:
             extra_infos = []
             for k,v in transaction.extra_info.items():
                 extra_infos.append(f"[37m{str(k)}: {str(v)}[m")

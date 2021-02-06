@@ -23,22 +23,25 @@ class Task:
 
     def pre_run(self, context):
         """
-        Called before self.run() is called.
+        Called before self.run() is called. Prints the task's title by default.
         """
-        # Print title
+        # Print title and description
         title = f">>>> Task: {ellipsis(self.identifier, 24)} <<<<"
-        description = ellipsis(self.description, 80)
-        print(f"\n[[33m*[m] [1;32m{title}[m [37m({description})[m")
+        if context.verbose >= 1:
+            description = ellipsis(self.description, 80)
+            print(f"\n[[33m*[m] [1;32m{title}[m [37m({description})[m")
+        else:
+            print(f"\n[[33m*[m] [1;32m{title}[m")
 
     def post_run(self, context):
         """
-        Called after self.run() is called.
+        Called after self.run() is called. No-op by default.
         """
         pass
 
     def run(self, context):
         """
-        To be overwritten by a subclass.
+        To be overwritten by a subclass. Contain's the task's logic.
         """
         pass
 
