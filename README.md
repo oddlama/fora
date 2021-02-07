@@ -36,5 +36,5 @@ The main features are:
 * Only track a directory without doing anything else. Useful for externally modified directories,
   or even to use this just for system tracking.
 * Variable inheritance order
-* Special jinja2 variables
+* Special jinja2 variables (simple_automation_managed, context)
 * Secrets: Don't put secrets where they are printed. Ideally only in templated files, then you are safe.

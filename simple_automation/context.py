@@ -140,7 +140,16 @@ class RemoteDispatcher:
 
 
 class Context:
+    """
+    A context is a wrapper object around a host and an ssh connection to that
+    host. It is used to execute commands on the remote machine, and tracks state
+    over the connection lifetime.
+    """
+
     def __init__(self, host, pretend, verbose, debug):
+        """
+        Initializes a new context. For internal use only.
+        """
         self.host = host
         self.precomputed_vars = self._vars()
         self.remote_dispatcher = None
@@ -157,11 +166,17 @@ class Context:
         self.defaults(user="root", umask=0o022, dir_mode=0o700, file_mode=0o600, owner="root", group="root")
 
     def __enter__(self):
+        """
+        Initializes the ssh connection and environment to the host.
+        """
         # Initialize ssh environment
         self.init_ssh()
         return self
 
     def __exit__(self, type, value, traceback):
+        """
+        Initializes the ssh connection to the host.
+        """
         # Remove temporary files, and also do a safety check, so
         # this will never go horribly wrong.
         self.remote_dispatcher.stop_and_wait()
@@ -340,12 +355,18 @@ class Context:
         return ret
 
     def print_transaction_title(self, transaction, title_color, status_char):
+        """
+        Prints the transaction title and name
+        """
         title = align_ellipsis(transaction.title, 10)
         name_align_at = 30 * (1 + (len(transaction.name) // 30))
         name = f"{transaction.name:<{name_align_at}}"
         print(f"[{status_char}] {title_color}{title}[m {name}", end="", flush=True)
 
     def print_transaction_early(self, transaction):
+        """
+        Prints the transaction summary early (i.e. without changes)
+        """
         title_color = "[1;33m"
         status_char = "[33m?[m"
 
@@ -353,6 +374,9 @@ class Context:
         self.print_transaction_title(transaction, title_color, status_char)
 
     def print_transaction(self, transaction):
+        """
+        Prints the transaction summary
+        """
         if transaction.success:
             if transaction.changed:
                 title_color = "[1;34m"

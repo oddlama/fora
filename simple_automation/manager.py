@@ -8,6 +8,7 @@ from simple_automation.vars import Vars
 
 from jinja2 import Environment, FileSystemLoader
 
+import os
 import argparse
 
 class ArgumentParserError(Exception):
@@ -18,12 +19,35 @@ class ThrowingArgumentParser(argparse.ArgumentParser):
         raise ArgumentParserError(message)
 
 class Manager(Vars):
-    def __init__(self, main_directory):
+    """
+    A class that manages a set of global variables, hosts, groups, and
+    tasks. It provides the CLI interface and represents the main entry
+    point for a simple automation script.
+    """
+    def __init__(self, main_directory=None):
+        """
+        Create a new manager.
+        All relative paths (mainly templates) will be interpreted relative
+        from the location of the initially executed script. If you want to change
+        this behavior, you can either set main_directory to a relative path, which
+        will then be appended to that location, or to an absolute path.
+        """
         super().__init__()
         self.groups = {}
         self.hosts = {}
         self.tasks = {}
-        self.main_directory = main_directory
+
+        # Find the directory of the initially called script
+        import inspect
+        first_frame = inspect.getouterframes(inspect.currentframe())[-1]
+        main_script_directory = os.path.abspath(os.path.dirname(first_frame.filename))
+
+        # Find the main directory
+        if main_directory is None:
+            self.main_directory = main_script_directory
+        else:
+            self.main_directory = os.path.realpath(os.path.join(main_script_directory, main_directory))
+
         self.jinja2_env = Environment(
             loader=FileSystemLoader(self.main_directory, followlinks=True),
             autoescape=False)

@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 
-from simple_automation import Manager
+from simple_automation import Vault, Manager
 from tasks import TaskZsh, TaskTrackPortage
-
-import os
 
 # TODO - somehow offload definitions into vault
 # TODO - track installed packages qlist -I in git
 # TODO - error on using unbound variables in templates
 
-#vault = Vault("myvault.enc", type='gpg')
+# -------- Load encrypted variables from vault --------
+vault = None #Vault("myvault.gpg", type='gpg')
 
 # -------- Create Manager --------
-manager = Manager(os.path.dirname(__file__))
+manager = Manager()
 manager.set("zsh.install", False)
+manager.set("vault", vault)
 
 # -------- Define Groups --------
 desktop = manager.add_group("desktop")
