@@ -15,6 +15,11 @@ The main features are:
 * Use python to write your configuration and don't be limited by a domain specific language.
 * Uses a single ssh connection per host.
 
+Drawbacks:
+
+* Currently for simplicity there is no way to become a privileged user on a host.
+  That means if you want to do things as root on a machine, you need an ssh connection for the root user.
+
 ## Minimal Example (Configure zsh)
 
 ...
@@ -23,6 +28,7 @@ The main features are:
 
 ## Good to know
 
+* Tasks have an implicit enabled variable
 * Context defaults. Best practice: Always set them yourself.
   context.defaults(user="root", umask=0o077, dir_mode=0o700, file_mode=0o600,
                    owner="root", group="root")

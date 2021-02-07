@@ -112,8 +112,8 @@ class Dispatcher:
         exit(3)
 
     def main(self):
-        # Cd into temporary directory
-        os.chdir(os.path.dirname(script_path))
+        # Change into /tmp
+        os.chdir("/tmp")
 
         handler = {
             "debug": self.handle_set_debug,

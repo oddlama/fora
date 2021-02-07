@@ -5,29 +5,43 @@ class Vars:
     def __init__(self):
         self.vars = {}
 
-    def get(self, key):
-        check_valid_key(key)
-        d = self.vars
-        cs = []
-        for k in key.split('.'):
-            cs.append(k)
-            if not isinstance(d, dict):
-                csname = '.'.join(cs)
-                raise LogicError(f"Cannot access variable '{key}' because '{csname}' is not a dictionary")
+    def get(self, key, default=None):
+        """
+        Retrieves a variable by the given key. If no such key exists,
+        it returns the given default value or throws a KeyError if no default is set.
+        """
 
-            if k not in d:
-                raise KeyError(f"Variable '{key}' does not exist")
-            else:
-                d = d[k]
-        return d
+        def get_or_throw(key):
+            """
+            Retrieves a variable by the given key or raises a KeyError if no such key exists.
+            """
+            check_valid_key(key)
+            d = self.vars
+            cs = []
+            for k in key.split('.'):
+                cs.append(k)
+                if not isinstance(d, dict):
+                    csname = '.'.join(cs)
+                    raise LogicError(f"Cannot access variable '{key}' because '{csname}' is not a dictionary")
 
-    def get(self, key, default):
-        try:
-            return self.get(key)
-        except KeyError:
-            return default
+                if k not in d:
+                    raise KeyError(f"Variable '{key}' does not exist")
+                else:
+                    d = d[k]
+            return d
+
+        if default is None:
+            return get_or_throw(key)
+        else:
+            try:
+                return get_or_throw(key)
+            except KeyError:
+                return default
 
     def set(self, key, value):
+        """
+        Sets the given variable.
+        """
         check_valid_key(key)
         d = self.vars
         cs = []

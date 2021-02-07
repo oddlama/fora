@@ -9,9 +9,6 @@ class TaskZsh(TrackedTask):
     description = "Installs zsh and a global zsh configuration"
     tracking_paths = ["/etc/zsh"]
 
-    def set_defaults(self, manager):
-        manager.set(f"tasks.{self.identifier}.install", True)
-
     def run(self, context):
         # Set defaults
         context.defaults(user="root", umask=0o022, dir_mode=0o755, file_mode=0o644,

@@ -13,7 +13,7 @@ def _template_str(context: Context, template_str):
     Renders the given string template.
     """
     template = Template(template_str)
-    return template.render(context.vars())
+    return template.render(context.vars_dict)
 
 def _mode_to_str(mode):
     """
@@ -68,6 +68,52 @@ def _remote_sha512sum(context: Context, path: str):
         return sha512sum.stdout.strip().split(" ")[0]
     else:
         return None
+
+def _remote_upload(context: Context, get_content, title: str, name: str, dst: str, mode=None, owner=None, group=None):
+    """
+    Calls get_content and saves the resulting string as a file on the remote host at dst.
+    No arguments will be templated, this is task of the calling function.
+    Optionally accepts file mode, owner and group, if not given, context defaults are used.
+    """
+    with context.transaction(title=title, name=name) as action:
+        mode, owner, group = _resolve_mode_owner_group(context, mode, owner, group, context.file_mode)
+
+        # Query current state
+        (cur_ft, cur_mode, cur_owner, cur_group) = _remote_stat(context, dst)
+        cur_sha512sum = _remote_sha512sum(context, dst)
+
+        # Get content
+        content = get_content()
+        sha512sum = hashlib.sha512(content.encode("utf-8")).hexdigest()
+
+        # Record this initial state
+        if cur_ft is None:
+            action.initial_state(exists=False, sha512sum=None, mode=None, owner=None, group=None)
+        elif cur_ft == "regular file":
+            action.initial_state(exists=True, sha512sum=cur_sha512sum, mode=cur_mode, owner=cur_owner, group=cur_group)
+            if sha512sum == cur_sha512sum and mode == cur_mode and owner == cur_owner and group == cur_group:
+                return action.unchanged()
+        else:
+            raise LogicError("Cannot create file on remote: Path already exists and is not a file")
+
+        # Record the final state
+        action.final_state(exists=True, sha512sum=sha512sum, mode=mode, owner=owner, group=group)
+        # Apply actions to reach new state, if we aren't in pretend mode
+        if not context.pretend:
+            try:
+                # Replace file
+                content_base64 = base64.b64encode(content.encode('utf-8')).decode('utf-8')
+                dst_base64 = base64.b64encode(dst.encode('utf-8')).decode('utf-8')
+                context.remote_exec(["sh", "-c", f"cat > \"$(echo '{dst_base64}' | base64 -d)\""], checked=True, input=content)
+
+                # Set permissions
+                context.remote_exec(["chown", f"{owner}:{group}", dst], checked=True)
+                context.remote_exec(["chmod", mode, dst], checked=True)
+            except RemoteExecError as e:
+                return action.failure(e)
+
+        # Return success
+        return action.success()
 
 def directory(context: Context, path: str, mode=None, owner=None, group=None):
     """
@@ -126,49 +172,15 @@ def template(context: Context, src: str, dst: str, mode=None, owner=None, group=
     dst = _template_str(context, dst)
     check_valid_path(dst)
 
-    with context.transaction(title="template", name=dst) as action:
-        mode, owner, group = _resolve_mode_owner_group(context, mode, owner, group, context.file_mode)
-
-        # Query current state
-        (cur_ft, cur_mode, cur_owner, cur_group) = _remote_stat(context, dst)
-        cur_sha512sum = _remote_sha512sum(context, dst)
-
-        # Prepare templated version
+    def get_content():
+        # Get templated content
         try:
             template = context.host.manager.jinja2_env.get_template(src)
         except TemplateNotFound as e:
             raise LogicError("template not found: " + str(e))
-        content = template.render(context.vars())
-        sha512sum = hashlib.sha512(content.encode("utf-8")).hexdigest()
+        return template.render(context.vars_dict)
 
-        # Record this initial state
-        if cur_ft is None:
-            action.initial_state(exists=False, sha512sum=None, mode=None, owner=None, group=None)
-        elif cur_ft == "regular file":
-            action.initial_state(exists=True, sha512sum=cur_sha512sum, mode=cur_mode, owner=cur_owner, group=cur_group)
-            if sha512sum == cur_sha512sum and mode == cur_mode and owner == cur_owner and group == cur_group:
-                return action.unchanged()
-        else:
-            raise LogicError("Cannot create templated file on remote: Path already exists and is not a file")
-
-        # Record the final state
-        action.final_state(exists=True, sha512sum=sha512sum, mode=mode, owner=owner, group=group)
-        # Apply actions to reach new state, if we aren't in pretend mode
-        if not context.pretend:
-            try:
-                # Replace file
-                content_base64 = base64.b64encode(content.encode('utf-8')).decode('utf-8')
-                dst_base64 = base64.b64encode(dst.encode('utf-8')).decode('utf-8')
-                context.remote_exec(["sh", "-c", f"cat > \"$(echo '{dst_base64}' | base64 -d)\""], checked=True, input=content)
-
-                # Set permissions
-                context.remote_exec(["chown", f"{owner}:{group}", dst], checked=True)
-                context.remote_exec(["chmod", mode, dst], checked=True)
-            except RemoteExecError as e:
-                return action.failure(e)
-
-        # Return success
-        return action.success()
+    return _remote_upload(context, get_content, title="template", name=dst, dst=dst, mode=mode, owner=owner, group=group)
 
 def template_all(context: Context, src_dst_pairs: list, mode=None, owner=None, group=None):
     """
@@ -186,46 +198,12 @@ def copy(context: Context, src: str, dst: str, mode=None, owner=None, group=None
     dst = _template_str(context, dst)
     check_valid_path(dst)
 
-    with context.transaction(title="copy", name=dst) as action:
-        mode, owner, group = _resolve_mode_owner_group(context, mode, owner, group, context.file_mode)
-
-        # Query current state
-        (cur_ft, cur_mode, cur_owner, cur_group) = _remote_stat(context, dst)
-        cur_sha512sum = _remote_sha512sum(context, dst)
-
-        # Prepare templated version
+    def get_content():
+        # Get source content
         with open(os.path.join(context.host.manager.main_directory, src), 'r') as f:
-            content = f.read()
-        sha512sum = hashlib.sha512(content.encode("utf-8")).hexdigest()
+            return f.read()
 
-        # Record this initial state
-        if cur_ft is None:
-            action.initial_state(exists=False, sha512sum=None, mode=None, owner=None, group=None)
-        elif cur_ft == "regular file":
-            action.initial_state(exists=True, sha512sum=cur_sha512sum, mode=cur_mode, owner=cur_owner, group=cur_group)
-            if sha512sum == cur_sha512sum and mode == cur_mode and owner == cur_owner and group == cur_group:
-                return action.unchanged()
-        else:
-            raise LogicError("Cannot create file on remote: Path already exists and is not a file")
-
-        # Record the final state
-        action.final_state(exists=True, sha512sum=sha512sum, mode=mode, owner=owner, group=group)
-        # Apply actions to reach new state, if we aren't in pretend mode
-        if not context.pretend:
-            try:
-                # Replace file
-                content_base64 = base64.b64encode(content.encode('utf-8')).decode('utf-8')
-                dst_base64 = base64.b64encode(dst.encode('utf-8')).decode('utf-8')
-                context.remote_exec(["sh", "-c", f"cat > \"$(echo '{dst_base64}' | base64 -d)\""], checked=True, input=content)
-
-                # Set permissions
-                context.remote_exec(["chown", f"{owner}:{group}", dst], checked=True)
-                context.remote_exec(["chmod", mode, dst], checked=True)
-            except RemoteExecError as e:
-                return action.failure(e)
-
-        # Return success
-        return action.success()
+    return _remote_upload(context, get_content, title="copy", name=dst, dst=dst, mode=mode, owner=owner, group=group)
 
 def copy_all(context: Context, src_dst_pairs: list, mode=None, owner=None, group=None):
     """
@@ -233,3 +211,21 @@ def copy_all(context: Context, src_dst_pairs: list, mode=None, owner=None, group
     """
     for src,dst in src_dst_pairs:
         copy(context, src, dst, mode, owner, group)
+
+def save_output(context: Context, command: list, dst: str, desc=None, mode=None, owner=None, group=None):
+    """
+    Saves the stdout of the given command on the remote host at remote dst.
+    Using --pretend will still run the command, but won't save the output.
+    Changed status reflects if the file contents changed.
+    Optionally accepts file mode, owner and group, if not given, context defaults are used.
+    """
+    command = [_template_str(context, c) for c in command]
+    dst = _template_str(context, dst)
+    check_valid_path(dst)
+
+    def get_content():
+        # Get command output
+        return context.remote_exec(command, checked=True).stdout
+
+    name = f"{command}" if desc is None else desc
+    return _remote_upload(context, get_content, title="save out", name=name, dst=dst, mode=mode, owner=owner, group=group)

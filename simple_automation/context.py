@@ -8,7 +8,6 @@ from subprocess import CalledProcessError
 import subprocess
 import os
 import sys
-import time
 
 class CompletedRemoteCommand:
     """
@@ -146,24 +145,42 @@ class Context:
     over the connection lifetime.
     """
 
-    def __init__(self, host, pretend, verbose, debug):
+    def __init__(self, manager, host):
         """
         Initializes a new context. For internal use only.
         """
+        self.manager = manager
         self.host = host
-        self.precomputed_vars = self._vars()
-        self.remote_dispatcher = None
 
-        # Variables given by manager
-        self.pretend = pretend
-        self.verbose = verbose
-        self.debug = debug
+        self._precompute_vars()
+        self.remote_dispatcher = None
 
         # A cache for internal purposes only.
         self.cache = {}
 
         # Initial defaults for remote actions. Should be called by every task.
         self.defaults(user="root", umask=0o022, dir_mode=0o700, file_mode=0o600, owner="root", group="root")
+
+    @property
+    def pretend(self):
+        """
+        Forwards the corresponding variable from the associated manager.
+        """
+        return self.manager.pretend
+
+    @property
+    def verbose(self):
+        """
+        Forwards the corresponding variable from the associated manager.
+        """
+        return self.manager.verbose
+
+    @property
+    def debug(self):
+        """
+        Forwards the corresponding variable from the associated manager.
+        """
+        return self.manager.debug
 
     def __enter__(self):
         """
@@ -179,9 +196,8 @@ class Context:
         """
         # Remove temporary files, and also do a safety check, so
         # this will never go horribly wrong.
+        self.remote_exec(["lsof", self.remote_temp_dir], verbosity=0)
         self.remote_dispatcher.stop_and_wait()
-        # Give the process some time to die
-        time.sleep(0.1)
         if self.remote_temp_dir.startswith("/tmp"):
             self.exec_ssh_raw(["rm", "-rf", self.remote_temp_dir])
 
@@ -232,26 +248,30 @@ class Context:
         """
         return Transaction(self, title, name)
 
-    def _vars(self):
+    def _precompute_vars(self):
         """
         Merges all vars from inherited contexts (manager, groups, host) to
         provide a master dictionary for templating.
         """
         # Create merged dictionary
-        d = self.host.manager.vars.copy()
+        d = self.manager.vars.copy()
         for group in self.host.groups:
             merge_dicts(group.vars, d)
         merge_dicts(self.host.vars, d)
 
         # Add procedural entries
-        temp = Vars()
-        temp.vars = d
-        temp.set("context.host", self.host)
-        temp.set("context.manager", self.host.manager)
-        return d
+        self.merged_vars = Vars()
+        self.merged_vars.vars = d
+        self.merged_vars.set("context.manager", self.manager)
+        self.merged_vars.set("context.host", self.host)
 
+    @property
     def vars(self):
-        return self.precomputed_vars
+        return self.merged_vars
+
+    @property
+    def vars_dict(self):
+        return self.merged_vars.vars
 
     def _base_ssh_command(self, command):
         """
@@ -342,10 +362,12 @@ class Context:
 
         # Show the output if the verbosity demands it
         if do_print_verbosity or do_print_error_verbosity:
-            print(f"\n[[31m>[m] ---- REMOTE COMMAND: {command} ----")
-            print("[[31m>[m] ---- STDOUT ----")
+            status_char = "[32m>[m" if ret.return_code == 0 else "[31m>[m"
+            print(f"\n[{status_char}] ---- REMOTE COMMAND: {command} ----")
+            print(f"[{status_char}] exit code: {ret.return_code}")
+            print(f"[{status_char}] stdout:")
             print(ret.stdout, end="")
-            print("[[31m>[m] ---- STDERR ----")
+            print(f"[{status_char}] stderr:")
             print(ret.stderr, end="")
 
         # Check the output
@@ -353,6 +375,17 @@ class Context:
             raise RemoteExecError(command, ret)
 
         return ret
+
+    def run_task(self, registered_task_class):
+        """
+        Runs the registered instance (see Manager) for the given task class.
+        """
+        instance = self.manager.tasks.get(registered_task_class.identifier, None)
+        if not instance:
+            raise LogicError(f"Cannot run unregistered task {registered_task_class}")
+        if not isinstance(instance, registered_task_class):
+            raise LogicError("Cannot run unrelated task with the same identifier as a registered task.")
+        instance.exec(self)
 
     def print_transaction_title(self, transaction, title_color, status_char):
         """

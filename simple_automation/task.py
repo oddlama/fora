@@ -14,7 +14,11 @@ class Task:
     """
     def __init__(self, manager):
         self.manager = manager
+
         # Initialize variable defaults
+        self.var_enabled = f"tasks.{self.identifier}.enabled"
+        print("x " + self.var_enabled)
+        self.manager.set(self.var_enabled, True)
         self.set_defaults(manager)
 
     def set_defaults(self, manager):
@@ -39,6 +43,10 @@ class Task:
         """
         pass
 
+    def enabled(self, context):
+        print(f"{self.var_enabled} = {context.vars.get(self.var_enabled)}")
+        return context.vars.get(self.var_enabled)
+
     def run(self, context):
         """
         To be overwritten by a subclass. Contain's the task's logic.
@@ -47,8 +55,12 @@ class Task:
 
     def exec(self, context):
         """
-        Executes the actual task, as well as the pre and post functions in respective order.
+        Executes the actual task, as well as the pre and post functions
+        in respective order, if the task is enabled for the current context.
         """
+        if not self.enabled(context):
+            return
+
         self.pre_run(context)
         # Set safe context defaults
         context.defaults(user="root", umask=0o077, dir_mode=0o700, file_mode=0o600,
@@ -115,7 +127,7 @@ class TrackedTask(Task):
         """
         A sub-task used to initialize the tracking repository.
         """
-        identifier = "Initialize tracking"
+        identifier = "initialize_tracking"
         description = "Initialize the tracking repository"
 
         def __init__(self, tracked_task):
@@ -124,6 +136,9 @@ class TrackedTask(Task):
             parent task, so so we have access to the tracking specific variables later.
             """
             self.tracked_task = tracked_task
+
+        def enabled(self, context):
+            return True
 
         def run(self, context):
             # Set defaults
