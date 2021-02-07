@@ -17,7 +17,6 @@ class Task:
 
         # Initialize variable defaults
         self.var_enabled = f"tasks.{self.identifier}.enabled"
-        print("x " + self.var_enabled)
         self.manager.set(self.var_enabled, True)
         self.set_defaults(manager)
 
@@ -44,7 +43,6 @@ class Task:
         pass
 
     def enabled(self, context):
-        print(f"{self.var_enabled} = {context.vars.get(self.var_enabled)}")
         return context.vars.get(self.var_enabled)
 
     def run(self, context):
