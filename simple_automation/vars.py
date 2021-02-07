@@ -58,6 +58,6 @@ class Vars:
                 raise LogicError(f"Cannot set variable '{key}' because existing variable '{csname}' is not a dictionary")
 
         if self.warn_on_redefinition and keys[-1] in d:
-            print(f"[1;33mwarning:[m Redefinition of variable '{key}'")
+            print(f"[1;33mwarning:[m [1mRedefinition of variable '{key}':[m previous={d[keys[-1]]} new={value}")
 
         d[keys[-1]] = value
