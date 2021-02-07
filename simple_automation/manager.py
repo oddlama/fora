@@ -92,7 +92,13 @@ class Manager(Vars):
         check_valid_key(identifier, msg="Invalid task identifier")
         if identifier in self.tasks:
             raise Exception(f"Cannot register task: Duplicate identifier {identifier}")
+
+        # We want the manager to warn when a variable is redefined
+        # on task instanciation.
+        self.warn_on_redefinition = True
         task = task_class(self)
+        self.warn_on_redefinition = False
+
         self.tasks[identifier] = task
         return task
 

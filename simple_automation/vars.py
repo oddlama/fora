@@ -4,6 +4,7 @@ from simple_automation.checks import check_valid_key
 class Vars:
     def __init__(self):
         self.vars = {}
+        self.warn_on_redefinition = False
 
     def get(self, key, default=None):
         """
@@ -55,4 +56,8 @@ class Vars:
             if not isinstance(d, dict):
                 csname = '.'.join(cs)
                 raise LogicError(f"Cannot set variable '{key}' because existing variable '{csname}' is not a dictionary")
+
+        if self.warn_on_redefinition and keys[-1] in d:
+            print(f"[1;33mwarning:[m Redefinition of variable '{key}'")
+
         d[keys[-1]] = value
