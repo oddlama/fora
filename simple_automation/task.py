@@ -205,6 +205,10 @@ class TrackedTask(Task):
             TrackedTask.TaskInitializeTracking(self).exec(context)
 
     def _assert_tracking_repo_clean(self, context):
+        """
+        Asserts that the tracking repository is clean, so we will never
+        confuse different changes in a commit.
+        """
         (_, dst, _) = context.cache["tracking"][self.tracking_id]
 
         if not context.pretend:
@@ -214,6 +218,10 @@ class TrackedTask(Task):
                 raise LogicError("Refusing operation: Tracking repository is not clean!")
 
     def _track(self, context):
+        """
+        Uses rsync to copy the tracking paths into the repository, and
+        creates and pushes a commit if there are any changes.
+        """
         context.defaults(user="root", umask=0o077, dir_mode=0o700, file_mode=0o600,
                          owner="root", group="root")
         (_, dst, sub) = context.cache["tracking"][self.tracking_id]
@@ -272,7 +280,7 @@ class TrackedTask(Task):
 
                     # Create commit
                     commit_opts = [_template_str(context, o) for o in self.tracking_git_commit_opts]
-                    context.remote_exec(["git", "-C", dst, "commit"] + commit_opts + ["--message", f"Track: {added=}, {modified=}, {deleted=}"], checked=True)
+                    context.remote_exec(["git", "-C", dst, "commit"] + commit_opts + ["--message", f"task {self.identifier}: {added=}, {modified=}, {deleted=}"], checked=True)
 
                     # Push commit
                     context.remote_exec(["git", "-C", dst, "push", "origin", "master"], checked=True)
