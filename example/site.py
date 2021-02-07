@@ -12,6 +12,13 @@ vault = None#Vault("myvault.gpg", type='gpg')
 
 # -------- Create Manager --------
 manager = Manager()
+
+# -------- Define Tasks --------
+manager.add_task(TaskZsh)
+manager.add_task(TaskTrackPortage)
+manager.add_task(TaskTrackInstalledPackages)
+
+# -------- Set global variables --------
 manager.set("tasks.zsh.enabled", False)
 manager.set("vault", vault)
 
@@ -28,11 +35,6 @@ my_laptop.add_group(desktop)
 my_laptop.hostname = "chef"
 
 # TODO my_laptop.set("root_pw", vault_key="")
-
-# -------- Define Tasks --------
-manager.add_task(TaskZsh)
-manager.add_task(TaskTrackPortage)
-manager.add_task(TaskTrackInstalledPackages)
 
 def run(context):
     """
