@@ -4,7 +4,7 @@ from simple_automation.host import Host
 from simple_automation.task import Task
 from simple_automation.checks import check_valid_key
 from simple_automation.context import Context
-from simple_automation.exceptions import SimpleAutomationError, TransactionError, LogicError
+from simple_automation.exceptions import SimpleAutomationError, MessageError, LogicError
 from simple_automation.vars import Vars
 
 from jinja2 import Environment, FileSystemLoader
@@ -25,9 +25,9 @@ class Manager(Vars):
     tasks. It provides the CLI interface and represents the main entry
     point for a simple automation script.
     """
-    def __init__(self, main_directory=None):
+    def __init__(self, inventory_class, main_directory=None):
         """
-        Create a new manager.
+        Create a new manager, which will instanciate the given inventory class.
         All relative paths (mainly files used in basic.template() or basic.copy()) will
         be interpreted relative from the location of the initially executed script. If
         you want to change this behavior, you can either set main_directory to a relative
@@ -38,6 +38,7 @@ class Manager(Vars):
         self.groups = {}
         self.hosts = {}
         self.tasks = {}
+        self.vaults = {}
 
         self.pretend = True
         self.verbose = 0
@@ -58,6 +59,9 @@ class Manager(Vars):
             loader=FileSystemLoader(self.main_directory, followlinks=True),
             autoescape=False)
         self.set("simple_automation_managed", "This file is managed by simple automation.")
+
+        # Create inventory
+        self.inventory = inventory_class(self)
 
     def add_group(self, identifier):
         """
@@ -91,7 +95,7 @@ class Manager(Vars):
         identifier = task_class.identifier
         check_valid_key(identifier, msg="Invalid task identifier")
         if identifier in self.tasks:
-            raise Exception(f"Cannot register task: Duplicate identifier {identifier}")
+            raise LogicError(f"Cannot register task: Duplicate identifier {identifier}")
 
         # We want the manager to warn when a variable is redefined
         # on task instanciation.
@@ -102,9 +106,22 @@ class Manager(Vars):
         self.tasks[identifier] = task
         return task
 
-    def main(self, run):
+    def add_vault(self, vault_class, file, **kwargs):
         """
-        Run the user-supplied function on the defined inventory.
+        Registers a vault of the given class, with its storage at file.
+        Additional parameters are forwarded to the vault constructor.
+        """
+        canonical_path = os.path.realpath(os.path.join(self.main_directory, file))
+        if canonical_path in self.vaults:
+            raise LogicError(f"Duplicate vault: Another vault with file='{canonical_path}' has already been defined!")
+        vault = vault_class(manager=self, file=canonical_path, **kwargs)
+        self.vaults[canonical_path] = vault
+        return vault
+
+    def main(self):
+        """
+        The main program entry point. This will parse arguments and call the
+        user-supplied function on the defined inventory, when the script should be executed.
         """
 
         # Stop accepting new registrations, which would not be handeled correctly
@@ -114,6 +131,8 @@ class Manager(Vars):
         parser = ThrowingArgumentParser(description="Runs this simple automation script.")
 
         # General options
+        parser.add_argument('-e', '--edit-vault', dest='edit_vault', default=None, type=str,
+                help="Edit the given vault instead of running the main script.")
         parser.add_argument('-H', '--hosts', dest='hosts', default=None, type=list,
                 help="Specifies a subset of hosts to run on. By default all hosts are selected.")
         parser.add_argument('-p', '--pretend', dest='pretend', action='store_true',
@@ -123,7 +142,7 @@ class Manager(Vars):
         parser.add_argument('--debug', dest='debug', action='store_true',
                 help="Enable debugging output.")
         parser.add_argument('--version', action='version',
-                version='%(prog)s built with simple_automation version {version}'.format(version=__version__))
+                version=f"%(prog)s built with simple_automation version {__version__}")
 
         try:
             args = parser.parse_args()
@@ -135,11 +154,35 @@ class Manager(Vars):
         self.verbose = args.verbose
         self.debug = args.debug
 
-        # TODO ask for vault key, vaultdecrypt = ask = [openssl - ...], gpg = []
         try:
-            with Context(self, self.hosts["my_laptop"]) as c:
-                run(c)
-        except TransactionError as e:
+            if args.edit_vault is not None:
+                # Let the inventory register vaults
+                self.inventory.register_vaults()
+
+                # Retrieve vault
+                canonical_path = os.path.realpath(os.path.join(self.main_directory, args.edit_vault))
+                if canonical_path not in self.vaults:
+                    raise MessageError(f"No registered vault matches the given file '{canonical_path}'!")
+                vault = self.vaults[canonical_path]
+
+                # Load vault content, then launch editor
+                vault.decrypt()
+                vault.edit()
+            else:
+                # Load and decrypt all vaults
+                self.inventory.register_vaults()
+                for v in self.vaults.values():
+                    v.decrypt()
+
+                # Let the inventory register everything else
+                self.inventory.register_tasks()
+                self.inventory.register_globals()
+                self.inventory.register_inventory()
+
+                # TODO respect -H
+                with Context(self, self.hosts["my_laptop"]) as c:
+                    self.inventory.run(c)
+        except MessageError as e:
             print(f"[1;31merror:[m {str(e)}")
         except SimpleAutomationError as e:
             print(f"[1;31merror:[m {str(e)}")

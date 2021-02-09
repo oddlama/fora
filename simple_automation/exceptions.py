@@ -1,6 +1,12 @@
 class SimpleAutomationError(Exception):
     pass
 
+class MessageError(SimpleAutomationError):
+    """
+    Stacktrace will be supressed.
+    """
+    pass
+
 class LogicError(SimpleAutomationError):
     pass
 
@@ -10,7 +16,7 @@ class RemoteExecError(SimpleAutomationError):
         self.command = command
         self.ret = ret
 
-class TransactionError(SimpleAutomationError):
+class TransactionError(MessageError):
     def __init__(self, result):
         super().__init__(result.failure_reason)
         self.result = result

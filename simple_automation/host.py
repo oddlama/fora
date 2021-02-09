@@ -9,7 +9,6 @@ class Host(Vars):
         self.ssh_port = 22
         self.ssh_scp_params = []
         self.groups = []
-        manager.set(f"hosts.{identifier}.ssh_host", self.ssh_host)
 
     def set_ssh_port(self, port):
         self.ssh_port = port

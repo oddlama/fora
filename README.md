@@ -6,8 +6,8 @@ Intended uses are small-scale machine administation, system configuration tracki
 The main features are:
 
 * Simple, not complex.
-* Almost self-contained, except for jinja2 for templating.
-* Minimal. This library consists of only ~1000 LOC.
+* Almost self-contained, except for jinja2 for templating (and optionally openssl and gpg for symmetric / gpg encrypted vaults).
+* Minimal. This library consists of just a little over 1000 LoC.
 * Supports encrypted variable storage.
 * Executes commands over a single ssh connection (→ fast execution)
 * Concicse, readable output (and optionally more verbose but still compact)
@@ -28,8 +28,6 @@ Drawbacks:
 
 ## Good to know
 
-* Do not define global variables before adding tasks! Otherwise
-  the task may override your definitions!
 * Tasks have an implicit enabled variable
 * Context defaults. Best practice: Always set them yourself.
   context.defaults(user="root", umask=0o077, dir_mode=0o700, file_mode=0o600,
@@ -46,3 +44,12 @@ Drawbacks:
 * Variable inheritance order
 * Special jinja2 variables (simple_automation_managed, context)
 * Secrets: Don't put secrets where they are printed. Ideally only in templated files, then you are safe.
+* host.set("var", "value") vs host.var = "value".
+  You may also use custom python variables and object in templates. These
+  have the advantage that they are not merged into the global variables
+  dictionary. You can access them later in any templated string via {{ context.host.<var> }}.
+* Defer variable definition to vault, by doing set("var", vault.get("var")) convenience funciton maybe? manager.defer("var", vault)
+* Vault types: Keyfile, keyfile from ENV example, Symmetric key ask, symm from env, gpg unlock with keyid.
+* Base directory is deduced from the location of the main started script. To override, use Manager ctor param
+* Unlock multiple vaults with one key: getpass before, use key= param
+* Only unlock the edited vault: Pass a function to key=, which is then called based on need.
