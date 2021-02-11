@@ -21,7 +21,7 @@ def checkout(context: Context, url: str, dst: str, update: bool = True, depth=No
         action.extra_info(url=url)
 
         # Query current state
-        (cur_ft, cur_mode, cur_owner, cur_group) = _remote_stat(context, dst)
+        (cur_ft, _, _, _) = _remote_stat(context, dst)
 
         # Record this initial state
         if cur_ft is None:

@@ -1,4 +1,5 @@
-from simple_automation import Context
+from simple_automation.context import Context
+from simple_automation.exceptions import LogicError
 from simple_automation.transactions.basic import _template_str
 
 ATOMS = ['category', 'name', 'version', 'ebuild_revision', 'slots', 'prefixes', 'sufixes']
@@ -40,7 +41,7 @@ def is_installed(context: Context, atom: str, packages=None):
         packages = list_packages(context)
     return cn in packages
 
-def package(context: Context, atom: str, state="present", oneshot=False, opts=[]):
+def package(context: Context, atom: str, state="present", oneshot=False, opts: list = None):
     """
     Installs or uninstalls (depending if state == "present" or "absent") the given
     package atom. Additional options to emerge can be passed via opts, and will be appended
@@ -50,7 +51,7 @@ def package(context: Context, atom: str, state="present", oneshot=False, opts=[]
         raise LogicError(f"Invalid package state '{state}'")
 
     atom = _template_str(context, atom)
-    opts = [_template_str(context, o) for o in opts]
+    opts = [] if opts is None else [_template_str(context, o) for o in opts]
 
     with context.transaction(title="package", name=atom) as action:
         # Query current state

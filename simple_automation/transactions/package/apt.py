@@ -1,11 +1,12 @@
-from simple_automation import Context
+from simple_automation.context import Context
+from simple_automation.exceptions import LogicError
 from simple_automation.transactions.basic import _template_str
 
-def is_installed(context: Context, atom: str, packages=None):
+def is_installed(context: Context, atom: str):
     remote_query = context.remote_exec(["dpgk-query", "--show", "--showformat=${Status}", atom], checked=True)
     return "ok installed" in remote_query.stdout
 
-def package(context: Context, atom: str, state="present", oneshot=False, opts=[]):
+def package(context: Context, atom: str, state="present", opts: list = None):
     """
     Installs or uninstalls (depending if state == "present" or "absent") the given
     package atom. Additional options to apt-get can be passed via opts, and will be appended
@@ -15,7 +16,7 @@ def package(context: Context, atom: str, state="present", oneshot=False, opts=[]
         raise LogicError(f"Invalid package state '{state}'")
 
     atom = _template_str(context, atom)
-    opts = [_template_str(context, o) for o in opts]
+    opts = [] if opts is None else [_template_str(context, o) for o in opts]
 
     with context.transaction(title="package", name=atom) as action:
         # Query current state

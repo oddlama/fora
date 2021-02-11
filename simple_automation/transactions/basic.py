@@ -3,7 +3,7 @@ from simple_automation.exceptions import LogicError, MessageError, RemoteExecErr
 from simple_automation.checks import check_valid_path
 
 from jinja2.exceptions import TemplateNotFound, UndefinedError
-from jinja2 import Template, Environment, FileSystemLoader
+from jinja2 import Template
 
 import hashlib
 import base64
@@ -13,11 +13,11 @@ def _template_str(context: Context, template_str):
     """
     Renders the given string template.
     """
-    template = Template(template_str)
+    templ = Template(template_str)
     try:
-        return template.render(context.vars_dict)
+        return templ.render(context.vars_dict)
     except UndefinedError as e:
-        raise LogicError(f"Error while templating string '{template_str}': " + str(e))
+        raise LogicError(f"Error while templating string '{template_str}': " + str(e)) from e
 
 def _mode_to_str(mode):
     """
@@ -112,7 +112,6 @@ def _remote_upload(context: Context, get_content, title: str, name: str, dst: st
         if not context.pretend:
             try:
                 # Replace file
-                content_base64 = base64.b64encode(content.encode('utf-8')).decode('utf-8')
                 dst_base64 = base64.b64encode(dst.encode('utf-8')).decode('utf-8')
                 context.remote_exec(["sh", "-c", f"cat > \"$(echo '{dst_base64}' | base64 -d)\""], checked=True, input=content)
 
@@ -153,7 +152,7 @@ def directory(context: Context, path: str, mode=None, owner=None, group=None):
         if not context.pretend:
             try:
                 # If stat failed, the directory doesn't exist and we need to create it.
-                if stat.return_code != 0:
+                if cur_ft is None:
                     context.remote_exec(["mkdir", path], checked=True)
 
                 # Set permissions
@@ -185,14 +184,14 @@ def template(context: Context, src: str, dst: str, mode=None, owner=None, group=
     def get_content():
         # Get templated content
         try:
-            template = context.host.manager.jinja2_env.get_template(src)
+            templ = context.host.manager.jinja2_env.get_template(src)
         except TemplateNotFound as e:
-            raise LogicError("Template not found: " + str(e))
+            raise LogicError("Template not found: " + str(e)) from e
 
         try:
-            return template.render(context.vars_dict)
+            return templ.render(context.vars_dict)
         except UndefinedError as e:
-            raise MessageError(f"Error while templating '{src}': " + str(e))
+            raise MessageError(f"Error while templating '{src}': " + str(e)) from e
 
     return _remote_upload(context, get_content, title="template", name=dst, dst=dst, mode=mode, owner=owner, group=group)
 
