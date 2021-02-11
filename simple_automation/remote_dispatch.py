@@ -160,8 +160,8 @@ class Dispatcher:
             """
             try:
                 os.umask(self.execution_settings.umask)
-                os.setresuid(self.execution_settings.uid, self.execution_settings.uid, self.execution_settings.uid)
                 os.setresgid(self.execution_settings.gid, self.execution_settings.gid, self.execution_settings.gid)
+                os.setresuid(self.execution_settings.uid, self.execution_settings.uid, self.execution_settings.uid)
             except Exception as e:
                 print(str(e))
 
