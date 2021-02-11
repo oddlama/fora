@@ -39,12 +39,9 @@ class MySite(Inventory):
         my_laptop.hostname = "chef"
 
     def run(self, context):
-        context.defaults(user="nobody", umask=0o022, dir_mode=0o755, file_mode=0o644,
-                         owner="nobody", group="nobody")
-        context.remote_exec(["touch", "/tmp/aaaaaaaaaaaaaa"])
-        #context.run_task(TaskZsh)
-        #context.run_task(TaskTrackPortage)
-        #context.run_task(TaskTrackInstalledPackages)
+        context.run_task(TaskZsh)
+        context.run_task(TaskTrackPortage)
+        context.run_task(TaskTrackInstalledPackages)
 
 # -------- Run the inventory --------
 if __name__ == "__main__":
