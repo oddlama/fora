@@ -1,7 +1,8 @@
-from simple_automation import Context, LogicError, RemoteExecError
+from simple_automation.context import Context
+from simple_automation.exceptions import LogicError, MessageError, RemoteExecError
 from simple_automation.checks import check_valid_path
 
-from jinja2.exceptions import TemplateNotFound
+from jinja2.exceptions import TemplateNotFound, UndefinedError
 from jinja2 import Template, Environment, FileSystemLoader
 
 import hashlib
@@ -13,7 +14,10 @@ def _template_str(context: Context, template_str):
     Renders the given string template.
     """
     template = Template(template_str)
-    return template.render(context.vars_dict)
+    try:
+        return template.render(context.vars_dict)
+    except UndefinedError as e:
+        raise LogicError(f"Error while templating string '{template_str}': " + str(e))
 
 def _mode_to_str(mode):
     """
@@ -82,19 +86,25 @@ def _remote_upload(context: Context, get_content, title: str, name: str, dst: st
         (cur_ft, cur_mode, cur_owner, cur_group) = _remote_stat(context, dst)
         cur_sha512sum = _remote_sha512sum(context, dst)
 
-        # Get content
-        content = get_content()
-        sha512sum = hashlib.sha512(content.encode("utf-8")).hexdigest()
-
         # Record this initial state
         if cur_ft is None:
             action.initial_state(exists=False, sha512sum=None, mode=None, owner=None, group=None)
         elif cur_ft == "regular file":
             action.initial_state(exists=True, sha512sum=cur_sha512sum, mode=cur_mode, owner=cur_owner, group=cur_group)
-            if sha512sum == cur_sha512sum and mode == cur_mode and owner == cur_owner and group == cur_group:
-                return action.unchanged()
         else:
             raise LogicError("Cannot create file on remote: Path already exists and is not a file")
+
+        # Get content
+        try:
+            content = get_content()
+        except Exception as e:
+            action.failure(e, set_final_state=True)
+            raise e
+        sha512sum = hashlib.sha512(content.encode("utf-8")).hexdigest()
+
+        if cur_ft == "regular file":
+            if sha512sum == cur_sha512sum and mode == cur_mode and owner == cur_owner and group == cur_group:
+                return action.unchanged()
 
         # Record the final state
         action.final_state(exists=True, sha512sum=sha512sum, mode=mode, owner=owner, group=group)
@@ -177,8 +187,12 @@ def template(context: Context, src: str, dst: str, mode=None, owner=None, group=
         try:
             template = context.host.manager.jinja2_env.get_template(src)
         except TemplateNotFound as e:
-            raise LogicError("template not found: " + str(e))
-        return template.render(context.vars_dict)
+            raise LogicError("Template not found: " + str(e))
+
+        try:
+            return template.render(context.vars_dict)
+        except UndefinedError as e:
+            raise MessageError(f"Error while templating '{src}': " + str(e))
 
     return _remote_upload(context, get_content, title="template", name=dst, dst=dst, mode=mode, owner=owner, group=group)
 

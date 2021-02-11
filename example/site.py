@@ -5,8 +5,6 @@ from tasks import TaskZsh, TaskTrackPortage, TaskTrackInstalledPackages
 
 import os
 
-# TODO - error on using unbound variables in templates
-
 class MySite(Inventory):
     def register_vaults(self):
         # -------- Load vault --------
@@ -32,6 +30,7 @@ class MySite(Inventory):
         # -------- Define Groups --------
         desktops = self.manager.add_group("desktops")
         desktops.set("system.is_desktop", True)
+        desktops.set("tasks.zsh.enabled", True)
 
         # -------- Define Hosts --------
         my_laptop = self.manager.add_host("my_laptop", ssh_host="root@localhost")

@@ -111,7 +111,7 @@ class ActiveTransaction:
         self.result = CompletedTransaction(self, success=True, store=kwargs)
         return self.result
 
-    def failure(self, reason, **kwargs):
+    def failure(self, reason, set_final_state=False, **kwargs):
         """
         Completes the transaction, marking it as failed with the given reason.
         If reason is a RemoteExecError, additional information will be printed.
@@ -120,6 +120,9 @@ class ActiveTransaction:
             e = reason
             reason = f"{type(e).__name__}: {str(e)}\n"
             reason += e.ret.stderr
+
+        if set_final_state:
+            self.final_state(**self.initial_state_dict)
 
         if self.result is not None:
             raise LogicError("A transaction cannot be completed multiple times.")

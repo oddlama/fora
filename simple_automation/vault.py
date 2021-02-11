@@ -144,8 +144,6 @@ class SymmetricVault(Vault):
         # Return salt, nonce, AES ciphertext and verification tag
         return salt + cipher.nonce + aes_ciphertext + tag
 
-# TODO salt
-# TODO base64 storage for git ability
 class GpgVault(Vault):
     def __init__(self, manager, file, recipient):
         """

@@ -7,7 +7,7 @@ from simple_automation.context import Context
 from simple_automation.exceptions import SimpleAutomationError, MessageError, LogicError
 from simple_automation.vars import Vars
 
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 import os
 import argparse
@@ -57,7 +57,8 @@ class Manager(Vars):
 
         self.jinja2_env = Environment(
             loader=FileSystemLoader(self.main_directory, followlinks=True),
-            autoescape=False)
+            autoescape=False,
+            undefined = StrictUndefined)
         self.set("simple_automation_managed", "This file is managed by simple automation.")
 
         # Create inventory
