@@ -155,12 +155,13 @@ class Manager(Vars):
         self.debug = args.debug
 
         try:
-            if args.edit_vault is not None:
+            self.edit_vault = args.edit_vault
+            if self.edit_vault is not None:
                 # Let the inventory register vaults
                 self.inventory.register_vaults()
 
                 # Retrieve vault
-                canonical_path = os.path.realpath(os.path.join(self.main_directory, args.edit_vault))
+                canonical_path = os.path.realpath(os.path.join(self.main_directory, self.edit_vault))
                 if canonical_path not in self.vaults:
                     raise MessageError(f"No registered vault matches the given file '{canonical_path}'!")
                 vault = self.vaults[canonical_path]

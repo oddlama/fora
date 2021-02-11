@@ -1,6 +1,7 @@
 from simple_automation.vars import Vars
 from simple_automation.exceptions import LogicError
 
+import base64
 import getpass
 import json
 import os
@@ -38,16 +39,17 @@ class Vault(Vars):
         """
         try:
             with open(self.file, 'rb') as f:
-                self.vars = json.loads(self.decrypt_content(f.read()))
+                self.vars = json.loads(self.decrypt_content(base64.decodebytes(f.read())))
         except FileNotFoundError:
-            print(f"[1;33mwarning:[m [1mLoaded nonexistent vault '{self.file}': [mTo create the file, use --edit-vault")
+            if self.manager.edit_vault is None:
+                print(f"[1;33mwarning:[m [1mLoaded nonexistent vault '{self.file}': [mTo create the file, use --edit-vault")
             pass
 
     def encrypt(self) -> bytes:
         """
         Encrypts the currently stored Vars (using self.encrypt_content) and overwrites the vault file.
         """
-        content = self.encrypt_content(json.dumps(self.vars).encode('utf-8'))
+        content = base64.encodebytes(self.encrypt_content(json.dumps(self.vars).encode('utf-8')))
         with open(self.file, 'wb') as f:
             f.write(content)
 
@@ -101,13 +103,49 @@ class SymmetricVault(Vault):
             # Latin1 is a str <-> bytes no-op (see https://stackoverflow.com/questions/42795042/how-to-cast-a-string-to-bytes-without-encoding)
             self.key = self.key.encode('latin1')
 
+    def kdf(self, salt):
+        from Crypto.Protocol.KDF import scrypt
+        return scrypt(self.key, salt, key_len=32, N=2**17, r=8, p=1)
+
     def decrypt_content(self, ciphertext: bytes) -> bytes:
-        return b''
+        from Crypto.Cipher import AES
+
+        # Split ciphertext into raw input parts
+        salt = ciphertext[:32]
+        nonce = ciphertext[32:48]
+        aes_ciphertext = ciphertext[48:-16]
+        tag = ciphertext[-16:]
+
+        # Derive aeskey and decrypt ciphertext
+        aeskey = self.kdf(salt)
+        cipher = AES.new(aeskey, AES.MODE_GCM, nonce=nonce)
+        plaintext = cipher.decrypt(aes_ciphertext)
+
+        # Verify encrypted file was not tampered with
+        try:
+            cipher.verify(tag)
+        except ValueError as e:
+            # If we get a ValueError, there was an error when decrypting so delete the file we created
+            raise MessageError(f"Refusing decrypted data from '{self.file}', because content verification failed! Your file might have been tampered with!")
+
+        return plaintext
 
     def encrypt_content(self, plaintext: bytes) -> bytes:
-        return b''
+        from Crypto.Cipher import AES
+        from Crypto.Random import get_random_bytes
+        salt = get_random_bytes(32)
 
+        # Derive aeskey and encrypt plaintext
+        aeskey = self.kdf(salt)
+        cipher = AES.new(aeskey, AES.MODE_GCM)
+        aes_ciphertext = cipher.encrypt(plaintext)
+        tag = cipher.digest()
 
+        # Return salt, nonce, AES ciphertext and verification tag
+        return salt + cipher.nonce + aes_ciphertext + tag
+
+# TODO salt
+# TODO base64 storage for git ability
 class GpgVault(Vault):
     def __init__(self, manager, file, recipient):
         """

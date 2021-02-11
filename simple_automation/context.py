@@ -196,6 +196,7 @@ class Context:
         """
         # Remove temporary files, and also do a safety check, so
         # this will never go horribly wrong.
+        # TODO remove this debug print
         self.remote_exec(["lsof", self.remote_temp_dir], verbosity=0)
         self.remote_dispatcher.stop_and_wait()
         if self.remote_temp_dir.startswith("/tmp"):
@@ -332,7 +333,7 @@ class Context:
         via our built-in remote dispatch script. If checked is True,
         it will throw an exception if the remote command returns an
         unsuccessful exit status. checked=True also implies a default error_verbosity=0
-        and verbosity=2
+        and verbosity=2.
 
         If verbosity is not None and self.verbose >= verbosity, the command
         output will be printed. Read: verbosity is the number of -v flags

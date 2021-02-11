@@ -6,7 +6,10 @@ Intended uses are small-scale machine administation, system configuration tracki
 The main features are:
 
 * Simple, not complex.
-* Almost self-contained, except for jinja2 for templating (and optionally openssl and gpg for symmetric / gpg encrypted vaults).
+* Minimal dependencies:
+  - Uses jinja2 for templating
+  - System command 'gpg' is used for gpg encrypted vaults.
+  - pycryptodome is used (scrypt + AES-256-GCM) for symmetric vault encryption (not required if feature not used).
 * Minimal. This library consists of just a little over 1000 LoC.
 * Supports encrypted variable storage.
 * Executes commands over a single ssh connection (→ fast execution)

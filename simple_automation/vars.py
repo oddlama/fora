@@ -1,10 +1,17 @@
-from simple_automation import LogicError
 from simple_automation.checks import check_valid_key
+from simple_automation.exceptions import LogicError
 
 class Vars:
     def __init__(self):
         self.vars = {}
         self.warn_on_redefinition = False
+
+    def copy(self, key, vars):
+        """
+        Copies a value from another vars object into this one.
+        Same as calling self.set(key, vars.get(key))
+        """
+        self.set(key, vars.get(key))
 
     def get(self, key, default=None):
         """
