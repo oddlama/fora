@@ -54,5 +54,4 @@ Drawbacks:
 * Defer variable definition to vault, by doing set("var", vault.get("var")) convenience funciton maybe? manager.defer("var", vault)
 * Vault types: Keyfile, keyfile from ENV example, Symmetric key ask, symm from env, gpg unlock with keyid.
 * Base directory is deduced from the location of the main started script. To override, use Manager ctor param
-* Unlock multiple vaults with one key: getpass before, use key= param
-* Only unlock the edited vault: Pass a function to key=, which is then called based on need.
+* Unlock multiple vaults with one key: getpass before, use key= param. Downside: will need to unlock every time not only when needed

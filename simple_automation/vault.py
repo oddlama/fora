@@ -88,7 +88,10 @@ class SymmetricVault(Vault):
         it will automatically be converted to bytes (without encoding) before usage.
         """
         super().__init__(manager, file)
+        self.keyfile = keyfile
+        self.key = key
 
+    def get_key():
         # Get key from keyfile / ask for pass
         if key is None:
             if keyfile is None:
@@ -108,6 +111,7 @@ class SymmetricVault(Vault):
         return scrypt(self.key, salt, key_len=32, N=2**17, r=8, p=1)
 
     def decrypt_content(self, ciphertext: bytes) -> bytes:
+        self.get_key()
         from Crypto.Cipher import AES
 
         # Split ciphertext into raw input parts
@@ -156,6 +160,7 @@ class GpgVault(Vault):
         self.recipient = recipient
 
     def decrypt_content(self, ciphertext: bytes) -> bytes:
+        print(f"Decrypting gpg vault '{self.file}'")
         return subprocess.run(["gpg", "--quiet", "--decrypt"], input=ciphertext, capture_output=True, check=True).stdout
 
     def encrypt_content(self, plaintext: bytes) -> bytes:
