@@ -10,7 +10,7 @@ The main features are:
   - Uses jinja2 for templating
   - System command 'gpg' is used for gpg encrypted vaults.
   - pycryptodome is used (scrypt + AES-256-GCM) for symmetric vault encryption (not required if feature not used).
-* Minimal. This library consists of just a little over 1000 LoC.
+* Minimal. This library consists of just 1300 LoC.
 * Supports encrypted variable storage.
 * Executes commands over a single ssh connection (→ fast execution)
 * Concicse, readable output (and optionally more verbose but still compact)
@@ -41,7 +41,7 @@ Drawbacks:
 * Manage packages on hosts with different distributions
 * Conditionals based on transaction results
 * Using vault variables
-* Check if host is in group
+* Check if host is in group: `if my_laptop in desktops:` or `if desktops in my_laptop.groups`.
 * Only track a directory without doing anything else. Useful for externally modified directories,
   or even to use this just for system tracking.
 * Variable inheritance order

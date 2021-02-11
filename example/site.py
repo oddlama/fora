@@ -43,9 +43,6 @@ class MySite(Inventory):
         context.run_task(TaskTrackPortage)
         context.run_task(TaskTrackInstalledPackages)
 
-        # TODO if context.host == my_laptop
-        # TODO if context.host in desktops: //i.e. desktops in context.hosts.groups
-
 # -------- Run the inventory --------
 if __name__ == "__main__":
     run_inventory(MySite)
