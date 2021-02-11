@@ -4,9 +4,9 @@ from simple_automation.transaction import Transaction
 from simple_automation.vars import Vars
 from simple_automation.utils import merge_dicts, align_ellipsis, ellipsis
 
-from subprocess import CalledProcessError
-import subprocess
+import base64
 import os
+import subprocess
 import sys
 
 class CompletedRemoteCommand:
@@ -196,11 +196,7 @@ class Context:
         """
         # Remove temporary files, and also do a safety check, so
         # this will never go horribly wrong.
-        # TODO remove this debug print
-        self.remote_exec(["lsof", self.remote_temp_dir], verbosity=0)
         self.remote_dispatcher.stop_and_wait()
-        if self.remote_temp_dir.startswith("/tmp"):
-            self.exec_ssh_raw(["rm", "-rf", self.remote_temp_dir])
 
     def defaults(self, user, umask, dir_mode, file_mode, owner, group):
         """
@@ -304,28 +300,16 @@ class Context:
         so we can more easily execute commands on the remote.
         """
         print(f"[[32m>[m] Establishing ssh connection to {self.host.ssh_host}")
-        # Create temporary directory
-        self.remote_temp_dir = self.exec_ssh_raw(["mktemp", "-d"]).stdout.decode("utf-8").split('\n')[0]
-        # Upload remote dispatch script
-        self.remote_dispatch_script_path = self.upload_file(local_remote_dispatch_script_path)
-        # Start remote dispatch script
-        self.remote_dispatcher = RemoteDispatcher(self, self._base_ssh_command(["python3", self.remote_dispatch_script_path]))
+        with open(local_remote_dispatch_script_path, 'rb') as f:
+            remote_dispatcher_script_source_base64 = base64.b64encode(f.read()).decode('utf-8')
+        # Upload and start remote dispatch script
+        self.remote_dispatcher = RemoteDispatcher(self, self._base_ssh_command([f"python3 -c \"$(echo '{remote_dispatcher_script_source_base64}' | base64 -d)\""]))
 
     def exec_ssh_raw(self, command):
         """
         Execute ssh to execute the given command on the remote host, directly via ssh.
         """
         return subprocess.run(self._base_ssh_command(command), check=True, capture_output=True)
-
-    def upload_file(self, file):
-        """
-        Uploads the given file to the temporary directory on the remote host
-        and returns the absolute path to the resulting file.
-        """
-        basename = os.path.basename(file)
-        remote_file_path = os.path.join(self.remote_temp_dir, basename)
-        subprocess.run(self._base_scp_command(file, remote_file_path), check=True)
-        return remote_file_path
 
     def remote_exec(self, command, checked=False, input=None, error_verbosity=None, verbosity=None):
         """
