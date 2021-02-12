@@ -1,5 +1,3 @@
-.. _concepts:
-
 Frequently Asked Questions
 ==========================
 

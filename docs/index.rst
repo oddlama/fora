@@ -18,12 +18,6 @@ your topic of interest. You can also use the search function in the top left cor
 
 .. toctree::
     :maxdepth: 1
-    :caption: Getting started
-    :name: sec-getting-started
-
-
-.. toctree::
-    :maxdepth: 1
     :caption: Contents
     :name: sec-contents
 
@@ -34,8 +28,22 @@ your topic of interest. You can also use the search function in the top left cor
     contents/faq
 
 .. toctree::
+    :maxdepth: 2
+    :caption: API
+    :name: sec-api
+
+    api
+
+.. toctree::
     :maxdepth: 1
     :caption: Info
     :name: sec-info
 
     info/license
+
+Indices and tables
+==================
+
+- :ref:`genindex`
+- :ref:`modindex`
+- :ref:`search`
