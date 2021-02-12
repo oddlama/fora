@@ -111,7 +111,7 @@ class ActiveTransaction:
 
     def unchanged(self, **kwargs):
         """
-        Sets the final state to the initial state and returns success(**kwargs).
+        Sets the final state to the initial state and returns ``success(**kwargs)``.
         """
         self.final_state(**self.initial_state_dict)
         return self.success(**kwargs)

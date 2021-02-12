@@ -219,3 +219,9 @@ class Manager(Vars):
         except SimpleAutomationError as e:
             print(f"[1;31merror:[m {str(e)}")
             raise e
+
+def run_inventory(inventory_class):
+    """
+    Instanciates a manager given an inventory class and runs the manager's CLI.
+    """
+    Manager(inventory_class).main()

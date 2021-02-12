@@ -100,10 +100,9 @@ class TrackedTask(Task):
     """
     The remote url to the repository which will be used as the tracking repo.
     Will be templated by the currently executed context.
-
     For example:
-      - (via ssh)   "git@github.com:myuser/tracked-system-settings"
-      - (via https) "https://{{ personal_access_token }}@github.com/myuser/tracked-system-settings"
+    - (via ssh)   "git@github.com:myuser/tracked-system-settings"
+    - (via https) "https://{{ personal_access_token }}@github.com/myuser/tracked-system-settings"
     Remember to put secrets into a vault so they aren't checked into your repository in plain text.
     We recommend using ssh, as secrets in the url will be printed to the terminal when executed.
     """
