@@ -1,0 +1,6 @@
+.. _directives:
+
+Examples
+========
+
+Example
