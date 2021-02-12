@@ -1,5 +1,6 @@
-from simple_automation.vars import Vars
-from simple_automation.exceptions import LogicError, MessageError
+"""
+Provides the Vault class for secure variable storage.
+"""
 
 import base64
 import getpass
@@ -7,6 +8,9 @@ import json
 import os
 import subprocess
 import tempfile
+
+from simple_automation.vars import Vars
+from simple_automation.exceptions import LogicError, MessageError
 
 class Vault(Vars):
     """
@@ -80,6 +84,10 @@ class Vault(Vars):
             self.encrypt()
 
 class SymmetricVault(Vault):
+    """
+    A SymmetricVault is a Vault which saves its context symmetrically encrypted.
+    Content is encrypted with a salted key (+scrypt) using AES-256-GCM.
+    """
     def __init__(self, manager, file, keyfile=None, key=None):
         """
         Initializes the vault from the given file and key/keyfile.
@@ -91,6 +99,9 @@ class SymmetricVault(Vault):
         self.key = key
 
     def get_key(self):
+        """
+        Loads the decryption key.
+        """
         # Get key from keyfile / ask for pass
         if self.key is None:
             if self.keyfile is None:
@@ -101,16 +112,24 @@ class SymmetricVault(Vault):
                     self.key = f.read()
 
         # Change key to bytes, if it's a str
-        if type(self.key) == str:
+        if isinstance(self.key, str):
             # Latin1 is a str <-> bytes no-op (see https://stackoverflow.com/questions/42795042/how-to-cast-a-string-to-bytes-without-encoding)
             self.key = self.key.encode('latin1')
 
     def kdf(self, salt):
+        """
+        Derives the actual aeskey from a given salt and the saved key.
+        """
+        # pylint: disable=C0415
         from Crypto.Protocol.KDF import scrypt
         return scrypt(self.key, salt, key_len=32, N=2**17, r=8, p=1)
 
     def decrypt_content(self, ciphertext: bytes) -> bytes:
+        """
+        Decrypts the given ciphertext.
+        """
         self.get_key()
+        # pylint: disable=C0415
         from Crypto.Cipher import AES
 
         # Split ciphertext into raw input parts
@@ -134,6 +153,10 @@ class SymmetricVault(Vault):
         return plaintext
 
     def encrypt_content(self, plaintext: bytes) -> bytes:
+        """
+        Encrypts the given plaintext.
+        """
+        # pylint: disable=C0415
         from Crypto.Cipher import AES
         from Crypto.Random import get_random_bytes
         salt = get_random_bytes(32)
@@ -148,6 +171,11 @@ class SymmetricVault(Vault):
         return salt + cipher.nonce + aes_ciphertext + tag
 
 class GpgVault(Vault):
+    """
+    A GpgVault is a Vault which saves its context encrypted with gpg.
+    This can be convenient if you e.g. use a YubiKey or similar hardware
+    to store your encryption keys.
+    """
     def __init__(self, manager, file, recipient):
         """
         Initializes the gpg encrypted vault from the given file and recipient.
@@ -159,10 +187,16 @@ class GpgVault(Vault):
         self.recipient = recipient
 
     def decrypt_content(self, ciphertext: bytes) -> bytes:
+        """
+        Decrypts the given ciphertext.
+        """
         print(f"Decrypting gpg vault '{self.file}'")
         return subprocess.run(["gpg", "--quiet", "--decrypt"], input=ciphertext, capture_output=True, check=True).stdout
 
     def encrypt_content(self, plaintext: bytes) -> bytes:
+        """
+        Encrypts the given plaintext.
+        """
         if self.recipient is None:
             raise LogicError("GpgVault encryption requires a recipient")
         return subprocess.run(["gpg", "--quiet", "--encrypt", "--recipient", self.recipient], input=plaintext, capture_output=True, check=True).stdout

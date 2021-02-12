@@ -1,13 +1,17 @@
-from simple_automation.context import Context
-from simple_automation.exceptions import LogicError, MessageError, RemoteExecError
-from simple_automation.checks import check_valid_path
-
-from jinja2.exceptions import TemplateNotFound, UndefinedError
-from jinja2 import Template
+"""
+Provides basic transactions.
+"""
 
 import hashlib
 import base64
 import os
+
+from jinja2.exceptions import TemplateNotFound, UndefinedError
+from jinja2 import Template
+
+from simple_automation.context import Context
+from simple_automation.exceptions import LogicError, MessageError, RemoteExecError
+from simple_automation.checks import check_valid_path
 
 def _template_str(context: Context, template_str):
     """
@@ -59,8 +63,7 @@ def _remote_stat(context, path):
         file_type, mode, owner, group = stat.stdout.strip().split(";")
         mode, owner, group = _resolve_mode_owner_group(context, int(mode, 8), owner, group, None)
         return (file_type, mode, owner, group)
-    else:
-        return (None, None, None, None)
+    return (None, None, None, None)
 
 def _remote_sha512sum(context: Context, path: str):
     """
@@ -70,8 +73,7 @@ def _remote_sha512sum(context: Context, path: str):
     sha512sum = context.remote_exec(["sha512sum", "-b", path])
     if sha512sum.return_code == 0:
         return sha512sum.stdout.strip().split(" ")[0]
-    else:
-        return None
+    return None
 
 def _remote_upload(context: Context, get_content, title: str, name: str, dst: str, mode=None, owner=None, group=None):
     """

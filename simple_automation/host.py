@@ -1,20 +1,44 @@
+"""
+Provides the host class.
+"""
+
 from simple_automation.vars import Vars
 
 class Host(Vars):
+    """
+    A Host represents a machine that can be reached via ssh, and
+    which should be managed by simple_automation.
+    It can store variables which override gloabl and group variables,
+    which may be used to customize the execution routine.
+    """
+
     def __init__(self, manager, identifier, ssh_host):
+        """
+        Initializes a new host.
+        """
         super().__init__()
         self.manager = manager
         self.identifier = identifier
         self.ssh_host = ssh_host
         self.ssh_port = 22
-        self.ssh_scp_params = []
+        self.ssh_params = []
         self.groups = []
 
     def set_ssh_port(self, port):
+        """
+        Sets the ssh port for the host's connection.
+        """
         self.ssh_port = port
 
-    def set_ssh_scp_params(self, params):
-        self.ssh_scp_params = params
+    def set_ssh_params(self, params):
+        """
+        Sets additional ssh parameters for this host's connection.
+        """
+        self.ssh_params = params
 
     def add_group(self, group):
-        self.groups.append(group)
+        """
+        Adds this host to the given group, if it isn't already in that group.
+        """
+        if self not in group:
+            self.groups.append(group)

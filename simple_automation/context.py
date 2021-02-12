@@ -1,17 +1,22 @@
-from simple_automation.exceptions import RemoteExecError, LogicError
-from simple_automation.remote_dispatch import script_path as local_remote_dispatch_script_path
-from simple_automation.transaction import Transaction
-from simple_automation.vars import Vars
-from simple_automation.utils import merge_dicts, align_ellipsis, ellipsis
+"""
+Provides the Context class and related methods.
+"""
 
 import base64
 import subprocess
 import sys
 
+from simple_automation.exceptions import RemoteExecError, LogicError
+from simple_automation.remote_dispatch import script_path as local_remote_dispatch_script_path
+from simple_automation.transaction import Transaction
+from simple_automation.vars import Vars
+from simple_automation.utils import merge_dicts
+
 class CompletedRemoteCommand:
     """
     A wrapper for the information returned by a remote command.
     """
+    # pylint: disable=R0903
     def __init__(self):
         self.stdout = None
         self.stderr = None
@@ -84,7 +89,8 @@ class RemoteDispatcher:
         """
         l = int(self.process.stdout.readline().decode('utf-8'))
         if l < 0 or l > 16*1024*1024*1024:
-            exit(2)
+            print("error: Recieved invalid length string! Aborting.", file=sys.stderr)
+            sys.exit(2)
         return l
 
     def read_str(self):
@@ -137,7 +143,6 @@ class RemoteDispatcher:
         ret.stderr = self.read_str()
         ret.return_code = int(self.read_str())
         return ret
-
 
 class Context:
     """
@@ -271,10 +276,20 @@ class Context:
 
     @property
     def vars(self):
+        """
+        Returns a Vars object containing the current active set of variables,
+        which was merged from parent objects (global variables, group variables) on
+        construction.
+        """
         return self.merged_vars
 
     @property
     def vars_dict(self):
+        """
+        Returns a dictionary containing the current active set of variables,
+        which was merged from parent objects (global variables, group variables) on
+        construction.
+        """
         return self.merged_vars.vars
 
     def _base_ssh_command(self, command):
@@ -283,23 +298,10 @@ class Context:
         host that this context is bound to.
         """
         ssh_command = ["ssh"]
-        ssh_command.extend(self.host.ssh_scp_params)
+        ssh_command.extend(self.host.ssh_params)
         ssh_command.append(f"ssh://{self.host.ssh_host}:{self.host.ssh_port}")
         ssh_command.extend(command)
         return ssh_command
-
-    def _base_scp_command(self, local_path, remote_path, recursive=False):
-        """
-        Constructs the base scp command using the options supplied from the respective
-        host that this context is bound to.
-        """
-        scp_command = ["scp", "-q"]
-        if recursive:
-            scp_command.append("-r")
-        scp_command.extend(self.host.ssh_scp_params)
-        scp_command.append(local_path)
-        scp_command.append(f"scp://{self.host.ssh_host}:{self.host.ssh_port}/{remote_path}")
-        return scp_command
 
     def init_ssh(self):
         """
@@ -380,66 +382,3 @@ class Context:
         if not isinstance(instance, registered_task_class):
             raise LogicError("Cannot run unrelated task with the same identifier as a registered task.")
         instance.exec(self)
-
-    def print_transaction_title(self, transaction, title_color, status_char):
-        """
-        Prints the transaction title and name
-        """
-        title = align_ellipsis(transaction.title, 10)
-        name_align_at = 30 * (1 + (len(transaction.name) // 30))
-        name = f"{transaction.name:<{name_align_at}}"
-        print(f"[{status_char}] {title_color}{title}[m {name}", end="", flush=True)
-
-    def print_transaction_early(self, transaction):
-        """
-        Prints the transaction summary early (i.e. without changes)
-        """
-        title_color = "[1;33m"
-        status_char = "[33m?[m"
-
-        # Print title and name
-        self.print_transaction_title(transaction, title_color, status_char)
-
-    def print_transaction(self, transaction):
-        """
-        Prints the transaction summary
-        """
-        if transaction.success:
-            if transaction.changed:
-                title_color = "[1;34m"
-                status_char = "[32m+[m"
-            else:
-                title_color = "[1m"
-                status_char = "[37m.[m"
-        else:
-            title_color = "[1;31m"
-            status_char = "[1;31m![m"
-
-        # Print title and name, overwriting the transitive status
-        print("\r", end="")
-        self.print_transaction_title(transaction, title_color, status_char)
-
-        # Print key: value pairs with changes
-        state_infos = []
-        for k,final_v in transaction.final_state.items():
-            initial_v = transaction.initial_state[k]
-
-            # Add ellipsis on long strings
-            str_k = ellipsis(k, 12)
-            str_initial_v = ellipsis(str(initial_v), 9)
-            str_final_v = ellipsis(str(final_v), 9)
-
-            if initial_v == final_v:
-                if self.verbose >= 1:
-                    entry_str = f"[37m{str_k}: {str_initial_v}[m"
-                    state_infos.append(entry_str)
-            else:
-                entry_str = f"[33m{str_k}: [31m{str_initial_v}[33m → [32m{str_final_v}[m"
-                state_infos.append(entry_str)
-        print("[37m,[m ".join(state_infos))
-
-        if self.verbose >= 1 and transaction.extra_info is not None:
-            extra_infos = []
-            for k,v in transaction.extra_info.items():
-                extra_infos.append(f"[37m{str(k)}: {str(v)}[m")
-            print(" " * 15 + "[37m,[m ".join(extra_infos))

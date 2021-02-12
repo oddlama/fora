@@ -1,5 +1,14 @@
 #!/usr/bin/env python3
 
+"""
+This module provides a standalone "server" that accepts commands on
+stdin and will be used to securely execute multiple commands over a
+single ssh connection. This script allows us to execute a command
+as-is without interpreting any arguments, and retrieve the exit
+status as well as capture and forwad stdout and stderr back to
+the client.
+"""
+
 import sys
 import os
 import subprocess
@@ -58,7 +67,8 @@ def read_len():
     """
     l = int(sys.stdin.buffer.readline().decode('utf-8'))
     if l < 0 or l > 16*1024*1024*1024:
-        exit(2)
+        print("error: Recieved invalid length string! Aborting.", file=sys.stderr, flush=True)
+        sys.exit(2)
     return l
 
 def read_data():
@@ -86,6 +96,7 @@ class ExecutionSettings:
     """
     Execution settings for the next command.
     """
+    # pylint: disable=R0903
     def __init__(self):
         self.uid = 0
         self.gid = 0
@@ -121,7 +132,7 @@ class Dispatcher:
             try:
                 pw = getpwuid(int(user))
             except (KeyError, ValueError):
-                exit(4)
+                sys.exit(4)
 
         self.execution_settings.uid = pw.pw_uid
         self.execution_settings.gid = pw.pw_gid
@@ -191,15 +202,6 @@ class Dispatcher:
         # Reset settings for next command
         self.execution_settings = ExecutionSettings()
 
-    def handle_invalid_mode(self, mode):
-        """
-        Handles any invalid mode packet.
-        Aborts the application.
-        """
-        # Invalid mode → abort
-        print(f"Remote dispatcher received invalid mode '{mode}'. Aborting.", file=sys.stderr, flush=True)
-        exit(3)
-
     def main(self):
         """
         Begin by changing directory to /tmp. Then listen for packets
@@ -216,13 +218,22 @@ class Dispatcher:
             "exec": self.handle_exec,
             }
 
+        def handle_invalid_mode(mode):
+            """
+            Handles any invalid mode packet.
+            Aborts the application.
+            """
+            # Invalid mode → abort
+            print(f"Remote dispatcher received invalid mode '{mode}'. Aborting.", file=sys.stderr, flush=True)
+            sys.exit(3)
+
         while True:
             # Read next mode, but end script on EOF
             mode = read_mode()
             if not mode:
                 return
 
-            handler.get(mode, lambda: self.handle_invalid_mode(mode))()
+            handler.get(mode, lambda: handle_invalid_mode(mode))()
 
 if __name__ == '__main__':
     Dispatcher().main()

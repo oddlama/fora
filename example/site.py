@@ -4,10 +4,6 @@ from simple_automation import run_inventory, Inventory, GpgVault
 from tasks import TaskZsh, TaskTrackPortage, TaskTrackInstalledPackages
 
 class MySite(Inventory):
-    def __init__(self, manager):
-        super().__init__(manager)
-        self.vault = None
-
     def register_vaults(self):
         # -------- Load vault --------
         self.vault = self.manager.add_vault(GpgVault, file="myvault.gpg", recipient="your_keyid_or_mail")

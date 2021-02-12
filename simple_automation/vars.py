@@ -1,8 +1,20 @@
+"""
+Provides the Vars class.
+"""
+
 from simple_automation.checks import check_valid_key
 from simple_automation.exceptions import LogicError
 
 class Vars:
+    """
+    The Vars class represents a nested dictionary, that allows setting
+    variables in children dicts by using '.' in the key as a delimiter.
+    """
+
     def __init__(self):
+        """
+        Initializes with an empty dictionary.
+        """
         self.vars = {}
         self.warn_on_redefinition = False
 
@@ -34,17 +46,16 @@ class Vars:
 
                 if k not in d:
                     raise KeyError(f"Variable '{key}' does not exist")
-                else:
-                    d = d[k]
+                d = d[k]
             return d
 
         if default is None:
             return get_or_throw(key)
-        else:
-            try:
-                return get_or_throw(key)
-            except KeyError:
-                return default
+
+        try:
+            return get_or_throw(key)
+        except KeyError:
+            return default
 
     def set(self, key, value):
         """

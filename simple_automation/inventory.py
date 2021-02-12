@@ -1,3 +1,6 @@
+"""
+Provides the Inventory class.
+"""
 
 class Inventory:
     """

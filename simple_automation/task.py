@@ -1,11 +1,16 @@
+"""
+Provides the Task class.
+"""
+
+import os
+import time
+from pathlib import PurePosixPath
+
 from simple_automation.checks import check_valid_path, check_valid_relative_path
 from simple_automation.exceptions import LogicError
 from simple_automation.transactions import git
 from simple_automation.transactions.basic import _template_str, _resolve_mode_owner_group
 from simple_automation.utils import ellipsis
-
-import os
-from pathlib import PurePosixPath
 
 class Task:
     """
@@ -37,8 +42,11 @@ class Task:
         self.set_defaults(manager)
 
     def set_defaults(self, manager):
+        """
+        Optional callback for subclasses. Called when the task may define its global defaults.
+        Default variable keys should be named like "tasks.{self.identifier}.variable_name".
+        """
         # No-op by default
-        pass
 
     def pre_run(self, context):
         """
@@ -58,6 +66,9 @@ class Task:
         """
 
     def enabled(self, context):
+        """
+        Returns true, if our enable variable is set to true in the given context.
+        """
         return context.vars.get(self.var_enabled)
 
     def run(self, context):
@@ -268,7 +279,6 @@ class TrackedTask(Task):
 
                 # Use rsync to backup all paths into the repository
                 for src in srcs:
-                    import time
                     time.sleep(1)
                     context.remote_exec(["rsync", "--quiet", "--recursive", "--one-file-system",
                                          "--links", "--times", "--relative", str(PurePosixPath(src)), rsync_dst],

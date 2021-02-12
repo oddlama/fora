@@ -1,5 +1,10 @@
-from simple_automation import Context, LogicError, RemoteExecError
+"""
+Provides git related transactions.
+"""
+
 from simple_automation.checks import check_valid_path
+from simple_automation.context import Context
+from simple_automation.exceptions import LogicError, RemoteExecError
 from simple_automation.transactions.basic import _template_str, _remote_stat
 
 def clone(context: Context, url: str, dst: str, depth=None):

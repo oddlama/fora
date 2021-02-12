@@ -1,2 +1,10 @@
-__pycache__/
+__pycache__
 .vim
+
+venv/
+build/
+dist/
+*.egg-info
+
+AUTHORS
+ChangeLog

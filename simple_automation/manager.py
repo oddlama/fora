@@ -1,3 +1,15 @@
+"""
+Provides the manager class, which contains the toplevel logic of simple_automation
+and provides the CLI interface.
+"""
+
+import argparse
+import inspect
+import os
+import sys
+
+from jinja2 import Environment, FileSystemLoader, StrictUndefined
+
 from simple_automation.version import __version__
 from simple_automation.group import Group
 from simple_automation.host import Host
@@ -6,16 +18,19 @@ from simple_automation.context import Context
 from simple_automation.exceptions import SimpleAutomationError, MessageError, LogicError
 from simple_automation.vars import Vars
 
-from jinja2 import Environment, FileSystemLoader, StrictUndefined
-
-import os
-import argparse
-
 class ArgumentParserError(Exception):
-    pass
+    """
+    Error class for argument parsing errors.
+    """
 
 class ThrowingArgumentParser(argparse.ArgumentParser):
+    """
+    An argument parser that throws when invalid argument types are passed.
+    """
     def error(self, message):
+        """
+        Raises an exception on error.
+        """
         raise ArgumentParserError(message)
 
 class Manager(Vars):
@@ -46,7 +61,6 @@ class Manager(Vars):
         self.verbose = 0
 
         # Find the directory of the initially called script
-        import inspect
         first_frame = inspect.getouterframes(inspect.currentframe())[-1]
         main_script_directory = os.path.abspath(os.path.dirname(first_frame.filename))
 
@@ -152,15 +166,10 @@ class Manager(Vars):
 
         try:
             args = parser.parse_args()
-        except ArgumentParserError as e:
-            print("error: " + str(e))
-            exit(1)
 
-        self.pretend = args.pretend
-        self.verbose = args.verbose
-        self.debug = args.debug
-
-        try:
+            self.pretend = args.pretend
+            self.verbose = args.verbose
+            self.debug = args.debug
             self.edit_vault = args.edit_vault
             if self.edit_vault is not None:
                 # Let the inventory register vaults
@@ -202,6 +211,9 @@ class Manager(Vars):
                 for host in hosts:
                     with Context(self, host) as c:
                         self.inventory.run(c)
+        except ArgumentParserError as e:
+            print(f"[1;31merror:[m {str(e)}")
+            sys.exit(1)
         except MessageError as e:
             print(f"[1;31merror:[m {str(e)}")
         except SimpleAutomationError as e:

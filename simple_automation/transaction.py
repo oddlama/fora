@@ -1,4 +1,9 @@
+"""
+Provides the transaction class for easy state tracking and printing.
+"""
+
 from simple_automation.exceptions import RemoteExecError, LogicError, TransactionError
+from simple_automation.utils import print_transaction, print_transaction_early
 
 class CompletedTransaction:
     """
@@ -37,7 +42,7 @@ class Transaction:
         if self.transaction_context is not None:
             raise LogicError("A transaction may only be started once.")
         self.transaction_context = ActiveTransaction()
-        self.context.print_transaction_early(self)
+        print_transaction_early(self)
         return self.transaction_context
 
     def __exit__(self, exc_type, exc_value, trace):
@@ -54,12 +59,18 @@ class ActiveTransaction:
     into the target state. This possible state change will be presented to the user.
     """
     def __init__(self):
+        """
+        Creates a new transaction.
+        """
         self.initial_state_dict = None
         self.final_state_dict = None
         self.extra_info_dict = None
         self.result = None
 
     def finalize(self, context, transaction):
+        """
+        Finalizes this transaction, which will verify that all states are set corectly, and print the transaction.
+        """
         if self.result is None:
             raise LogicError("A transaction cannot be completed without a result status.")
         if self.result.initial_state is None:
@@ -71,7 +82,7 @@ class ActiveTransaction:
 
         self.result.title = transaction.title
         self.result.name = transaction.name
-        context.print_transaction(self.result)
+        print_transaction(context, self.result)
 
         if not self.result.success:
             raise TransactionError(self.result)
@@ -99,6 +110,9 @@ class ActiveTransaction:
         self.extra_info_dict = dict(kwargs)
 
     def unchanged(self, **kwargs):
+        """
+        Sets the final state to the initial state and returns success(**kwargs).
+        """
         self.final_state(**self.initial_state_dict)
         return self.success(**kwargs)
 
@@ -116,7 +130,7 @@ class ActiveTransaction:
         Completes the transaction, marking it as failed with the given reason.
         If reason is a RemoteExecError, additional information will be printed.
         """
-        if type(reason) is RemoteExecError:
+        if isinstance(reason, RemoteExecError):
             e = reason
             reason = f"{type(e).__name__}: {str(e)}\n"
             reason += e.ret.stderr
