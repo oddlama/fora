@@ -1,11 +1,10 @@
-from simple_automation.exceptions import RemoteExecError
+from simple_automation.exceptions import RemoteExecError, LogicError
 from simple_automation.remote_dispatch import script_path as local_remote_dispatch_script_path
 from simple_automation.transaction import Transaction
 from simple_automation.vars import Vars
 from simple_automation.utils import merge_dicts, align_ellipsis, ellipsis
 
 import base64
-import os
 import subprocess
 import sys
 
@@ -106,6 +105,8 @@ class RemoteDispatcher:
         if line != s:
             raise Exception(f"expected '{s}' but got '{line}'")
 
+    # We name our argument input because thats how it's named in subprocess.run().
+    # pylint: disable=W0622
     def exec(self, command, input=None):
         """
         Executes the given command on the remote machine as the
@@ -159,6 +160,12 @@ class Context:
         self.cache = {}
 
         # Initial defaults for remote actions. Should be called by every task.
+        self.as_user = None
+        self.umask_value = None
+        self.dir_mode = None
+        self.file_mode = None
+        self.owner = None
+        self.group = None
         self.defaults(user="root", umask=0o022, dir_mode=0o700, file_mode=0o600, owner="root", group="root")
 
     @property
@@ -190,7 +197,7 @@ class Context:
         self.init_ssh()
         return self
 
-    def __exit__(self, type, value, traceback):
+    def __exit__(self, type_t, value, traceback):
         """
         Initializes the ssh connection to the host.
         """
@@ -311,6 +318,8 @@ class Context:
         """
         return subprocess.run(self._base_ssh_command(command), check=True, capture_output=True)
 
+    # We name our argument input because thats how it's named in subprocess.run().
+    # pylint: disable=W0622
     def remote_exec(self, command, checked=False, input=None, error_verbosity=None, verbosity=None):
         """
         Execute ssh to execute the given command on the remote host,

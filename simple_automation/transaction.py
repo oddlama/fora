@@ -100,7 +100,7 @@ class ActiveTransaction:
 
     def unchanged(self, **kwargs):
         self.final_state(**self.initial_state_dict)
-        return self.success()
+        return self.success(**kwargs)
 
     def success(self, **kwargs):
         """

@@ -1,7 +1,6 @@
 from simple_automation.version import __version__
 from simple_automation.group import Group
 from simple_automation.host import Host
-from simple_automation.task import Task
 from simple_automation.checks import check_valid_key
 from simple_automation.context import Context
 from simple_automation.exceptions import SimpleAutomationError, MessageError, LogicError
@@ -40,9 +39,11 @@ class Manager(Vars):
         self.tasks = {}
         self.vaults = {}
 
+        self.accept_registrations = True
+        self.debug = False
+        self.edit_vault = None
         self.pretend = True
         self.verbose = 0
-        self.debug = False
 
         # Find the directory of the initially called script
         import inspect
@@ -68,6 +69,8 @@ class Manager(Vars):
         """
         Registers a new group.
         """
+        if not self.accept_registrations:
+            raise LogicError("Cannot register group after registration phase!")
         check_valid_key(identifier, msg="Invalid group identifier")
         group = Group(self, identifier)
         if identifier in self.groups:
@@ -79,6 +82,8 @@ class Manager(Vars):
         """
         Registers a new host.
         """
+        if not self.accept_registrations:
+            raise LogicError("Cannot register host after registration phase!")
         check_valid_key(identifier, msg="Invalid host identifier")
         host = Host(self, identifier, ssh_host)
         if identifier in self.hosts:
@@ -93,6 +98,8 @@ class Manager(Vars):
         and call task.exec() when you want to run it, or you can use context.run_task(task_class)
         to run a registered task automatically.
         """
+        if not self.accept_registrations:
+            raise LogicError("Cannot register task after registration phase!")
         identifier = task_class.identifier
         check_valid_key(identifier, msg="Invalid task identifier")
         if identifier in self.tasks:
@@ -112,6 +119,8 @@ class Manager(Vars):
         Registers a vault of the given class, with its storage at file.
         Additional parameters are forwarded to the vault constructor.
         """
+        if not self.accept_registrations:
+            raise LogicError("Cannot register vault after registration phase!")
         canonical_path = os.path.realpath(os.path.join(self.main_directory, file))
         if canonical_path in self.vaults:
             raise LogicError(f"Duplicate vault: Another vault with file='{canonical_path}' has already been defined!")
@@ -124,10 +133,6 @@ class Manager(Vars):
         The main program entry point. This will parse arguments and call the
         user-supplied function on the defined inventory, when the script should be executed.
         """
-
-        # Stop accepting new registrations, which would not be handeled correctly
-        # when done dynamically. (e.g. Variable default registrations would be skipped for tasks)
-        self.accept_registrations = False
 
         parser = ThrowingArgumentParser(description="Runs this simple automation script.")
 
@@ -180,6 +185,10 @@ class Manager(Vars):
                 self.inventory.register_tasks()
                 self.inventory.register_globals()
                 self.inventory.register_inventory()
+
+                # Stop accepting new registrations, which would not be handeled correctly
+                # when done dynamically. (e.g. Variable default registrations would be skipped for tasks)
+                self.accept_registrations = False
 
                 # Check if host selection is valid
                 hosts = []

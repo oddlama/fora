@@ -5,7 +5,6 @@ class MessageError(SimpleAutomationError):
     """
     Stacktrace will be supressed.
     """
-    pass
 
 class LogicError(SimpleAutomationError):
     pass

@@ -2,7 +2,7 @@ from simple_automation.exceptions import LogicError
 
 def check_valid_key(key, msg="Invalid key"):
     if not key:
-        raise LogicError(f"Invalid empty key")
+        raise LogicError("Invalid empty key")
     if '..' in key or not key.replace('.', '').isidentifier():
         raise LogicError(f"{msg}: '{key}' is not a valid identifier")
 

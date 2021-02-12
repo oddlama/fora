@@ -6,12 +6,12 @@ class Vars:
         self.vars = {}
         self.warn_on_redefinition = False
 
-    def copy(self, key, vars):
+    def copy(self, key, other_vars):
         """
         Copies a value from another vars object into this one.
-        Same as calling self.set(key, vars.get(key))
+        Same as calling self.set(key, other_vars.get(key))
         """
-        self.set(key, vars.get(key))
+        self.set(key, other_vars.get(key))
 
     def get(self, key, default=None):
         """

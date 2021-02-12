@@ -1,5 +1,5 @@
 from simple_automation.vars import Vars
-from simple_automation.exceptions import LogicError
+from simple_automation.exceptions import LogicError, MessageError
 
 import base64
 import getpass
@@ -43,7 +43,6 @@ class Vault(Vars):
         except FileNotFoundError:
             if self.manager.edit_vault is None:
                 print(f"[1;33mwarning:[m [1mLoaded nonexistent vault '{self.file}': [mTo create the file, use --edit-vault")
-            pass
 
     def encrypt(self) -> bytes:
         """
@@ -69,7 +68,7 @@ class Vault(Vars):
             tf.flush()
 
             # Run editor
-            p = subprocess.run([editor, tf.name])
+            p = subprocess.run([editor, tf.name], check=False)
             if p.returncode != 0:
                 raise RuntimeError(f"Aborting vault edit: $EDITOR exited with status {p.returncode}")
 
@@ -91,14 +90,14 @@ class SymmetricVault(Vault):
         self.keyfile = keyfile
         self.key = key
 
-    def get_key():
+    def get_key(self):
         # Get key from keyfile / ask for pass
-        if key is None:
-            if keyfile is None:
+        if self.key is None:
+            if self.keyfile is None:
                 # Ask for key
                 self.key = getpass.getpass(f"Password for vault '{self.file}': ")
             else:
-                with open(keyfile, 'rb') as f:
+                with open(self.keyfile, 'rb') as f:
                     self.key = f.read()
 
         # Change key to bytes, if it's a str
@@ -130,7 +129,7 @@ class SymmetricVault(Vault):
             cipher.verify(tag)
         except ValueError as e:
             # If we get a ValueError, there was an error when decrypting so delete the file we created
-            raise MessageError(f"Refusing decrypted data from '{self.file}', because content verification failed! Your file might have been tampered with!")
+            raise MessageError(f"Refusing decrypted data from '{self.file}', because content verification failed! Your file might have been tampered with!") from e
 
         return plaintext
 

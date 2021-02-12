@@ -113,7 +113,7 @@ def _remote_upload(context: Context, get_content, title: str, name: str, dst: st
             try:
                 # Replace file
                 dst_base64 = base64.b64encode(dst.encode('utf-8')).decode('utf-8')
-                context.remote_exec(["sh", "-c", f"cat > \"$(echo '{dst_base64}' | base64 -d)\""], checked=True, input=content)
+                context.remote_exec(["sh", "-c", f"cat > \"$(echo '{dst_base64}' | base64 -d)\""], checked=True, stdin=content)
 
                 # Set permissions
                 context.remote_exec(["chown", f"{owner}:{group}", dst], checked=True)

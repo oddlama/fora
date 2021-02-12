@@ -3,7 +3,7 @@
 import sys
 import os
 import subprocess
-from pwd import getpwnam
+from pwd import getpwnam, getpwuid
 
 def resolve_script_path():
     """
@@ -12,7 +12,7 @@ def resolve_script_path():
     """
     try:
         return os.path.realpath(__file__)
-    except NameError as e:
+    except NameError:
         return "/dev/null"
 
 # Save path to this script so we can easily upload it
@@ -78,7 +78,7 @@ def read_str_list():
     Read a string list
     """
     xs = []
-    for i in range(read_len()):
+    for _ in range(read_len()):
         xs.append(read_str())
     return xs
 
@@ -117,10 +117,10 @@ class Dispatcher:
         user = read_str()
         try:
             pw = getpwnam(user)
-        except KeyError as e:
+        except KeyError:
             try:
                 pw = getpwuid(int(user))
-            except (KeyError, ValueError) as e:
+            except (KeyError, ValueError):
                 exit(4)
 
         self.execution_settings.uid = pw.pw_uid
@@ -153,7 +153,7 @@ class Dispatcher:
         if self.debug:
             print(f"executing command={command} umask={self.execution_settings.umask} uid={self.execution_settings.uid} gid={self.execution_settings.gid}", file=sys.stderr, flush=True)
 
-        input = None if self.execution_settings.input is None else self.execution_settings.input
+        cmd_input = None if self.execution_settings.input is None else self.execution_settings.input
         def child_preexec():
             """
             Sets umask and becomes the correct user.
@@ -162,10 +162,10 @@ class Dispatcher:
                 os.umask(self.execution_settings.umask)
                 os.setresgid(self.execution_settings.gid, self.execution_settings.gid, self.execution_settings.gid)
                 os.setresuid(self.execution_settings.uid, self.execution_settings.uid, self.execution_settings.uid)
-            except Exception as e:
-                print(str(e))
+            except OSError as e:
+                print(str(e), file=sys.stderr, flush=True)
 
-        return subprocess.run(command, input=input, capture_output=True, preexec_fn=child_preexec)
+        return subprocess.run(command, input=cmd_input, capture_output=True, preexec_fn=child_preexec, check=False)
 
     def handle_exec(self):
         """
@@ -189,9 +189,9 @@ class Dispatcher:
             print(f"rc: {str(completed_command.returncode)}", file=sys.stderr, flush=True)
 
         # Reset settings for next command
-        execution_settings = ExecutionSettings()
+        self.execution_settings = ExecutionSettings()
 
-    def handle_invalid_mode(self):
+    def handle_invalid_mode(self, mode):
         """
         Handles any invalid mode packet.
         Aborts the application.
@@ -222,7 +222,7 @@ class Dispatcher:
             if not mode:
                 return
 
-            handler.get(mode, self.handle_invalid_mode)()
+            handler.get(mode, lambda: self.handle_invalid_mode(mode))()
 
 if __name__ == '__main__':
     Dispatcher().main()

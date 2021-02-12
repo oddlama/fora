@@ -1,7 +1,4 @@
-from simple_automation import TrackedTask
-from simple_automation.transactions import git
-from simple_automation.transactions.basic import template, directory, save_output
-from simple_automation.transactions.package import portage
+from simple_automation.transactions.basic import save_output
 
 from tasks.tracking import TrackedTask
 

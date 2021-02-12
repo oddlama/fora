@@ -1,7 +1,7 @@
 from simple_automation.checks import check_valid_path, check_valid_relative_path
 from simple_automation.exceptions import LogicError
 from simple_automation.transactions import git
-from simple_automation.transactions.basic import _template_str, _remote_stat, _resolve_mode_owner_group
+from simple_automation.transactions.basic import _template_str, _resolve_mode_owner_group
 from simple_automation.utils import ellipsis
 
 import os
@@ -12,8 +12,24 @@ class Task:
     A base class for tasks. A task executes on a host context and runs a set
     of transactions on this context.
     """
+
+    identifier = None
+    """
+    The identifier of this task.
+    """
+
+    description = None
+    """
+    A short description of what the task does.
+    """
+
     def __init__(self, manager):
         self.manager = manager
+
+        if self.identifier is None:
+            raise LogicError("A task must override the static variable 'identifier'")
+        if self.description is None:
+            raise LogicError("A task must override the static variable 'description'")
 
         # Initialize variable defaults
         self.var_enabled = f"tasks.{self.identifier}.enabled"
@@ -40,7 +56,6 @@ class Task:
         """
         Called after self.run() is called. No-op by default.
         """
-        pass
 
     def enabled(self, context):
         return context.vars.get(self.var_enabled)
@@ -49,7 +64,6 @@ class Task:
         """
         To be overwritten by a subclass. Contain's the task's logic.
         """
-        pass
 
     def exec(self, context):
         """
@@ -71,6 +85,7 @@ class TrackedTask(Task):
     A base class for tasks which want to track changes in a git repository.
     """
 
+    tracking_repo_url = None
     """
     The remote url to the repository which will be used as the tracking repo.
     Will be templated by the currently executed context.
@@ -81,27 +96,29 @@ class TrackedTask(Task):
     Remember to put secrets into a vault so they aren't checked into your repository in plain text.
     We recommend using ssh, as secrets in the url will be printed to the terminal when executed.
     """
-    tracking_repo_url = None
 
+    tracking_local_dst = None # e.g. "/var/lib/root/system_settings"
     """
     The path where the local clone of the repository will be.
     Will be templated by the currently executed context.
     """
-    tracking_local_dst = None # e.g. "/var/lib/root/system_settings"
 
+    tracking_subpath = "{{ context.host.identifier }}" # e.g. "desktops/mymachine"
     """
     The subpath in the repository where the tracked files will be held.
     Will be templated by the currently executed context.
     It defaults to the identifier of the machine.
     """
-    tracking_subpath = "{{ context.host.identifier }}" # e.g. "desktops/mymachine"
 
+    tracking_paths = []
     """
     A list of directories and/or files that should be tracked.
     Will be templated by the currently executed context.
     """
-    tracking_paths = None
 
+    tracking_repo_configs = {
+        "user.name": "{{ context.host.identifier }}",
+        "user.email": "root@localhost" }
     """
     A dictionary of git configs to be set locally when the repository is first created.
     Values will be templated by the currently executed context.
@@ -110,15 +127,12 @@ class TrackedTask(Task):
     (for each entry, 'git config --local {key} {value}' is executed). Useful to set
     name and email, and maybe a gpg signing key.
     """
-    tracking_repo_configs = {
-        "user.name": "{{ context.host.identifier }}",
-        "user.email": "root@localhost" }
 
+    tracking_git_commit_opts = []
     """
     Extra options to 'git commit'.
     Will be templated by the currently executed context.
     """
-    tracking_git_commit_opts = []
 
 
     class TaskInitializeTracking(Task):
@@ -133,6 +147,7 @@ class TrackedTask(Task):
             Initialize this tracking initialization task and remember the tracked
             parent task, so so we have access to the tracking specific variables later.
             """
+            super().__init__(tracked_task.manager)
             self.tracked_task = tracked_task
 
         def enabled(self, context):
@@ -144,7 +159,7 @@ class TrackedTask(Task):
                              owner="root", group="root")
 
             # Get tracking specific variables
-            (url, dst, sub) = context.cache["tracking"][self.tracked_task.tracking_id]
+            (url, dst, _) = context.cache["tracking"][self.tracked_task.tracking_id]
 
             # Clone or update remote tracking repository
             git.checkout(context, url, dst)
@@ -162,7 +177,7 @@ class TrackedTask(Task):
             raise LogicError("A tracked task must override the variable 'tracking_repo_url'")
         if self.tracking_local_dst is None:
             raise LogicError("A tracked task must override the variable 'tracking_local_dst'")
-        if self.tracking_paths is None:
+        if self.tracking_paths == []:
             raise LogicError("A tracked task must override the variable 'tracking_paths'")
         self.tracking_id = None
 
