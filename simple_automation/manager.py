@@ -79,9 +79,19 @@ class Manager(Vars):
         # Create inventory
         self.inventory = inventory_class(self)
 
-    def add_group(self, identifier):
+    def add_group(self, identifier: str):
         """
         Registers a new group.
+
+        Parameters
+        ----------
+        identifier : str
+            The identifier for the new group.
+
+        Returns
+        -------
+        Group
+            The newly created group
         """
         if not self.accept_registrations:
             raise LogicError("Cannot register group after registration phase!")
@@ -92,9 +102,21 @@ class Manager(Vars):
         self.groups[identifier] = group
         return group
 
-    def add_host(self, identifier, ssh_host):
+    def add_host(self, identifier: str, ssh_host: str):
         """
         Registers a new host.
+
+        Parameters
+        ----------
+        identifier : str
+            The identifier for the new host.
+        ssh_host : str
+            The ssh host.
+
+        Returns
+        -------
+        Host
+            The newly created host.
         """
         if not self.accept_registrations:
             raise LogicError("Cannot register host after registration phase!")
@@ -111,6 +133,16 @@ class Manager(Vars):
         variable defaults. You can either save the returned instance yourself
         and call task.exec() when you want to run it, or you can use context.run_task(task_class)
         to run a registered task automatically.
+
+        Parameters
+        ----------
+        identifier : str
+            The identifier for the new task.
+
+        Returns
+        -------
+        Task
+            The newly created task.
         """
         if not self.accept_registrations:
             raise LogicError("Cannot register task after registration phase!")
@@ -128,10 +160,24 @@ class Manager(Vars):
         self.tasks[identifier] = task
         return task
 
-    def add_vault(self, vault_class, file, **kwargs):
+    def add_vault(self, vault_class, file: str, **kwargs):
         """
         Registers a vault of the given class, with its storage at file.
         Additional parameters are forwarded to the vault constructor.
+
+        Parameters
+        ----------
+        vault_class: class(Vault)
+            The vault class to instanciate.
+        file: str
+            A file relative to the project directory that will be passed onto the vault.
+        **kwargs:
+            Will be forwarded to the Vault constructor.
+
+        Returns
+        -------
+        Vault
+            The newly created vault
         """
         if not self.accept_registrations:
             raise LogicError("Cannot register vault after registration phase!")
@@ -223,5 +269,10 @@ class Manager(Vars):
 def run_inventory(inventory_class):
     """
     Instanciates a manager given an inventory class and runs the manager's CLI.
+
+    Parameters
+    ----------
+    inventory_class : str
+        The inventory class to instanciate.
     """
     Manager(inventory_class).main()

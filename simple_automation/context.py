@@ -210,37 +210,73 @@ class Context:
         # this will never go horribly wrong.
         self.remote_dispatcher.stop_and_wait()
 
-    def defaults(self, user, umask, dir_mode, file_mode, owner, group):
+    def defaults(self, user: str, umask: int, dir_mode: int, file_mode: int, owner: str, group: str):
         """
         Overwrite the defaults for command execution on the remote machine.
+
+        Parameters
+        ----------
+        user : str
+            The user to execute commands as on the remote.
+        umask : int
+            The umask to execute commands with on the remote.
+        dir_mode : int
+            The directory mode for newly created directories on the remote.
+        file_mode : int
+            The directory mode for newly created directories on the remote.
+        owner : str
+            The owner of newly created files or directories on the remote.
+        group : str
+            The group of newly created files or directories on the remote.
         """
         self.user(user)
         self.umask(umask)
         self.mode(dir_mode, file_mode, owner, group)
 
-    def umask(self, value):
+    def umask(self, value: int):
         """
         Sets the umask for executed commands on the remote machine.
+
+        Parameters
+        ----------
+        value : int
+            The umask to execute commands with on the remote.
         """
         self.umask_value = value
 
-    def user(self, user):
+    def user(self, user: str):
         """
         Sets the user to execute commands on the remote machine.
+
+        Parameters
+        ----------
+        user : str
+            The user to execute commands as on the remote.
         """
         self.as_user = user
 
-    def mode(self, dir_mode, file_mode, owner, group):
+    def mode(self, dir_mode: int, file_mode: int, owner: str, group: str):
         """
         Sets default modes for created directories and files,
         as well as default owner and group
+
+        Parameters
+        ----------
+        dir_mode : int
+            The directory mode for newly created directories on the remote.
+        file_mode : int
+            The directory mode for newly created directories on the remote.
+        owner : str
+            The owner of newly created files or directories on the remote.
+        group : str
+            The group of newly created files or directories on the remote.
         """
         self.dir_mode = dir_mode
         self.file_mode = file_mode
         self.owner = owner
         self.group = group
 
-    def transaction(self, title, name):
+    def transaction(self, title: str, name: str):
         """
         Begins a new transaction. Intended to be used in a 'with' statement.
         Each transaction will be shown to the user as a distinct unit.
@@ -254,6 +290,13 @@ class Context:
 
         A transaction may give additional variables to success() and failure(),
         which will be stored for later use.
+
+        Parameters
+        ----------
+        title : str
+            The title for the new transaction.
+        name : str
+            The name for the new transaction.
         """
         return Transaction(self, title, name)
 
@@ -317,6 +360,16 @@ class Context:
     def exec_ssh_raw(self, command):
         """
         Execute ssh to execute the given command on the remote host, directly via ssh.
+
+        Parameters
+        ----------
+        command : list[str]
+            The command to execute on the remote.
+
+        Returns
+        -------
+        subprocess.CompletedProcess
+            The completed subprocess
         """
         return subprocess.run(self._base_ssh_command(command), check=True, capture_output=True)
 
@@ -330,16 +383,30 @@ class Context:
         unsuccessful exit status. checked=True also implies a default error_verbosity=0
         and verbosity=2.
 
-        If verbosity is not None and self.verbose >= verbosity, the command
-        output will be printed. Read: verbosity is the number of -v flags
-        needed so that the command's output will be shown. If verbosity is not given,
-        the output will never be shown.
-
-        error_verbosity is the same as verbosity, but only triggers when the
-        command failed. E.g. calling with error_verbosity=1 causes both stdout
-        and stderr to be printed, if the command fails and at least -v was given.
-
         If both verbosity and error_verbosity trigger, the output will only be printed once.
+
+        Parameters
+        ----------
+        command : list[str]
+            The command to execute on the remote.
+        checked : bool, optional
+            If true, an exception will be raised if the command fails. Defaults to false.
+        input : bytes, optional
+            If not None, this will be passed to the command as stdin.
+        verbosity : int, optional
+            If verbosity is not None and self.verbose >= verbosity, the command
+            output will be printed. Read: verbosity is the number of -v flags
+            needed so that the command's output will be shown. If verbosity is not given,
+            the output will never be shown.
+        error_verbosity : int, optional
+            Same as verbosity, but only triggers when the command fails.
+            E.g. calling with error_verbosity=1 causes both stdout
+            and stderr to be printed, if the command fails and at least -v was given.
+
+        Returns
+        -------
+        CompletedRemoteCommand
+            The completed remote command
         """
         # Execute the command via our existing remote session. Commands
         # are passed with NUL-terminated parameters, so we don't have to worry
@@ -375,6 +442,11 @@ class Context:
     def run_task(self, registered_task_class):
         """
         Runs the registered instance (see Manager) for the given task class.
+
+        Parameters
+        ----------
+        registered_task_class : class(Task)
+            The task class that should be executed. The registered instance is found first, and then called.
         """
         instance = self.manager.tasks.get(registered_task_class.identifier, None)
         if not instance:
