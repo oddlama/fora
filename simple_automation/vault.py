@@ -17,23 +17,50 @@ class Vault(Vars):
     A base-class for vaults.
     """
 
-    def __init__(self, manager, file):
+    def __init__(self, manager, file: str):
         """
         Initializes the vault.
+
+        Parameters
+        ----------
+        manager : Manager
+            The manager to which this vault is registered.
+        file : str
+            The file which serves as the permanent storage.
         """
         super().__init__()
         self.manager = manager
         self.file = file
 
-    def encrypt_content(self, plaintext: bytes) -> bytes:
-        """
-        Encrypts the given plaintext. Should be implemented by subclasses.
-        """
-        raise NotImplementedError("Must be overwritten by subclass.")
-
     def decrypt_content(self, ciphertext: bytes) -> bytes:
         """
         Decrypts the given ciphertext. Should be implemented by subclasses.
+
+        Parameters
+        ----------
+        ciphertext : bytes
+            The bytes to decrypt.
+
+        Returns
+        -------
+        bytes
+            The plaintext
+        """
+        raise NotImplementedError("Must be overwritten by subclass.")
+
+    def encrypt_content(self, plaintext: bytes) -> bytes:
+        """
+        Encrypts the given plaintext. Should be implemented by subclasses.
+
+        Parameters
+        ----------
+        plaintext : bytes
+            The bytes to encrypt.
+
+        Returns
+        -------
+        bytes
+            The ciphertext
         """
         raise NotImplementedError("Must be overwritten by subclass.")
 
@@ -88,11 +115,23 @@ class SymmetricVault(Vault):
     A SymmetricVault is a Vault which saves its context symmetrically encrypted.
     Content is encrypted with a salted key (+scrypt) using AES-256-GCM.
     """
-    def __init__(self, manager, file, keyfile=None, key=None):
+    def __init__(self, manager, file: str, keyfile=None, key=None):
         """
         Initializes the vault from the given file and key/keyfile.
+        If neither key nor keyfile is provided, the key will be read via getpass().
         The key may be given as str or bytes. If the key is given a a str,
         it will automatically be converted to bytes (without encoding) before usage.
+
+        Parameters
+        ----------
+        manager : Manager
+            The manager to which this vault is registered.
+        file : str
+            The file which serves as the permanent storage.
+        keyfile : str, optional
+            A file which contains the decryption key. Defaults to None.
+        key : str, optional
+            The decryption key. Defaults to None.
         """
         super().__init__(manager, file)
         self.keyfile = keyfile
@@ -127,6 +166,16 @@ class SymmetricVault(Vault):
     def decrypt_content(self, ciphertext: bytes) -> bytes:
         """
         Decrypts the given ciphertext.
+
+        Parameters
+        ----------
+        ciphertext : bytes
+            The bytes to decrypt.
+
+        Returns
+        -------
+        bytes
+            The plaintext
         """
         self.get_key()
         # pylint: disable=C0415
@@ -155,6 +204,16 @@ class SymmetricVault(Vault):
     def encrypt_content(self, plaintext: bytes) -> bytes:
         """
         Encrypts the given plaintext.
+
+        Parameters
+        ----------
+        plaintext : bytes
+            The bytes to encrypt.
+
+        Returns
+        -------
+        bytes
+            The ciphertext
         """
         # pylint: disable=C0415
         from Crypto.Cipher import AES
@@ -176,12 +235,20 @@ class GpgVault(Vault):
     This can be convenient if you e.g. use a YubiKey or similar hardware
     to store your encryption keys.
     """
-    def __init__(self, manager, file, recipient):
+    def __init__(self, manager, file: str, recipient: str):
         """
         Initializes the gpg encrypted vault from the given file and recipient.
-        The recipient is only needed for encryption (when editing), and reflects
-        the gpg parameter '--recipient'. If you don't plan on using the editing
-        feature, the recipient may be set to None.
+
+        Parameters
+        ----------
+        manager : Manager
+            The manager to which this vault is registered.
+        file : str
+            The file which serves as the permanent storage.
+        recipient: str
+            Only needed for encryption (when editing). Reflects the gpg
+            command line parameter '--recipient'. If you don't plan on using
+            the editing feature, the recipient may be set to None.
         """
         super().__init__(manager, file)
         self.recipient = recipient
@@ -189,6 +256,16 @@ class GpgVault(Vault):
     def decrypt_content(self, ciphertext: bytes) -> bytes:
         """
         Decrypts the given ciphertext.
+
+        Parameters
+        ----------
+        ciphertext : bytes
+            The bytes to decrypt.
+
+        Returns
+        -------
+        bytes
+            The plaintext
         """
         print(f"Decrypting gpg vault '{self.file}'")
         return subprocess.run(["gpg", "--quiet", "--decrypt"], input=ciphertext, capture_output=True, check=True).stdout
@@ -196,6 +273,16 @@ class GpgVault(Vault):
     def encrypt_content(self, plaintext: bytes) -> bytes:
         """
         Encrypts the given plaintext.
+
+        Parameters
+        ----------
+        plaintext : bytes
+            The bytes to encrypt.
+
+        Returns
+        -------
+        bytes
+            The ciphertext
         """
         if self.recipient is None:
             raise LogicError("GpgVault encryption requires a recipient")
