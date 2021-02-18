@@ -13,9 +13,21 @@ from simple_automation.context import Context
 from simple_automation.exceptions import LogicError, MessageError, RemoteExecError
 from simple_automation.checks import check_valid_path
 
-def _template_str(context: Context, template_str):
+def _template_str(context: Context, template_str : str) -> str:
     """
     Renders the given string template.
+
+    Parameters
+    ----------
+    context : Context
+        The context providing the templating dictionary
+    template_str : str
+        The string to template
+
+    Returns
+    -------
+    str
+        The templated string
     """
     templ = Template(template_str)
     try:
@@ -128,8 +140,25 @@ def _remote_upload(context: Context, get_content, title: str, name: str, dst: st
 
 def directory(context: Context, path: str, mode=None, owner=None, group=None):
     """
-    Creates the given directory on the remote. Will use the context default
-    permissions if not explicitly given.
+    Creates the given directory on the remote.
+
+    Parameters
+    ----------
+    context : Context
+        The context providing the execution context and templating dictionary.
+    path : str
+        The directory path to create (will be templated). Parent directory must exist.
+    mode : int, optional
+        The new directory mode. Defaults the current context directory creation mode.
+    owner : str, optional
+        The new directory owner. Defaults the current context owner.
+    group : str, optional
+        The new directory group. Defaults the current context group.
+
+    Returns
+    -------
+    CompletedTransaction
+        The completed transaction
     """
     path = _template_str(context, path)
     check_valid_path(path)
@@ -166,18 +195,54 @@ def directory(context: Context, path: str, mode=None, owner=None, group=None):
         # Return success
         return action.success()
 
-def directory_all(context: Context, paths: list, mode=None, owner=None, group=None):
+def directory_all(context: Context, paths: list[str], mode=None, owner=None, group=None):
     """
     Creates the given directories as if directory() was called for each of them.
+
+    Parameters
+    ----------
+    context : Context
+        The context providing the execution context and templating dictionary.
+    paths : str
+        The directory paths to create (each will be templated). Parent directory must exist for each directory. Executed in order.
+    mode : int, optional
+        The new directory mode. Defaults the current context directory creation mode.
+    owner : str, optional
+        The new directory owner. Defaults the current context owner.
+    group : str, optional
+        The new directory group. Defaults the current context group.
+
+    Returns
+    -------
+    CompletedTransaction
+        The completed transaction
     """
     for path in paths:
         directory(context, path, mode, owner, group)
 
 def template(context: Context, src: str, dst: str, mode=None, owner=None, group=None):
     """
-    Templates the given src file (relative to your project directory),
-    and copies the output to the remote host at dst. Optionally accepts file mode, owner and group,
-    if not given, context defaults are used.
+    Templates the given src file and copies the output to the remote host at dst.
+
+    Parameters
+    ----------
+    context : Context
+        The context providing the execution context and templating dictionary.
+    src : str
+        The local source file path relative to the project directory. Will be templated.
+    dst : str
+        The remote destination file path. Will be templated.
+    mode : int, optional
+        The new file mode. Defaults the current context file creation mode.
+    owner : str, optional
+        The new file owner. Defaults the current context owner.
+    group : str, optional
+        The new file group. Defaults the current context group.
+
+    Returns
+    -------
+    CompletedTransaction
+        The completed transaction
     """
     src = _template_str(context, src)
     dst = _template_str(context, dst)
@@ -197,17 +262,54 @@ def template(context: Context, src: str, dst: str, mode=None, owner=None, group=
 
     return _remote_upload(context, get_content, title="template", name=dst, dst=dst, mode=mode, owner=owner, group=group)
 
-def template_all(context: Context, src_dst_pairs: list, mode=None, owner=None, group=None):
+def template_all(context: Context, src_dst_pairs: list[(str, str)], mode=None, owner=None, group=None):
     """
     Templates each (src, dst) list entry, as if template() was called for each of them.
+
+    Parameters
+    ----------
+    context : Context
+        The context providing the execution context and templating dictionary.
+    src_dst_pairs : list[(str, str)]
+        A list of (src, dst) pairs corresponding to the parameters from template().
+    mode : int, optional
+        The new file mode. Defaults the current context file creation mode.
+    owner : str, optional
+        The new file owner. Defaults the current context owner.
+    group : str, optional
+        The new file group. Defaults the current context group.
+
+    Returns
+    -------
+    CompletedTransaction
+        The completed transaction
     """
     for src,dst in src_dst_pairs:
         template(context, src, dst, mode, owner, group)
 
 def copy(context: Context, src: str, dst: str, mode=None, owner=None, group=None):
     """
-    Copies the given src file (relative to your project directory) to the remote host at dst.
-    Optionally accepts file mode, owner and group, if not given, context defaults are used.
+    Copies the given src file to the remote host at dst.
+
+    Parameters
+    ----------
+    context : Context
+        The context providing the execution context and templating dictionary.
+    src : str
+        The local source file path relative to the project directory. Will be templated.
+    dst : str
+        The remote destination file path. Will be templated.
+    mode : int, optional
+        The new file mode. Defaults the current context file creation mode.
+    owner : str, optional
+        The new file owner. Defaults the current context owner.
+    group : str, optional
+        The new file group. Defaults the current context group.
+
+    Returns
+    -------
+    CompletedTransaction
+        The completed transaction
     """
     src = _template_str(context, src)
     dst = _template_str(context, dst)
@@ -220,19 +322,59 @@ def copy(context: Context, src: str, dst: str, mode=None, owner=None, group=None
 
     return _remote_upload(context, get_content, title="copy", name=dst, dst=dst, mode=mode, owner=owner, group=group)
 
-def copy_all(context: Context, src_dst_pairs: list, mode=None, owner=None, group=None):
+def copy_all(context: Context, src_dst_pairs: list[(str, str)], mode=None, owner=None, group=None):
     """
     Copies each (src, dst) list entry, as if copy() was called for each of them.
+
+    Parameters
+    ----------
+    context : Context
+        The context providing the execution context and templating dictionary.
+    src_dst_pairs : list[(str, str)]
+        A list of (src, dst) pairs corresponding to the parameters from copy().
+    mode : int, optional
+        The new file mode. Defaults the current context file creation mode.
+    owner : str, optional
+        The new file owner. Defaults the current context owner.
+    group : str, optional
+        The new file group. Defaults the current context group.
+
+    Returns
+    -------
+    CompletedTransaction
+        The completed transaction
     """
     for src,dst in src_dst_pairs:
         copy(context, src, dst, mode, owner, group)
 
-def save_output(context: Context, command: list, dst: str, desc=None, mode=None, owner=None, group=None):
+def save_output(context: Context, command: list[str], dst: str, desc=None, mode=None, owner=None, group=None):
     """
     Saves the stdout of the given command on the remote host at remote dst.
     Using --pretend will still run the command, but won't save the output.
     Changed status reflects if the file contents changed.
     Optionally accepts file mode, owner and group, if not given, context defaults are used.
+
+    Parameters
+    ----------
+    context : Context
+        The context providing the execution context and templating dictionary.
+    command: list[str]
+        A list containing the command and its arguments. Each one will be templated.
+    dst : str
+        The remote destination file path. Will be templated.
+    desc : str
+        A description to be printed in the summary when executing.
+    mode : int, optional
+        The new file mode. Defaults the current context file creation mode.
+    owner : str, optional
+        The new file owner. Defaults the current context owner.
+    group : str, optional
+        The new file group. Defaults the current context group.
+
+    Returns
+    -------
+    CompletedTransaction
+        The completed transaction
     """
     command = [_template_str(context, c) for c in command]
     dst = _template_str(context, dst)
