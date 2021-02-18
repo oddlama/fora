@@ -22,6 +22,13 @@ class Vars:
         """
         Copies a value from another vars object into this one.
         Same as calling self.set(key, other_vars.get(key))
+
+        Parameters
+        ----------
+        key : str
+            The key that should be copied.
+        other_vars : Vars
+            The source variable storage where the key is copied from.
         """
         self.set(key, other_vars.get(key))
 
@@ -29,6 +36,18 @@ class Vars:
         """
         Retrieves a variable by the given key. If no such key exists,
         it returns the given default value or throws a KeyError if no default is set.
+
+        Parameters
+        ----------
+        key : str
+            The key that should be read.
+        default : Any, optional
+            If not None, this will be returned in case the key is unset. By default None.
+
+        Returns
+        -------
+        Any
+            The stored object.
         """
 
         def get_or_throw(key):
@@ -60,6 +79,13 @@ class Vars:
     def set(self, key, value):
         """
         Sets the given variable.
+
+        Parameters
+        ----------
+        key : str
+            The key that should be read.
+        value : Any, optional
+            The value to be stored. Must be json (de-)serializable.
         """
         check_valid_key(key)
         d = self.vars

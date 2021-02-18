@@ -11,6 +11,17 @@ class CompletedTransaction:
     Additionally, it records a success status, a changed flag to indicate that at least one
     action has actually been performed, as well as additional stored values
     defined by the specific transaction for later use.
+
+    Parameters
+    ----------
+    transaction : Transaction
+        The transaction that is about to be completed.
+    success : bool
+        True if the transaction result was successful.
+    store : dict
+        Additional value store that can later be used by callers to retrieve additional information.
+    failure_reason : str, optional
+        The failure reason that will be attached if the transaction failed.
     """
     def __init__(self, transaction, success, store, failure_reason=None):
         self.success = success
@@ -30,6 +41,18 @@ class Transaction:
     'with' statement to modify the transaction.
     """
     def __init__(self, context, title, name):
+        """
+        Internal use. Creates a new transaction.
+
+        Parameters
+        ----------
+        context : Context
+            The context on which the transaction will be executed.
+        title : str
+            The title of the transaction for printed output.
+        name : str
+            The name of the transaction for printed output.
+        """
         self.context = context
         self.title = title
         self.name = name
@@ -70,6 +93,13 @@ class ActiveTransaction:
     def finalize(self, context, transaction):
         """
         Finalizes this transaction, which will verify that all states are set corectly, and print the transaction.
+
+        Parameters
+        ----------
+        context : Context
+            The associated context.
+        transaction : Transaction
+            The transaction that should be finalized.
         """
         if self.result is None:
             raise LogicError("A transaction cannot be completed without a result status.")
@@ -90,6 +120,11 @@ class ActiveTransaction:
     def initial_state(self, **kwargs):
         """
         Records the observed initial state of the remote.
+
+        Parameters
+        ----------
+        **kwargs
+            Initial state assocations
         """
         if self.result is not None:
             raise LogicError("A transaction cannot be altered after it is completed")
@@ -98,6 +133,11 @@ class ActiveTransaction:
     def final_state(self, **kwargs):
         """
         Records the (expected) final state of the remote.
+
+        Parameters
+        ----------
+        **kwargs
+            Final state assocations
         """
         if self.result is not None:
             raise LogicError("A transaction cannot be altered after it is completed")
@@ -106,12 +146,27 @@ class ActiveTransaction:
     def extra_info(self, **kwargs):
         """
         Purely extraneous information that will be shown additionally to the user.
+
+        Parameters
+        ----------
+        **kwargs
+            Extra information assocations
         """
         self.extra_info_dict = dict(kwargs)
 
     def unchanged(self, **kwargs):
         """
         Sets the final state to the initial state and returns ``success(**kwargs)``.
+
+        Parameters
+        ----------
+        **kwargs
+            Final state assocations
+
+        Returns
+        -------
+        CompletedTransaction
+            The completed transaction.
         """
         self.final_state(**self.initial_state_dict)
         return self.success(**kwargs)
@@ -119,6 +174,16 @@ class ActiveTransaction:
     def success(self, **kwargs):
         """
         Completes the transaction with successful status.
+
+        Parameters
+        ----------
+        **kwargs
+            Final state assocations
+
+        Returns
+        -------
+        CompletedTransaction
+            The completed transaction.
         """
         if self.result is not None:
             raise LogicError("A transaction cannot be completed multiple times.")
@@ -129,6 +194,20 @@ class ActiveTransaction:
         """
         Completes the transaction, marking it as failed with the given reason.
         If reason is a RemoteExecError, additional information will be printed.
+
+        Parameters
+        ----------
+        reason : str
+            The reason for the failure.
+        set_final_state : bool
+            If true, the final transaction state will be set. Defaults to false.
+        **kwargs
+            Final state assocations
+
+        Returns
+        -------
+        CompletedTransaction
+            The completed transaction.
         """
         if isinstance(reason, RemoteExecError):
             e = reason
