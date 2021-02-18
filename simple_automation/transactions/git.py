@@ -9,13 +9,48 @@ from simple_automation.transactions.basic import _template_str, _remote_stat
 
 def clone(context: Context, url: str, dst: str, depth=None):
     """
-    Clone a git repository, without updating it, if it is already cloned.
+    Clone a git repository, without updating it, if it is already cloned. Same as calling
+    :func:`~checkout()` with update=False.
+
+    Parameters
+    ----------
+    context : Context
+        The context providing the execution context and templating dictionary.
+    url : str
+        The url of the git repository to checkout. Will be templated.
+    dst : str
+        The remote destination path for the repository. Will be templated.
+    depth : str, optional
+        Restrict repository cloning depth. Beware that updates might not work correctly because of forced updates.
+
+    Returns
+    -------
+    CompletedTransaction
+        The completed transaction
     """
     return checkout(context, url, dst, update=False, depth=depth)
 
 def checkout(context: Context, url: str, dst: str, update: bool = True, depth=None):
     """
     Checkout (and optionally update) the given git repository to dst.
+
+    Parameters
+    ----------
+    context : Context
+        The context providing the execution context and templating dictionary.
+    url : str
+        The url of the git repository to checkout. Will be templated.
+    dst : str
+        The remote destination path for the repository. Will be templated.
+    update: bool, optional
+        Also tries to update the repository if it is already cloned. Defaults to true.
+    depth : str, optional
+        Restrict repository cloning depth. Beware that updates might not work correctly because of forced updates.
+
+    Returns
+    -------
+    CompletedTransaction
+        The completed transaction
     """
     url = _template_str(context, url)
     dst = _template_str(context, dst)
