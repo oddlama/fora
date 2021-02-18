@@ -13,6 +13,16 @@ def list_packages(context: Context):
     """
     Returns a dictionary of all installed packages on the remote system.
     The dictionary maps from "{category}/{name}" → any INFO_ATOMS → str/None
+
+    Parameters
+    ----------
+    context : Context
+        The context providing the execution context and templating dictionary.
+
+    Returns
+    -------
+    list[str]
+        All package atoms that are installed on the remote system.
     """
     # Query installed packages
     remote_packages = context.remote_exec(["sh", "-c", "qlist -CIv | xargs qatom -C --"], checked=True)
@@ -35,9 +45,23 @@ def list_packages(context: Context):
 
     return packages
 
-def is_installed(context: Context, atom: str, packages=None):
+def is_installed(context: Context, atom: str, packages: list[str] = None):
     """
-    Queries whether or the given package atom is installed on the remote.
+    Queries whether or not the given package atom is installed on the remote.
+
+    Parameters
+    ----------
+    context : Context
+        The context providing the execution context and templating dictionary.
+    atom : str
+        The package name to query. Will be templated.
+    packages : list[str]
+        Additional options to portage. Will be templated.
+
+    Returns
+    -------
+    bool
+        True if the package is installed
     """
     remote_atom = context.remote_exec(["qatom", "-C", "--", atom], checked=True)
     package_info = dict(zip(ATOMS, remote_atom.stdout.split()))
@@ -48,11 +72,29 @@ def is_installed(context: Context, atom: str, packages=None):
         packages = list_packages(context)
     return cn in packages
 
-def package(context: Context, atom: str, state="present", oneshot=False, opts: list = None):
+def package(context: Context, atom: str, state="present", oneshot=False, opts: list[str] = None):
     """
     Installs or uninstalls (depending if state == "present" or "absent") the given
     package atom. Additional options to emerge can be passed via opts, and will be appended
     before the package atom. opts will be templated.
+
+    Parameters
+    ----------
+    context : Context
+        The context providing the execution context and templating dictionary.
+    atom : str
+        The package name to be installed or uninstalled. Will be templated.
+    state : str, optional
+        The desired state, either "present" or "absent". Defaults to "present".
+    oneshot : bool, optional
+        Use portage option --oneshot. Defaults to false.
+    opts : list[str]
+        Additional options to portage. Will be templated.
+
+    Returns
+    -------
+    CompletedTransaction
+        The completed transaction
     """
     opts = [] if opts is None else [_template_str(context, o) for o in opts]
 
