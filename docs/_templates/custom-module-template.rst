@@ -1,4 +1,4 @@
-{{ fullname | escape | underline }}
+{{ fullname | replace('simple_automation.', '') | escape | underline }}
 
 .. automodule:: {{ fullname }}
 

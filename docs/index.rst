@@ -32,7 +32,15 @@ your topic of interest. You can also use the search function in the top left cor
     :caption: API
     :name: sec-api
 
-    api
+    api/overview
+    api/transactions
+
+.. autosummary::
+     :toctree: _autosummary
+     :template: custom-module-template.rst
+     :recursive:
+
+     simple_automation
 
 .. toctree::
     :maxdepth: 1
