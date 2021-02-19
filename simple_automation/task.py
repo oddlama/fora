@@ -16,6 +16,32 @@ class Task:
     """
     A base class for tasks. A task executes on a host context and runs a set
     of transactions on this context.
+
+    Examples
+    --------
+
+    Every tasks needs an identifier and a description. The identifier can be used as a
+    namespace for related variables.
+
+    .. highlight:: python
+    .. code-block:: python
+
+        from simple_automation import Task
+
+        class TaskZshConfig(Task):
+            identifier = "zsh"
+            description = "Installs a global zsh configuration"
+
+            def run(self, context):
+                # Set defaults
+                context.defaults(user="root", umask=0o022, dir_mode=0o755, file_mode=0o644,
+                                 owner="root", group="root")
+
+                # Copy configuration
+                directory(context, path="/etc/zsh")
+                template(context, src="templates/zsh/zshrc.j2", dst="/etc/zsh/zshrc")
+                template(context, src="templates/zsh/zprofile.j2", dst="/etc/zsh/zprofile")
+
     """
 
     identifier = None
@@ -45,6 +71,14 @@ class Task:
         """
         Optional callback for subclasses. Called when the task may define its global defaults.
         Default variable keys should be named like "tasks.{self.identifier}.variable_name".
+
+        Examples
+        --------
+
+        .. highlight:: python
+        .. code-block:: python
+
+            TODO
         """
         # No-op by default
 
@@ -94,6 +128,59 @@ class Task:
 class TrackedTask(Task):
     """
     A base class for tasks which want to track changes in a git repository.
+    All tracking will be done after :meth:`~run()` has finished.
+
+    Examples
+    --------
+
+    Generally, to track files or directories, you have to inherit from :class:`TrackedTask <simple_automation.task.TrackedTask>`
+    instead of :class:`Task <simple_automation.task.Task>`. It may be beneficial to create your own base class for all tracked
+    trask, to set a common tracking repository. All files or directories you want to track just have to be set in to :attr:`~tracking_paths`
+    in the actual task.
+
+    .. highlight:: python
+    .. code-block:: python
+
+        from simple_automation import TrackedTask
+
+        class MyTrackedTask(TrackedTask):
+            tracking_repo_url = "{{ tracking.repo_url }}"
+            tracking_local_dst = "/var/lib/root/tracking"
+
+    To track a config file, simply extend your task with the correct tracking path:
+
+    .. highlight:: python
+    .. code-block:: python
+
+        class TaskZshConfig(MyTrackedTask):
+            tracking_paths = ["/etc/zsh"]
+            # ...
+
+    To track dynamic information, first save it to a file:
+
+    .. highlight:: python
+    .. code-block:: python
+
+        # Track installed packages from portage
+        class TaskTrackInstalledPackages(MyTrackedTask):
+            identifier = "track_installed_packages"
+            description = "Tracks all installed packages"
+            tracking_paths = ["/var/lib/root/installed_packages"]
+
+            def run(self, context):
+                save_output(context, command=["qlist", "-CIv"],
+                            dst="/var/lib/root/installed_packages",
+                            desc="Query installed packages")
+    """
+
+    identifier = None
+    """
+    The identifier of this task.
+    """
+
+    description = None
+    """
+    A short description of what the task does.
     """
 
     tracking_repo_url = None
