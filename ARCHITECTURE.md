@@ -1,1 +1,1 @@
-Please refer to the architecture documentation under `docs/contents/architecture.rst`.
+Please refer to the architecture documentation under `docs/api/architecture.rst`.

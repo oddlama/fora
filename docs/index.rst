@@ -22,9 +22,7 @@ your topic of interest. You can also use the search function in the top left cor
     :name: sec-contents
 
     contents/introduction
-    contents/usage
     contents/examples
-    contents/architecture
     contents/faq
 
 .. toctree::
@@ -33,6 +31,7 @@ your topic of interest. You can also use the search function in the top left cor
     :name: sec-api
 
     api/overview
+    api/architecture
     api/transactions
 
 .. autosummary::

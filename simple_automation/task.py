@@ -41,7 +41,6 @@ class Task:
                 directory(context, path="/etc/zsh")
                 template(context, src="templates/zsh/zshrc.j2", dst="/etc/zsh/zshrc")
                 template(context, src="templates/zsh/zprofile.j2", dst="/etc/zsh/zprofile")
-
     """
 
     identifier = None
@@ -75,10 +74,23 @@ class Task:
         Examples
         --------
 
+        Define variables so your task can be customized easily for your different systems.
+
         .. highlight:: python
         .. code-block:: python
 
-            TODO
+            from simple_automation import Task
+
+            class TaskZshConfig(Task):
+                identifier = "zsh"
+                description = "Installs a global zsh configuration"
+
+                def set_defaults(self, manager):
+                    manager.set("tasks.zsh.config_folder", "/etc/zsh")
+
+                def run(self, context):
+                    # ...
+                    template(context, src="templates/zsh/zshrc.j2", dst="{{ tasks.zsh.config_folder }}/zshrc")
         """
         # No-op by default
 
