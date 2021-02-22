@@ -3,14 +3,14 @@
 Architecture
 ============
 
-In this document you will find a high-level overview of the architecture.
+In this document you will find a high-level overview of the library architecture.
 
 .. code-block::
 
    ┌─────────┐ Gets variables     ┌─────────┐         Initializes  ┌───────────┐
    │ Context │ ╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌→ │ Manager │ ←——————————————————— │ Inventory │
    └─────────┘                    └─────────┘                      └───────────┘
-        ┊ Associated to                │ Owns                            ┊ Uses tasks to build
+        ┊ SSH connection to            │ Owns                            ┊ Uses tasks to build
         ┊ a specific host              │       ┌──────┐                  ┊ global script
         └╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌ │ ╌╌→ ┌──────┐ │  ←╌┐             ┊
                                        ├───→ │ Host │ ┘    ┊             ┊
@@ -89,4 +89,4 @@ Transaction function
 - Examines current state
 - Defines target state
 - If changes are necessary, performs these changes on the remote
-- Returns what has been changed.
+- Returns an object that stores information about what has been changed.

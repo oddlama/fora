@@ -64,9 +64,9 @@ class Task:
         # Initialize variable defaults
         self.var_enabled = f"tasks.{self.identifier}.enabled"
         self.manager.set(self.var_enabled, True)
-        self.set_defaults(manager)
+        self.set_defaults()
 
-    def set_defaults(self, manager):
+    def set_defaults(self):
         """
         Optional callback for subclasses. Called when the task may define its global defaults.
         Default variable keys should be named like "tasks.{self.identifier}.variable_name".
@@ -85,8 +85,8 @@ class Task:
                 identifier = "zsh"
                 description = "Installs a global zsh configuration"
 
-                def set_defaults(self, manager):
-                    manager.set("tasks.zsh.config_folder", "/etc/zsh")
+                def set_defaults(self):
+                    self.manager.set("tasks.zsh.config_folder", "/etc/zsh")
 
                 def run(self, context):
                     # ...

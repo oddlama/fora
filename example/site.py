@@ -4,6 +4,9 @@ from simple_automation import run_inventory, Inventory, GpgVault
 from tasks import TaskZsh, TaskTrackPortage, TaskTrackInstalledPackages
 
 class MySite(Inventory):
+    # -------- Register Tasks --------
+    tasks = [TaskZsh, TaskTrackPortage, TaskTrackInstalledPackages]
+
     def register_vaults(self):
         # -------- Load vault --------
         self.vault = self.manager.add_vault(GpgVault, file="myvault.gpg", recipient="your_keyid_or_mail")
@@ -11,12 +14,6 @@ class MySite(Inventory):
         #vault = self.manager.add_vault(SymmetricVault, file="myvault_keyfile_static.asc", keyfile="/dev/null")
         #vault = self.manager.add_vault(SymmetricVault, file="myvault_keyfile_env.asc", keyfile=os.environ.get("MY_KEYFILE") or "/dev/null")
         #vault = self.manager.add_vault(SymmetricVault, file="myvault_key_env.asc", key=os.environ.get("MY_KEY"))
-
-    def register_tasks(self):
-        # -------- Register Tasks --------
-        self.manager.add_task(TaskZsh)
-        self.manager.add_task(TaskTrackPortage)
-        self.manager.add_task(TaskTrackInstalledPackages)
 
     def register_globals(self):
         # -------- Set global variables --------
