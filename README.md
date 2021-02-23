@@ -31,6 +31,8 @@ Drawbacks:
 
 ## Good to know
 
+* Variable precedence
+* Pretend
 * Tasks have an implicit enabled variable
 * Context defaults. Best practice: Always set them yourself.
   context.defaults(user="root", umask=0o077, dir_mode=0o700, file_mode=0o600,

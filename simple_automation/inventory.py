@@ -23,7 +23,6 @@ class Inventory:
         Also remember to save the return value of this function, which will be
         a vault object you can later use to access stored values.
         """
-        pass
 
     def register_tasks(self):
         """
@@ -43,7 +42,6 @@ class Inventory:
         This function will be executed when your inventory should define
         its global variables. Use :meth:`self.manager.set() <simple_automation.manager.Manager.set>` to define them.
         """
-        pass
 
     def register_inventory(self):
         """

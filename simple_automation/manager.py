@@ -38,14 +38,23 @@ class Manager(Vars):
     A class that manages a set of global variables, hosts, groups, and
     tasks. It provides the CLI interface and represents the main entry
     point for a simple automation script.
+
+    All relative paths (mainly files used in basic.template() or basic.copy()) will
+    be interpreted relative from the location of the initially executed script. If
+    you want to change this behavior, you can either set main_directory to a relative
+    path, which will then be appended to that location, or to an absolute path.
+
+    Parameters
+    ----------
+    inventory_class : cls
+        The inventory class to instanciate.
+    main_directory : str, optional
+        The main directory of the script. Will be used to determine relative paths.
+        If set to None, it will be set to the directory of the executed script file.
     """
     def __init__(self, inventory_class, main_directory=None):
         """
         Create a new manager, which will instanciate the given inventory class.
-        All relative paths (mainly files used in basic.template() or basic.copy()) will
-        be interpreted relative from the location of the initially executed script. If
-        you want to change this behavior, you can either set main_directory to a relative
-        path, which will then be appended to that location, or to an absolute path.
         """
         super().__init__()
 

@@ -12,6 +12,21 @@ class CompletedTransaction:
     action has actually been performed, as well as additional stored values
     defined by the specific transaction for later use.
 
+    .. rubric:: Instance variables
+
+    success : bool
+        True if the transaction result was successful.
+    changed : bool
+        True if the transaction did change anything.
+    failure_reason : str, optional
+        The failure reason that will be attached if the transaction failed.
+    initial_state : dict
+        The observed initial state.
+    final_state : dict
+        The final state of the system. If success=False, this will be the initial state.
+    extra_info : dict, optional
+        Optional extra information given by the transaction
+
     Parameters
     ----------
     transaction : Transaction
@@ -23,6 +38,7 @@ class CompletedTransaction:
     failure_reason : str, optional
         The failure reason that will be attached if the transaction failed.
     """
+
     def __init__(self, transaction, success, store, failure_reason=None):
         self.success = success
         self.failure_reason = failure_reason
@@ -39,19 +55,19 @@ class Transaction:
     """
     A wrapper around a transaction context that enforces usage of the
     'with' statement to modify the transaction.
+
+    Parameters
+    ----------
+    context : Context
+        The context on which the transaction will be executed.
+    title : str
+        The title of the transaction for printed output.
+    name : str
+        The name of the transaction for printed output.
     """
     def __init__(self, context, title, name):
         """
         Internal use. Creates a new transaction.
-
-        Parameters
-        ----------
-        context : Context
-            The context on which the transaction will be executed.
-        title : str
-            The title of the transaction for printed output.
-        name : str
-            The name of the transaction for printed output.
         """
         self.context = context
         self.title = title

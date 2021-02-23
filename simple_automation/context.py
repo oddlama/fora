@@ -113,19 +113,19 @@ class RemoteDispatcher:
 
     # We name our argument input because thats how it's named in subprocess.run().
     # pylint: disable=W0622
-    def exec(self, command, input=None):
+    def exec(self, command, input=None, user=None, umask=None):
         """
         Executes the given command on the remote machine as the
         user and with the umask given by the attached context.
         """
         # Set user to execute as
         self.write_mode("user")
-        self.write_str(self.context.as_user)
+        self.write_str(user or self.context.as_user)
         self.expect("ok")
 
         # Set umask value
         self.write_mode("umask")
-        self.write_str(str(self.context.umask_value))
+        self.write_str(str(umask or self.context.umask_value))
         self.expect("ok")
 
         # Set input value
@@ -375,7 +375,7 @@ class Context:
 
     # We name our argument input because thats how it's named in subprocess.run().
     # pylint: disable=W0622
-    def remote_exec(self, command, checked=False, input=None, error_verbosity=None, verbosity=None):
+    def remote_exec(self, command, checked=False, input=None, error_verbosity=None, user=None, umask=None, verbosity=None):
         """
         Execute ssh to execute the given command on the remote host,
         via our built-in remote dispatch script. If checked is True,
@@ -393,6 +393,10 @@ class Context:
             If true, an exception will be raised if the command fails. Defaults to false.
         input : bytes, optional
             If not None, this will be passed to the command as stdin.
+        user : str, optional
+            A specific user to execute the command as. Defaults to the user set in the context.
+        umask : int, optional
+            A specific umask to execute the command with. Defaults to the umask set in the context.
         verbosity : int, optional
             If verbosity is not None and self.verbose >= verbosity, the command
             output will be printed. Read: verbosity is the number of -v flags
@@ -412,7 +416,7 @@ class Context:
         # are passed with NUL-terminated parameters, so we don't have to worry
         # about any quoting. This therefore ensures that there is no command
         # injection possible.
-        ret = self.remote_dispatcher.exec(command, input)
+        ret = self.remote_dispatcher.exec(command, input, user, umask)
 
         if checked:
             if error_verbosity is None:

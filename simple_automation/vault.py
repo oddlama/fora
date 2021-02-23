@@ -15,19 +15,16 @@ from simple_automation.exceptions import LogicError, MessageError
 class Vault(Vars):
     """
     A base-class for vaults.
+
+    Parameters
+    ----------
+    manager : Manager
+        The manager to which this vault is registered.
+    file : str
+        The file which serves as the permanent storage.
     """
 
     def __init__(self, manager, file: str):
-        """
-        Initializes the vault.
-
-        Parameters
-        ----------
-        manager : Manager
-            The manager to which this vault is registered.
-        file : str
-            The file which serves as the permanent storage.
-        """
         super().__init__()
         self.manager = manager
         self.file = file
@@ -114,25 +111,24 @@ class SymmetricVault(Vault):
     """
     A SymmetricVault is a Vault which saves its context symmetrically encrypted.
     Content is encrypted with a salted key (+scrypt) using AES-256-GCM.
+
+    Initializes the vault from the given file and key/keyfile.
+    If neither key nor keyfile is provided, the key will be read via getpass().
+    The key may be given as str or bytes. If the key is given a a str,
+    it will automatically be converted to bytes (without encoding) before usage.
+
+    Parameters
+    ----------
+    manager : Manager
+        The manager to which this vault is registered.
+    file : str
+        The file which serves as the permanent storage.
+    keyfile : str, optional
+        A file which contains the decryption key. Defaults to None.
+    key : str, optional
+        The decryption key. Defaults to None.
     """
     def __init__(self, manager, file: str, keyfile=None, key=None):
-        """
-        Initializes the vault from the given file and key/keyfile.
-        If neither key nor keyfile is provided, the key will be read via getpass().
-        The key may be given as str or bytes. If the key is given a a str,
-        it will automatically be converted to bytes (without encoding) before usage.
-
-        Parameters
-        ----------
-        manager : Manager
-            The manager to which this vault is registered.
-        file : str
-            The file which serves as the permanent storage.
-        keyfile : str, optional
-            A file which contains the decryption key. Defaults to None.
-        key : str, optional
-            The decryption key. Defaults to None.
-        """
         super().__init__(manager, file)
         self.keyfile = keyfile
         self.key = key
@@ -234,22 +230,21 @@ class GpgVault(Vault):
     A GpgVault is a Vault which saves its context encrypted with gpg.
     This can be convenient if you e.g. use a YubiKey or similar hardware
     to store your encryption keys.
+
+    Initializes the gpg encrypted vault from the given file and recipient.
+
+    Parameters
+    ----------
+    manager : Manager
+        The manager to which this vault is registered.
+    file : str
+        The file which serves as the permanent storage.
+    recipient: str
+        Only needed for encryption (when editing). Reflects the gpg
+        command line parameter '--recipient'. If you don't plan on using
+        the editing feature, the recipient may be set to None.
     """
     def __init__(self, manager, file: str, recipient: str):
-        """
-        Initializes the gpg encrypted vault from the given file and recipient.
-
-        Parameters
-        ----------
-        manager : Manager
-            The manager to which this vault is registered.
-        file : str
-            The file which serves as the permanent storage.
-        recipient: str
-            Only needed for encryption (when editing). Reflects the gpg
-            command line parameter '--recipient'. If you don't plan on using
-            the editing feature, the recipient may be set to None.
-        """
         super().__init__(manager, file)
         self.recipient = recipient
 

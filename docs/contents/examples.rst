@@ -32,15 +32,32 @@ and where you will find the main execution routine.
     .. code-block:: python
 
         #!/usr/bin/env python3
-        from simple_automation import run_inventory, Inventory
+        from simple_automation import run_inventory, Inventory, SymmetricVault
         from tasks.my_simple_task import MySimpleTask
 
         # -------- Define your inventory --------
         class MyInventory(Inventory):
             tasks = [MySimpleTask]
 
+            # (Optional) Vaults store encrypted variables
+            def register_vaults(self):
+                # -------- Load vault --------
+                self.vault = self.manager.add_vault(SymmetricVault, file="myvault.asc")
+
+            # (Optional) Global variables
+            def register_globals(self):
+                # -------- Set global variables --------
+                self.manager.set("tasks.my_simple_task.enabled", False)
+
             def register_inventory(self):
-                self.manager.add_host("my_home_pc", ssh_host="root@localhost")
+                # -------- Define Groups --------
+                desktops = self.manager.add_group("desktops")
+                desktops.set("system.is_desktop", True)
+                desktops.copy("system.root_pw", self.vault)
+
+                # -------- Define Hosts --------
+                my_home_pc = self.manager.add_host("my_home_pc", ssh_host="root@localhost")
+                my_laptop.add_group(desktops)
 
             def run(self, context):
                 context.run_task(MySimpleTask)
@@ -103,7 +120,7 @@ Example:
 .. code-block:: python
 
     from simple_automation import Task
-    from simple_automation.transactions.basic import copy, directory
+    from simple_automation.transactions.basic import template
 
     class MyTask(Task):
         identifier = "my_task"
@@ -123,14 +140,235 @@ Example:
 Global variables
 ----------------
 
-Conditional transactions
-------------------------
+You can set global variables by calling :meth:`self.manager.set() <simple_automation.manager.Managert.set>`.
+This is mainly helpful if you want to create customization points for your
+own global inventory :meth:`run() <simple_automation.inventory.Inventory.run>` routine.
 
-Tracking files
---------------
+.. code-block:: python
+
+    from simple_automation import Inventory
+
+    class MyInventory(Inventory):
+        # ...
+        def register_globals(self):
+            # -------- Set global variables --------
+            self.manager.set("install_dotfiles", False)
+
+        def run(self, context):
+            if context.vars.get("install_dotfiles"):
+                # ...
 
 Groups
 ------
 
+If you have multiple hosts with related configuration needs,
+you can add them to groups to manage this common functionality.
+You might for example want to add all desktop machines into one group
+to install common software that you need on all of those hosts.
+
+.. code-block:: python
+
+    from simple_automation import Inventory
+
+    class MyInventory(Inventory):
+        # ...
+
+        def register_inventory(self):
+            # -------- Define Groups --------
+            self.desktops = self.manager.add_group("desktops")
+            self.desktops.set("system.is_desktop", True)
+
+            # -------- Define Hosts --------
+            my_home_pc = self.manager.add_host("my_home_pc", ssh_host="root@localhost")
+            my_laptop.add_group(self.desktops)
+
+        def run(self, context):
+            # ...
+
+            # Check if the current host belongs to a group
+            if context.host in self.desktops:
+                pass
+
+            # Or examine a variable you set for that group
+            if context.vars.get("system.is_desktop"):
+                pass
+
+
+Using transaction results
+-------------------------
+
+Sometimes you will need results from past transactions to determine what to do next.
+For example you might need to run some transactions only if a directory was created.
+
+All transaction return an object of type :class:`CompletedTransaction <simple_automation.transaction.CompletedTransaction>`
+which you can use to examine the initial and final transaction state.
+
+.. topic:: Conditional execution based on directory creation state
+
+    .. code-block:: python
+
+        from simple_automation import Task
+        from simple_automation.transactions.basic import directory
+
+        class MyTask(Task):
+            # ...
+            def run(self, context):
+                # ...
+                res = directory("/some/directory")
+                if not res.initial_state["exists"]:
+                    # Directory didn't exist before
+                    # Do some additional work
+
+Conditional execution based on command output
+---------------------------------------------
+
+You might find yourself in the situation where you need the
+output of an arbitrary command, or a file on the remote system
+to determine the next steps. This can be done by directly
+executing a command on the remote system via the given context.
+
+.. hint::
+
+    The method :meth:`context.remote_exec() <simple_automation.context.Context.remote_exec>` works
+    similar to ``subprocess.run()``, but is executed on the remote host. Please view the method documentation
+    to see which parameters are avaiable.
+
+.. topic:: Executing a remote command
+
+    .. code-block:: python
+
+        from simple_automation import Task
+
+        class MyTask(Task):
+            # ...
+            def run(self, context):
+                # ...
+                remote_content = context.remote_exec(["cat", "/path/to/some/file"], checked=True)
+                content = remote_content.stdout
+                # Use the content in your logic.
+
+Tracking files
+--------------
+
+You can have tasks automatically check some files or directories into a git repository,
+so you can keep track of your system's state over time. This is as simple as
+deriving from :class:`TrackedTask <simple_automation.task.TrackedTask>` instead of :class:`Task <simple_automation.task.Task>`,
+and defining some additional class variables. Be sure to have a look at the documentation of :class:`TrackedTask <simple_automation.task.TrackedTask>` to see
+which options are available.
+
+.. hint::
+
+    It may be beneficial to create your own base class for all tracked
+    tasks, to set a common tracking repository. You will then only have to
+    add all files and directories you want to track to :attr:`tracking_paths <simple_automation.task.TrackedTask.tracking_paths>`
+    in the actual task.
+
+.. topic:: Define a common base task
+
+    .. code-block:: python
+
+        from simple_automation import TrackedTask
+
+        class MyTrackedTask(TrackedTask):
+            # Save the url into a vault so it doesn't leak into your management repository
+            tracking_repo_url = "{{ tracking.repo_url }}"
+            # Choose some path where the actual tracking repository will be cloned on your machines
+            tracking_local_dst = "/var/lib/root/tracking"
+
+.. topic:: Track some files
+
+    Simply extend any of your task by inheriting from your new base task,
+    then set the files and/or directories you want to track.
+
+    .. code-block:: python
+
+        class TaskZshConfig(MyTrackedTask):
+            tracking_paths = ["/etc/zsh"]
+            # ...
+
+.. topic:: A tracking-only task
+
+    It is perfectly valid to create a new task that does nothing but
+    track some files.
+
+    .. code-block:: python
+
+        class TaskTrackSomething(MyTrackedTask):
+            identifier = "track_something"
+            description = "Tracks something"
+            tracking_paths = ["/etc/location1", "/var/lib/something_else"]
+
+.. topic:: Track arbitrary information
+
+    You can also track arbitrary information, by querying this information in your
+    tasks :meth:`run() <simple_automation.task.Task.run>` function and save it into
+    a temporary destination.
+
+    .. code-block:: python
+
+        # Track installed packages from portage
+        class TaskTrackInstalledPackages(MyTrackedTask):
+            identifier = "track_installed_packages"
+            description = "Tracks all installed packages"
+            tracking_paths = ["/var/lib/root/installed_packages"]
+
+            def run(self, context):
+                # Change the command to fit your package manager
+                save_output(context, command=["qlist", "-CIv"],
+                            dst="/var/lib/root/installed_packages",
+                            desc="Query installed packages")
+
 Vaults
 ------
+
+Vaults let you store variables in an encrypted file. This is useful
+when you want to safely store secrets in your management repository. By default
+we offer symmetrically encrypted vaults (scrypt+AES-256-GCM), or gpg encrypted vaults (convenient
+in combination with a smartcard or YubiKey).
+
+For specific information on each, have a look at the respective class documentations:
+
+- :class:`SymmetricVault <simple_automation.vault.SymmetricVault>`
+- :class:`GpgVault <simple_automation.vault.GpgVault>`
+
+A vault is just a variable storage, and therefore works similar to other variable storages
+like groups or hosts.
+
+.. topic:: Creating/Editing a vault
+
+    If you have defined a vault, you can use ``./site.py --edit-vault VAULT_IDENTIFIER`` to edit it.
+    This will open ``$EDITOR`` and show the vault content in JSON format.
+
+.. topic:: Using a vault
+
+    .. code-block:: python
+
+        #!/usr/bin/env python3
+        from simple_automation import Inventory, SymmetricVault
+        from tasks.my_simple_task import MySimpleTask
+
+        # -------- Define your inventory --------
+        class MyInventory(Inventory):
+            # ...
+            def register_vaults(self):
+                # You can optionally pass the unlock key / keyfile if needed
+                self.vault = self.manager.add_vault(SymmetricVault, file="myvault.asc")
+                # You may define multiple vaults. Store them in your instance to access them later.
+
+            def register_inventory(self):
+                # ...
+                # Copy root password from vault
+                my_laptop.copy("system.root_pw", self.vault)
+
+.. topic:: Creating a GpgVault
+
+    .. code-block:: python
+
+        # ...
+        def register_vaults(self):
+            self.vault = self.manager.add_vault(GpgVault, file="myvault.gpg", recipient="your_keyid")
+
+.. hint::
+
+    Use :class:`copy() <simple_automation.vars.Vars.copy>` to easily copy a variable from
+    a vault into your globals, group or host variables.

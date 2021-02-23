@@ -146,9 +146,10 @@ class TrackedTask(Task):
     --------
 
     Generally, to track files or directories, you have to inherit from :class:`TrackedTask <simple_automation.task.TrackedTask>`
-    instead of :class:`Task <simple_automation.task.Task>`. It may be beneficial to create your own base class for all tracked
-    trask, to set a common tracking repository. All files or directories you want to track just have to be set in to :attr:`~tracking_paths`
-    in the actual task.
+    instead of :class:`Task <simple_automation.task.Task>`. It may be beneficial to
+    create your own base class for all tracked tasks, to set a common tracking repository.
+    You will then only have to add all files and directories you want to track to
+    :attr:`~tracking_paths` in the actual task.
 
     .. highlight:: python
     .. code-block:: python
@@ -247,15 +248,14 @@ class TrackedTask(Task):
     class TaskInitializeTracking(Task):
         """
         A sub-task used to initialize the tracking repository.
+
+        We remember the tracked
+        parent task, so so we have access to the tracking specific variables later.
         """
         identifier = "initialize_tracking"
         description = "Initialize the tracking repository"
 
         def __init__(self, tracked_task):
-            """
-            Initialize this tracking initialization task and remember the tracked
-            parent task, so so we have access to the tracking specific variables later.
-            """
             super().__init__(tracked_task.manager)
             self.tracked_task = tracked_task
 
