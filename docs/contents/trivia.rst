@@ -184,8 +184,8 @@ There are two ways of associating additional information with a host:
     self.my_host.var = "value"
 
 Both are fine, while the first might be more flexible, as it will allow you to
-inherit from global or group variables, the second can be beneficial if you want
-access to arbitrary python objects from templated contexts.
+inherit from global or group variables. You can use both approaches to
+access to arbitrary python objects from templated contexts, by using any object as the value.
 
 Relative local paths
 --------------------
