@@ -23,6 +23,7 @@ your topic of interest. You can also use the search function in the top left cor
 
     contents/introduction
     contents/examples
+    contents/trivia
     contents/faq
 
 .. toctree::

@@ -9,7 +9,7 @@ from pathlib import PurePosixPath
 from simple_automation.checks import check_valid_path, check_valid_relative_path
 from simple_automation.exceptions import LogicError
 from simple_automation.transactions import git
-from simple_automation.transactions.basic import _template_str, _resolve_mode_owner_group
+from simple_automation.transactions.utils import template_str, resolve_mode_owner_group
 from simple_automation.utils import ellipsis
 
 class Task:
@@ -276,7 +276,7 @@ class TrackedTask(Task):
             if not context.pretend:
                 # Set given git repo configs
                 for k,v in self.tracked_task.tracking_repo_configs.items():
-                    v = _template_str(context, v)
+                    v = template_str(context, v)
                     context.remote_exec(["git", "-C", dst, "config", "--local", k, v], checked=True)
 
 
@@ -294,9 +294,9 @@ class TrackedTask(Task):
         """
         Resolve the templated variables for this tracked task
         """
-        url = _template_str(context, self.tracking_repo_url)
-        dst = _template_str(context, self.tracking_local_dst)
-        sub = _template_str(context, self.tracking_subpath)
+        url = template_str(context, self.tracking_repo_url)
+        dst = template_str(context, self.tracking_local_dst)
+        sub = template_str(context, self.tracking_subpath)
         tracking_id = f"{url}:{dst}/{sub}"
         check_valid_path(dst)
         check_valid_relative_path(sub)
@@ -353,7 +353,7 @@ class TrackedTask(Task):
         # Check source paths
         srcs = []
         for src in self.tracking_paths:
-            src = _template_str(context, src)
+            src = template_str(context, src)
             check_valid_path(src)
             srcs.append(src)
 
@@ -362,7 +362,7 @@ class TrackedTask(Task):
             action.initial_state(added=0, modified=0, deleted=0)
 
             if not context.pretend:
-                mode, owner, group = _resolve_mode_owner_group(context, None, None, None, context.dir_mode)
+                mode, owner, group = resolve_mode_owner_group(context, None, None, None, context.dir_mode)
                 rsync_dst = f"{dst}/{sub}/"
                 base_parts = PurePosixPath(dst).parts
                 parts = PurePosixPath(rsync_dst).parts
@@ -402,7 +402,7 @@ class TrackedTask(Task):
                     action.final_state(added=added, modified=modified, deleted=deleted)
 
                     # Create commit
-                    commit_opts = [_template_str(context, o) for o in self.tracking_git_commit_opts]
+                    commit_opts = [template_str(context, o) for o in self.tracking_git_commit_opts]
                     context.remote_exec(["git", "-C", dst, "commit"] + commit_opts + ["--message", f"task {self.identifier}: {added=}, {modified=}, {deleted=}"], checked=True)
 
                     # Push commit

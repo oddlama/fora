@@ -4,7 +4,7 @@ Provides package related utils.
 
 from simple_automation.context import Context
 from simple_automation.exceptions import LogicError
-from simple_automation.transactions.basic import _template_str
+from simple_automation.transactions.utils import template_str
 
 def generic_package(context: Context, atom: str, state: str, is_installed, install, uninstall):
     """
@@ -36,7 +36,7 @@ def generic_package(context: Context, atom: str, state: str, is_installed, insta
     if state not in ["present", "absent"]:
         raise LogicError(f"Invalid package state '{state}'")
 
-    atom = _template_str(context, atom)
+    atom = template_str(context, atom)
 
     with context.transaction(title="package", name=atom) as action:
         # Query current state

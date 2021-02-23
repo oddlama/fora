@@ -5,7 +5,7 @@ Provides git related transactions.
 from simple_automation.checks import check_valid_path
 from simple_automation.context import Context
 from simple_automation.exceptions import LogicError, RemoteExecError
-from simple_automation.transactions.basic import _template_str, _remote_stat
+from simple_automation.transactions.utils import template_str, remote_stat
 
 def clone(context: Context, url: str, dst: str, depth=None):
     """
@@ -52,8 +52,8 @@ def checkout(context: Context, url: str, dst: str, update: bool = True, depth=No
     CompletedTransaction
         The completed transaction
     """
-    url = _template_str(context, url)
-    dst = _template_str(context, dst)
+    url = template_str(context, url)
+    dst = template_str(context, dst)
     check_valid_path(dst)
 
     with context.transaction(title="checkout", name=dst) as action:
@@ -61,7 +61,7 @@ def checkout(context: Context, url: str, dst: str, update: bool = True, depth=No
         action.extra_info(url=url)
 
         # Query current state
-        (cur_ft, _, _, _) = _remote_stat(context, dst)
+        (cur_ft, _, _, _) = remote_stat(context, dst)
 
         # Record this initial state
         if cur_ft is None:
@@ -69,7 +69,7 @@ def checkout(context: Context, url: str, dst: str, update: bool = True, depth=No
             cloned = False
         elif cur_ft == "directory":
             # Assert that it is a git directory
-            (cur_git_ft, _, _, _) = _remote_stat(context, dst + "/.git")
+            (cur_git_ft, _, _, _) = remote_stat(context, dst + "/.git")
             if cur_git_ft != 'directory':
                 raise LogicError("Cannot checkout git repository on remote: Directory already exists and is not a git repository")
 

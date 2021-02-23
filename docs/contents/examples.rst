@@ -256,6 +256,12 @@ deriving from :class:`TrackedTask <simple_automation.task.TrackedTask>` instead 
 and defining some additional class variables. Be sure to have a look at the documentation of :class:`TrackedTask <simple_automation.task.TrackedTask>` to see
 which options are available.
 
+.. warning::
+
+    Your chosen tracking repository should already have at least one commit.
+    This is necessary because only then there will be a tracked branch when
+    checking it out initially.
+
 .. hint::
 
     It may be beneficial to create your own base class for all tracked
@@ -318,6 +324,8 @@ which options are available.
                             dst="/var/lib/root/installed_packages",
                             desc="Query installed packages")
 
+.. _example_vaults:
+
 Vaults
 ------
 
@@ -370,5 +378,5 @@ like groups or hosts.
 
 .. hint::
 
-    Use :class:`copy() <simple_automation.vars.Vars.copy>` to easily copy a variable from
+    Use :meth:`copy() <simple_automation.vars.Vars.copy>` to easily copy a variable from
     a vault into your globals, group or host variables.

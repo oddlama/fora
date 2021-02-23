@@ -3,7 +3,7 @@ Provides portage related transactions.
 """
 
 from simple_automation.context import Context
-from simple_automation.transactions.basic import _template_str
+from simple_automation.transactions.utils import template_str
 from simple_automation.transactions.package.utils import generic_package
 
 ATOMS = ['category', 'name', 'version', 'ebuild_revision', 'slots', 'prefixes', 'sufixes']
@@ -96,7 +96,7 @@ def package(context: Context, atom: str, state="present", oneshot=False, opts: l
     CompletedTransaction
         The completed transaction
     """
-    opts = [] if opts is None else [_template_str(context, o) for o in opts]
+    opts = [] if opts is None else [template_str(context, o) for o in opts]
 
     def install(context, atom):
         emerge_cmd = ["emerge", "--color=y", "--verbose"]

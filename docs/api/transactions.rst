@@ -32,6 +32,6 @@ Package transactions
 By default, there is rudimentary support for installing packages via ``apt``, ``pacman`` and ``portage``.
 
 .. autosummary::
-    simple_automation.transactions.package.portage.package
     simple_automation.transactions.package.apt.package
     simple_automation.transactions.package.pacman.package
+    simple_automation.transactions.package.portage.package

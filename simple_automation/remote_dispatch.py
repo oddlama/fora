@@ -48,7 +48,7 @@ def write_mode(mode):
 
 def write_data(data):
     """
-    Write arbirtary binary data (sends a length, newline, data)
+    Write arbitrary binary data (sends a length, newline, data)
     """
     sys.stdout.buffer.write(str(len(data)).encode('utf-8'))
     sys.stdout.buffer.write(b'\n')
@@ -57,7 +57,7 @@ def write_data(data):
 
 def write_str(s):
     """
-    Write arbirtary string
+    Write arbitrary string
     """
     write_data(s.encode('utf-8'))
 
@@ -73,13 +73,13 @@ def read_len():
 
 def read_data():
     """
-    Read arbirtary data
+    Read arbitrary data
     """
     return sys.stdin.buffer.read(read_len())
 
 def read_str():
     """
-    Read arbirtary string
+    Read arbitrary string
     """
     return read_data().decode('utf-8')
 

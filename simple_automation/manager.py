@@ -275,7 +275,7 @@ class Manager(Vars):
             print(f"[1;31merror:[m {str(e)}")
             raise e
 
-def run_inventory(inventory_class):
+def run_inventory(inventory_class, main_directory=None):
     """
     Instanciates a manager given an inventory class and runs the manager's CLI.
 
@@ -283,5 +283,8 @@ def run_inventory(inventory_class):
     ----------
     inventory_class : str
         The inventory class to instanciate.
+    main_directory : str, optional
+        The main directory of the script. Will be used to determine relative paths.
+        If set to None, it will be set to the directory of the executed script file.
     """
-    Manager(inventory_class).main()
+    Manager(inventory_class, main_directory).main()
