@@ -153,8 +153,8 @@ def remote_upload(context: Context, get_content, title: str, name: str, dst: str
 
     Returns
     -------
-    str
-        The hexlified sha512sum of the path on the remote host, or None if an error occurred.
+    CompletedTransaction
+        The completed transaction
     """
     with context.transaction(title=title, name=name) as action:
         mode, owner, group = resolve_mode_owner_group(context, mode, owner, group, context.file_mode)
