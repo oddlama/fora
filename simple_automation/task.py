@@ -403,7 +403,7 @@ class TrackedTask(Task):
 
                     # Create commit
                     commit_opts = [template_str(context, o) for o in self.tracking_git_commit_opts]
-                    context.remote_exec(["git", "-C", dst, "commit"] + commit_opts + ["--message", f"task {self.identifier}: {added=}, {modified=}, {deleted=}"], checked=True)
+                    context.remote_exec(["git", "-C", dst, "commit"] + commit_opts + ["--message", f"task {self.identifier}: added={added}, modified={modified}, deleted={deleted}"], checked=True)
 
                     # Push commit
                     context.remote_exec(["git", "-C", dst, "push", "origin", "master"], checked=True)
