@@ -13,6 +13,7 @@ python:
   install:
     - method: setuptools
       path: .
+  version: 3.9
 
 # Also build additional formats such as PDF and ePub
 formats: all
