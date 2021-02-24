@@ -13,7 +13,7 @@ or even just dotfiles management. Although it can certainly be used to administe
 infrastructures.
 
 If you want a high level overview of the different library components
-and how they work together, please have a look at the [Architecture](https://simple-automation.oddlama.org/simple_automation/en/latest/api/architecture.html) page.
+and how they work together, please have a look at the [Architecture](https://simple-automation.oddlama.org/en/latest/api/architecture.html) page.
 
 - [x] Focus on minimalism and simplicity. It's easy to extend functionality, and there is no bullshit.
 - [x] Use python to write your configuration and don't be limited by a domain specific language
