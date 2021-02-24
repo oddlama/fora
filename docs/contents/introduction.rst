@@ -101,6 +101,8 @@ Installation
 Use can use pip to install simple_automation. If you want to help maintaining a package
 for your favourite distribution, feel free to reach out.
 
+You will need ``python>=3.9``.
+
 .. topic:: Using pip
 
     .. code-block:: bash

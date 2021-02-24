@@ -28,11 +28,11 @@ and how they work together, please have a look at the [Architecture](https://sim
 Use can use pip to install simple_automation. If you want to help maintaining a package
 for your favourite distribution, feel free to reach out.
 
+You will need `python>=3.9`.
+
 ```bash
 pip install simple_automation
 ```
-
-You will need at least python 3.7.
 
 ## Quick example
 
