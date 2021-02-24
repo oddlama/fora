@@ -341,7 +341,7 @@ class Context:
         host that this context is bound to.
         """
         ssh_command = ["ssh"]
-        ssh_command.extend(self.host.ssh_params)
+        ssh_command.extend(self.host.ssh_opts)
         ssh_command.append(f"ssh://{self.host.ssh_host}:{self.host.ssh_port}")
         ssh_command.extend(command)
         return ssh_command

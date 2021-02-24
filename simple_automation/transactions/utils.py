@@ -9,7 +9,7 @@ from jinja2.exceptions import UndefinedError
 from jinja2 import Template
 
 from simple_automation.context import Context
-from simple_automation.exceptions import LogicError, RemoteExecError
+from simple_automation.exceptions import LogicError, MessageError, RemoteExecError
 
 def template_str(context: Context, content : str) -> str:
     """
@@ -35,7 +35,7 @@ def template_str(context: Context, content : str) -> str:
 
 def _mode_to_str(mode):
     """
-    Stringifies a given octal mode.
+    Stringifies a given integer mode as an octal string (e.g. 493 → "755").
     """
     return f"{mode:>03o}"
 
@@ -96,12 +96,12 @@ def remote_stat(context, path):
     Returns
     -------
     (str, str, str, str)
-        A tuple of (file_type, mode, owner, group)
+        A tuple of (file_type, str_octal_mode, owner, group), where file_type is one of ["file", "directory", "link", "other"]
     """
-    stat = context.remote_exec(["stat", "-c", "%F;%a;%u;%g", path])
+    stat = context.remote_exec(["python", "-c", 'import os, sys, stat; s = os.lstat(sys.argv[1]); ft = "link" if stat.S_ISLNK(s.st_mode) else "file" if stat.S_ISREG(s.st_mode) else "directory" if stat.S_ISDIR(s.st_mode) else "other"; print(f"{ft};{stat.S_IMODE(s.st_mode)};{s.st_uid};{s.st_gid}")', path])
     if stat.return_code == 0:
         file_type, mode, owner, group = stat.stdout.strip().split(";")
-        mode, owner, group = resolve_mode_owner_group(context, int(mode, 8), owner, group, None)
+        mode, owner, group = resolve_mode_owner_group(context, int(mode), owner, group, None)
         return (file_type, mode, owner, group)
     return (None, None, None, None)
 
@@ -166,10 +166,10 @@ def remote_upload(context: Context, get_content, title: str, name: str, dst: str
         # Record this initial state
         if cur_ft is None:
             action.initial_state(exists=False, sha512sum=None, mode=None, owner=None, group=None)
-        elif cur_ft == "regular file":
+        elif cur_ft == "file":
             action.initial_state(exists=True, sha512sum=cur_sha512sum, mode=cur_mode, owner=cur_owner, group=cur_group)
         else:
-            raise LogicError("Cannot create file on remote: Path already exists and is not a file")
+            raise MessageError(f"Cannot create file on remote: Path already exists and is not a file (type is '{cur_ft}')")
 
         # Get content
         try:
@@ -179,7 +179,7 @@ def remote_upload(context: Context, get_content, title: str, name: str, dst: str
             raise e
         sha512sum = hashlib.sha512(content.encode("utf-8")).hexdigest()
 
-        if cur_ft == "regular file":
+        if cur_ft == "file":
             if sha512sum == cur_sha512sum and mode == cur_mode and owner == cur_owner and group == cur_group:
                 return action.unchanged()
 
@@ -190,7 +190,7 @@ def remote_upload(context: Context, get_content, title: str, name: str, dst: str
             try:
                 # Replace file
                 dst_base64 = base64.b64encode(dst.encode('utf-8')).decode('utf-8')
-                context.remote_exec(["sh", "-c", f"cat > \"$(echo '{dst_base64}' | base64 -d)\""], checked=True, stdin=content)
+                context.remote_exec(["sh", "-c", f"cat > \"$(echo '{dst_base64}' | base64 -d)\""], checked=True, input=content)
 
                 # Set permissions
                 context.remote_exec(["chown", f"{owner}:{group}", dst], checked=True)

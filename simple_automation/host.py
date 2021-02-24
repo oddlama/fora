@@ -21,20 +21,30 @@ class Host(Vars):
         self.identifier = identifier
         self.ssh_host = ssh_host
         self.ssh_port = 22
-        self.ssh_params = []
+        self.ssh_opts = []
         self.groups = []
 
     def set_ssh_port(self, port):
         """
         Sets the ssh port for the host's connection.
+
+        Parameters
+        ----------
+        port : int
+            The port number to connect to
         """
         self.ssh_port = port
 
-    def set_ssh_params(self, params):
+    def set_ssh_opts(self, opts):
         """
         Sets additional ssh parameters for this host's connection.
+
+        Parameters
+        ----------
+        opts : list[string]
+            Additional parameters to ssh
         """
-        self.ssh_params = params
+        self.ssh_opts = opts
 
     def add_group(self, group):
         """

@@ -1,4 +1,4 @@
-[Quick start guide](https://simple_automation.oddlama.org/en/latest/intro/quick-start-guide.html) \|
+[Introduction](https://simple_automation.oddlama.org/en/latest/contents/introduction.html) \|
 [Documentation](https://simple_automation.oddlama.org/en/latest)
 
 [![PyPI](https://img.shields.io/pypi/v/simple_automation.svg)](https://pypi.org/pypi/simple_automation/)
@@ -40,7 +40,7 @@ You will need at least python 3.7.
 #!/usr/bin/env python3
 
 from simple_automation import run_inventory, Inventory, Task
-from simple_automation.transactions.basic import copy, directory
+from simple_automation.transactions.basic import copy, directory, template
 
 # -------- Define a task --------
 class TaskZsh(Task):
@@ -52,9 +52,10 @@ class TaskZsh(Task):
         context.defaults(user="root", umask=0o022, dir_mode=0o755, file_mode=0o644,
                          owner="root", group="root")
 
-        # Template the given zshrcCopy configuration
+        # Template the zshrc, copy the zprofile
         directory(context, path="/etc/zsh")
         template(context, src="templates/zsh/zshrc.j2", dst="/etc/zsh/zshrc")
+        copy(context, src="files/zsh/zprofile", dst="/etc/zsh/zprofile")
 
 # -------- Setup your inventory --------
 class MySite(Inventory):

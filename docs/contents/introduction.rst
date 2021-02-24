@@ -19,7 +19,7 @@ Here is an example of how to use simple automation to manage some global config 
 
     #!/usr/bin/env python3
     from simple_automation import run_inventory, Inventory, Task
-    from simple_automation.transactions.basic import copy, directory
+    from simple_automation.transactions.basic import copy, directory, template
 
     # -------- Define a task --------
     class TaskZsh(Task):
@@ -31,9 +31,9 @@ Here is an example of how to use simple automation to manage some global config 
             context.defaults(user="root", umask=0o022, dir_mode=0o755, file_mode=0o644,
                              owner="root", group="root")
 
-            # Copy configuration
+            # Template the zshrc, copy the zprofile
             directory(context, path="/etc/zsh")
-            copy(context, src="files/zsh/zshrc", dst="/etc/zsh/zshrc")
+            template(context, src="templates/zsh/zshrc.j2", dst="/etc/zsh/zshrc")
             copy(context, src="files/zsh/zprofile", dst="/etc/zsh/zprofile")
 
     # -------- Setup your inventory --------
