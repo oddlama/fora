@@ -15,13 +15,13 @@ infrastructures.
 If you want a high level overview of the different library components
 and how they work together, please have a look at the [Architecture](https://simple_automation.oddlama.org/simple_automation/en/latest/api/architecture.html) page.
 
-[x] Focus on minimalism and simplicity. It's easy to extend functionality, and there is no bullshit.
-[x] Use python to write your configuration and don't be limited by a domain specific language
-[x] Provides concicse, readable output
-[x] Store your secrets in vaults encrypted symmetically or by gpg
-[x] Few dependencies: jinja2, pycryptodome (if you use symmetically encrypted vaults)
-[x] No remote dependencies except for python
-[x] Easily track your system's state by having arbitrary files and directories checked into a git repository automatically.
+- [x] Focus on minimalism and simplicity. It's easy to extend functionality, and there is no bullshit.
+- [x] Use python to write your configuration and don't be limited by a domain specific language
+- [x] Provides concicse, readable output
+- [x] Store your secrets in vaults encrypted symmetically or by gpg
+- [x] Few dependencies: jinja2, pycryptodome (if you use symmetically encrypted vaults)
+- [x] No remote dependencies except for python
+- [x] Easily track your system's state by having arbitrary files and directories checked into a git repository automatically.
 
 ## Installation
 
