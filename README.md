@@ -1,9 +1,9 @@
-[Introduction](https://simple_automation.oddlama.org/en/latest/contents/introduction.html) \|
-[Documentation](https://simple_automation.oddlama.org/en/latest)
+[Introduction](https://simple-automation.oddlama.org/en/latest/contents/introduction.html) \|
+[Documentation](https://simple-automation.oddlama.org/en/latest)
 
 [![PyPI](https://img.shields.io/pypi/v/simple_automation.svg)](https://pypi.org/pypi/simple_automation/)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-[![Docs](https://readthedocs.org/projects/simple_automation/badge/?version=latest)](https://simple_automation.oddlama.org/en/latest/?badge=latest)
+[![Docs](https://readthedocs.org/projects/simple-automation/badge/?version=latest)](https://simple-automation.oddlama.org/en/latest/?badge=latest)
 
 # About simple automation
 
@@ -13,7 +13,7 @@ or even just dotfiles management. Although it can certainly be used to administe
 infrastructures.
 
 If you want a high level overview of the different library components
-and how they work together, please have a look at the [Architecture](https://simple_automation.oddlama.org/simple_automation/en/latest/api/architecture.html) page.
+and how they work together, please have a look at the [Architecture](https://simple-automation.oddlama.org/simple_automation/en/latest/api/architecture.html) page.
 
 - [x] Focus on minimalism and simplicity. It's easy to extend functionality, and there is no bullshit.
 - [x] Use python to write your configuration and don't be limited by a domain specific language
@@ -82,5 +82,5 @@ Possible output:
 [.] copy       /etc/zsh/zprofile
 ```
 
-For more sophisticated examples have a look at the [Examples](https://simple_automation.oddlama.org/en/latest/contents/examples.html) section in the
+For more sophisticated examples have a look at the [Examples](https://simple-automation.oddlama.org/en/latest/contents/examples.html) section in the
 documentation.
