@@ -10,7 +10,9 @@ sphinx:
 
 # Do install the library itself
 python:
-  setup_py_install: true
+  install:
+    method: setuptools
+    path: .
 
 # Also build additional formats such as PDF and ePub
 formats: all
