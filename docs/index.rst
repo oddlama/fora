@@ -10,7 +10,7 @@ simple_automation docs
 |
 
 Welcome to the official documentation of simple_automation!
-If you are visiting for the fist time, we recommend that you read the :ref:`introduction` page
+If you are visiting for the first time, we recommend that you read the :ref:`introduction` page
 to get an overview of what simple_automation has to offer.
 
 Otherwise, the sidebar and the table of contents below should let you easily access
