@@ -5,7 +5,7 @@ Introduction
 
 Simple automation is an ansible-inspired infrastructure and configuration management tool,
 but with a focus on minimalism and simplicity. Its intended uses are small-scale machine administation, system configuration tracking,
-or even just dotfiles management. Although it can certainly be used to administer bigger
+or even just dotfiles management. Although it can certainly be used to administer larger
 infrastructures.
 
 .. hint::
@@ -17,6 +17,7 @@ Here is an example of how to use simple automation to manage some global config 
 
 .. code-block:: python
 
+    #!/usr/bin/env python3
     from simple_automation import run_inventory, Inventory, Task
     from simple_automation.transactions.basic import copy, directory
 

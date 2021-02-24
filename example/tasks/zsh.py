@@ -21,14 +21,7 @@ class TaskZsh(TrackedTask):
         git.checkout(context,
                   url="https://github.com/romkatv/powerlevel10k",
                   dst="/usr/share/zsh/repos/romkatv/powerlevel10k")
-        git.checkout(context,
-                  url="https://github.com/Aloxaf/fzf-tab",
-                  dst="/usr/share/zsh/repos/Aloxaf/fzf-tab")
-        git.checkout(context,
-                  url="https://github.com/zdharma/fast-syntax-highlighting",
-                  dst="/usr/share/zsh/repos/zdharma/fast-syntax-highlighting")
 
         # Copy configuration
         directory(context, path="/etc/zsh")
         template(context, src="templates/zsh/zshrc.j2", dst="/etc/zsh/zshrc")
-        template(context, src="templates/zsh/zprofile.j2", dst="/etc/zsh/zprofile")
