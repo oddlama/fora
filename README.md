@@ -72,5 +72,15 @@ if __name__ == "__main__":
     run_inventory(MySite)
 ```
 
+Possible output:
+```
+[>] Establishing ssh connection to root@localhost
+
+[*] >>>> Task: zsh <<<<
+[+] dir        /etc/zsh                      mode: 750 → 755
+[+] template   /etc/zsh/zshrc                sha512sum: 3d48b060… → fac69135…
+[.] copy       /etc/zsh/zprofile
+```
+
 For more sophisticated examples have a look at the [Examples](https://simple_automation.oddlama.org/en/latest/contents/examples.html) section in the
 documentation.

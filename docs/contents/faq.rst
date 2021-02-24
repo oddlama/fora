@@ -9,6 +9,11 @@ Only show what changes would be applied to the remote systems
 
 Use the ``--pretend`` command line parameter.
 
+Only run on some of the defined hosts
+-------------------------------------
+
+Use the ``--hosts`` command line parameter.
+
 Errors when trying to track files
 ---------------------------------
 

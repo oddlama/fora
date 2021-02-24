@@ -50,6 +50,17 @@ Here is an example of how to use simple automation to manage some global config 
     if __name__ == "__main__":
         run_inventory(MySite)
 
+Possible output:
+
+.. code-block::
+
+    [>] Establishing ssh connection to root@localhost
+
+    [*] >>>> Task: zsh <<<<
+    [+] dir        /etc/zsh                      mode: 750 → 755
+    [+] template   /etc/zsh/zshrc                sha512sum: 3d48b060… → fac69135…
+    [.] copy       /etc/zsh/zprofile
+
 
 Feature Overview
 ----------------
