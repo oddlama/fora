@@ -8,5 +8,9 @@ version: 2
 sphinx:
   configuration: docs/conf.py
 
+# Do install the library itself
+python:
+  setup_py_install: true
+
 # Also build additional formats such as PDF and ePub
 formats: all
