@@ -344,7 +344,7 @@ like groups or hosts.
 
 .. topic:: Creating/Editing a vault
 
-    If you have defined a vault, you can use ``./site.py --edit-vault VAULT_IDENTIFIER`` to edit it.
+    If you have defined a vault, you can use ``./site.py --edit-vault <vault_file>`` to edit it.
     This will open ``$EDITOR`` and show the vault content in JSON format.
 
 .. topic:: Using a vault
