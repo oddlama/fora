@@ -1,9 +1,13 @@
-[Introduction](https://simple-automation.oddlama.org/en/latest/contents/introduction.html) \|
-[Documentation](https://simple-automation.oddlama.org/en/latest)
-
 [![PyPI](https://img.shields.io/pypi/v/simple_automation.svg)](https://pypi.org/pypi/simple_automation/)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![Docs](https://readthedocs.org/projects/simple-automation/badge/?version=latest)](https://simple-automation.oddlama.org/en/latest/?badge=latest)
+
+<p align="center">
+  <img src="./docs/imgs/logo.svg" height="100" width="auto" />
+</p>
+
+[Introduction](https://simple-automation.oddlama.org/en/latest/contents/introduction.html) \|
+[Documentation](https://simple-automation.oddlama.org/en/latest)
 
 # About simple automation
 
