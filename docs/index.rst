@@ -3,9 +3,9 @@ simple_automation docs
 
 |
 
-.. .. image:: imgs/simple_automation_banner.svg
-..     :alt: simple_automation banner
-..     :align: center
+.. image:: imgs/logo.svg
+    :alt: simple_automation logo
+    :align: center
 
 |
 
