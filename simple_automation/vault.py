@@ -82,7 +82,7 @@ class Vault(Vars):
 
     def edit(self):
         """
-        Opens an $EDITOR containing the loaded content as a pretty printent json,
+        Opens an $EDITOR containing the loaded content as a pretty printed json,
         and updates the internal representation as well as the original vault file,
         if the content changed after the editor exists.
         """
