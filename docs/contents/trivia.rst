@@ -118,7 +118,7 @@ one for your hosts. This is as simple as:
         distro_arch = self.manager.add_group("arch")
         distro_arch.set("system.distribution", "arch")
 
-        # For all your hosts add theom to the correct group
+        # For all your hosts add them to the correct group
         my_host.add_group(distro_arch)
 
     # And define a global transaction wrapper

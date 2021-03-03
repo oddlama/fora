@@ -82,7 +82,7 @@ for related variables. The description will be printed in verbose mode.
 
         # -------- Define a task --------
         class MySimpleTask(Task):
-            identifier = "my_task"
+            identifier = "mytask"
             description = "Just copies some files"
 
             def run(self, context):
@@ -126,7 +126,7 @@ you can avoid clashes with other task variables.
     from simple_automation.transactions.basic import template
 
     class MyTask(Task):
-        identifier = "my_task"
+        identifier = "mytask"
         description = "A short description"
 
         def set_defaults(self):
