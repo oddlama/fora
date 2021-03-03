@@ -90,6 +90,17 @@ Predefined transactions
 
 See :ref:`api_transactions` for an overview of available transactions.
 
+Executing only a part of the script
+-----------------------------------
+
+If you separate your inventory :meth:`run() <simple_automation.inventory.Inventory.run>` method
+into several smaller methods, you will be able to run them individually. This
+can be beneficial especially for large scripts.
+
+You can select methods to execute by passing them as a comma separated list to
+the ``--scripts`` command line option. They will be executed in order.
+If not given, the parameter ``--scripts run`` is assumed.
+
 A unified ``package()`` command for different distributions
 -----------------------------------------------------------
 
@@ -104,7 +115,7 @@ one for your hosts. This is as simple as:
         distro_debian = self.manager.add_group("debians")
         distro_debian.set("system.distribution", "debian")
 
-        distro_arch = self.manager.add_group("debians")
+        distro_arch = self.manager.add_group("arch")
         distro_arch.set("system.distribution", "arch")
 
         # For all your hosts add theom to the correct group

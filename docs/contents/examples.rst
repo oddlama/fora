@@ -14,7 +14,7 @@ Typically, a project has a structure similar to the following:
 
     my_project/
     ├── templates/          -- File templates
-    │   └── zsh/            -- (Sorted by task)
+    │   └── zsh/            -- (Best sorted by task)
     │       └── zshrc.j2
     ├── tasks/              -- Task definitions
     │   ├── __init__.py
@@ -111,14 +111,14 @@ can define what default values your variables should have, if they are not
 overwritten by any globals, group variables or host variables.
 
 Each task has an identifier. If you always use this identifier as part of your variable name,
-you can avoid any clashes with other task variables.
+you can avoid clashes with other task variables.
 
 .. hint::
 
     All tasks automatically expose a variable named ``tasks.{identifier}.enabled``,
     which you can use to conditionally disable a whole task.
 
-Example:
+.. rubric:: Example:
 
 .. code-block:: python
 
@@ -130,15 +130,22 @@ Example:
         description = "A short description"
 
         def set_defaults(self):
-            self.manager.set(f"tasks.{self.identifier}.config_folder", "/etc/zsh")
+            self.manager.set(f"tasks.{self.identifier}.config_folder", "/etc/mytask")
 
         def run(self, context):
             # Use variables in templated parameters:
-            template(context, src="templates/zsh/zshrc.j2", dst="{{ tasks.zsh.config_folder }}/zshrc")
+            template(context, src="templates/mytask/template.j2", dst="{{ tasks.mytask.config_folder }}/config")
 
             # Use variables as a conditional
-            if context.vars.get("tasks.zsh.some_boolean"):
+            if context.vars.get("tasks.mytask.some_boolean"):
                 # ...
+
+.. rubric:: templates/mytask/template.j2
+
+.. code-block::
+
+    # This file's path is {{ tasks.mytask.config_folder }}/config
+    # and is saved on host {{ context.host.identifier }}
 
 Global variables
 ----------------

@@ -15,6 +15,8 @@ infrastructures.
 
 Here is an example of how to use simple automation to manage some global config files.
 
+.. rubric:: site.py
+
 .. code-block:: python
 
     #!/usr/bin/env python3
@@ -49,6 +51,12 @@ Here is an example of how to use simple automation to manage some global config 
     # -------- Run the inventory --------
     if __name__ == "__main__":
         run_inventory(MySite)
+
+.. rubric:: templates/zsh/zshrc.j2
+
+.. code-block::
+
+    # This is a zshrc for host {{ context.host.identifier }}
 
 Possible output:
 
