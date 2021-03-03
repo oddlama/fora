@@ -110,6 +110,9 @@ certain functionality. In :meth:`set_defaults() <simple_automation.task.Task.set
 can define what default values your variables should have, if they are not
 overwritten by any globals, group variables or host variables.
 
+Each task has an identifier. If you always use this identifier as part of your variable name,
+you can avoid any clashes with other task variables.
+
 .. hint::
 
     All tasks automatically expose a variable named ``tasks.{identifier}.enabled``,
@@ -127,7 +130,7 @@ Example:
         description = "A short description"
 
         def set_defaults(self):
-            self.manager.set(f"tasks.{identifier}.config_folder", "/etc/zsh")
+            self.manager.set(f"tasks.{self.identifier}.config_folder", "/etc/zsh")
 
         def run(self, context):
             # Use variables in templated parameters:
@@ -180,7 +183,7 @@ to install common software that you need on all of those hosts.
 
             # -------- Define Hosts --------
             my_home_pc = self.manager.add_host("my_home_pc", ssh_host="root@localhost")
-            my_laptop.add_group(self.desktops)
+            my_home_pc.add_group(self.desktops)
 
         def run(self, context):
             # ...
