@@ -11,6 +11,7 @@ import tempfile
 
 from simple_automation.vars import Vars
 from simple_automation.exceptions import LogicError, MessageError
+from simple_automation.utils import choice_yes
 
 class Vault(Vars):
     """
@@ -95,14 +96,23 @@ class Vault(Vars):
             tf.write(json.dumps(self.vars, sort_keys=True, indent=4).encode('utf-8'))
             tf.flush()
 
-            # Run editor
-            p = subprocess.run([editor, tf.name], check=False)
-            if p.returncode != 0:
-                raise RuntimeError(f"Aborting vault edit: $EDITOR exited with status {p.returncode}")
+            while True:
+                # Run editor
+                p = subprocess.run([editor, tf.name], check=False)
+                if p.returncode != 0:
+                    raise RuntimeError(f"Aborting vault edit: $EDITOR exited with status {p.returncode}")
 
-            # Seek to beginning of file and load content
-            tf.seek(0)
-            self.vars = json.load(tf)
+                # Seek to beginning of file and load content
+                tf.seek(0)
+                try:
+                    self.vars = json.load(tf)
+                    break
+                except json.decoder.JSONDecodeError as e:
+                    print(f"[1;31merror:[m {str(e)}")
+                    if not choice_yes("Invalid json! Reopen editor?"):
+                        # Abort without saving.
+                        print("Editing aborted. Changes have been discarded.")
+                        return
 
             # Save vault
             self.encrypt()

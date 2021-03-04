@@ -208,8 +208,10 @@ class Manager(Vars):
         # General options
         parser.add_argument('-e', '--edit-vault', dest='edit_vault', default=None, type=str,
                 help="Edit the given vault instead of running the main script.")
-        parser.add_argument('-H', '--hosts', dest='hosts', default=None, type=list,
+        parser.add_argument('-H', '--hosts', dest='hosts', default=None, type=str,
                 help="Specifies a comma separated list of hosts to run on. By default all hosts are selected. Duplicates will be ignored.")
+        parser.add_argument('-s', '--scripts', dest='scripts', default='run', type=str,
+                help="Specifies a comma separated list of inventory scripts to run on all hosts. By default only the run function will be called.")
         parser.add_argument('-p', '--pretend', dest='pretend', action='store_true',
                 help="Print what would be done instead of performing the actions.")
         parser.add_argument('-v', '--verbose', dest='verbose', action='count', default=0,
@@ -256,7 +258,7 @@ class Manager(Vars):
 
                 # Check if host selection is valid
                 hosts = []
-                for h in args.hosts if args.hosts is not None else self.hosts.keys():
+                for h in args.hosts.split(',') if args.hosts is not None else self.hosts.keys():
                     if h not in self.hosts:
                         raise MessageError(f"Unkown host {h}")
                     hosts.append(self.hosts[h])
@@ -265,7 +267,9 @@ class Manager(Vars):
                 # Run for each selected host
                 for host in hosts:
                     with Context(self, host) as c:
-                        self.inventory.run(c)
+                        for script in args.scripts.split(','):
+                            fn = getattr(self.inventory, script)
+                            fn(c)
         except ArgumentParserError as e:
             print(f"[1;31merror:[m {str(e)}")
             sys.exit(1)

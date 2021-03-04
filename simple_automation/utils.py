@@ -96,3 +96,17 @@ def print_transaction(context, transaction):
         for k,v in transaction.extra_info.items():
             extra_infos.append(f"[37m{str(k)}: {str(v)}[m")
         print(" " * 15 + "[37m,[m ".join(extra_infos))
+
+def choice_yes(msg: str) -> bool:
+    """
+    Awaits user choice (Y/n).
+    """
+    while True:
+        print(f"{msg} (Y/n) ", end="", flush=True)
+        choice = input().lower()
+        if choice in ["", "y", "yes"]:
+            return True
+        if choice in ["n", "no"]:
+            return False
+
+        print(f"Response '{choice}' not understood.")

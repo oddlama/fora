@@ -53,8 +53,12 @@ class Inventory:
 
     def run(self, context):
         """
-        This function will be executed for each host context,
-        and is your main customization point. Here you can build
-        your logic of what tasks to execute for a given host.
+        This function is the default inventory script that will be executed
+        for each host context, and is your main customization point.
+        Here you can build your logic of what tasks to execute for a given host.
+
+        It is a good idea to split this up into several functions, because then
+        you will be able to call those functions separately by selecting them via
+        the ``--scripts`` command line option.
         """
         raise NotImplementedError("Must be overwritten by subclass.")
