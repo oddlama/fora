@@ -4,7 +4,7 @@ Provides version information
 
 import re
 
-__version__ = '0.9.1'
+__version__ = '0.9.2'
 version_info = tuple(int(p) for p in
                      re.match(r'(\d+).(\d+).(\d+)', __version__).groups())
 
