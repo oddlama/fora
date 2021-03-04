@@ -50,8 +50,9 @@ def package(context: Context, atom: str, state="present", opts: list[str] = None
     opts = [] if opts is None else [template_str(context, o) for o in opts]
 
     def install(context, atom):
-        pacman_cmd = ["pacman", "--color", "always", "--noconfirm", "-S"]
+        pacman_cmd = ["pacman", "--color", "always", "--noconfirm"]
         pacman_cmd.extend(opts)
+        pacman_cmd.append("-S")
         pacman_cmd.append(atom)
 
         context.remote_exec(pacman_cmd, checked=True)
