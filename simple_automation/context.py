@@ -156,7 +156,7 @@ class Context:
         Creates a resource object, which sets the given defaults when it is entered, and
         resets them when it is exited. Always use in a with statement. Statements may be nested.
         """
-        def __init__(self, context: Context, user: str, umask: int, dir_mode: int, file_mode: int, owner: str, group: str):
+        def __init__(self, context, user: str, umask: int, dir_mode: int, file_mode: int, owner: str, group: str):
             self.context   = context
             self.user      = user
             self.umask     = umask
