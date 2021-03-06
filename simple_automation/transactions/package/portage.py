@@ -74,8 +74,8 @@ def is_installed(context: Context, atom: str, packages: list[str] = None):
 
 def package(context: Context, atom: str, state="present", oneshot=False, opts: list[str] = None):
     """
-    Installs or uninstalls (depending if state == "present" or "absent") the given
-    package atom. Additional options to emerge can be passed via opts, and will be appended
+    Installs or uninstalls the given package atom (depending on state == "present" or "absent").
+    Additional options to emerge can be passed via opts, and will be appended
     before the package atom. opts will be templated.
 
     Parameters

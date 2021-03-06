@@ -165,6 +165,13 @@ class Context:
             self.owner     = owner
             self.group     = group
 
+            self.saved_user      = None
+            self.saved_umask     = None
+            self.saved_dir_mode  = None
+            self.saved_file_mode = None
+            self.saved_owner     = None
+            self.saved_group     = None
+
         def __enter__(self):
             """
             Incrementally sets the associated context defaults,
@@ -312,7 +319,7 @@ class Context:
         group : str, optional
             The group of newly created files or directories on the remote.
         """
-        return ContextDefaults(self, user, umask, dir_mode, file_mode, owner, group)
+        return Context.ContextDefaults(self, user, umask, dir_mode, file_mode, owner, group)
 
     def transaction(self, title: str, name: str):
         """

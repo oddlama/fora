@@ -126,7 +126,7 @@ def template(context: Context, dst: str, src: str = None, content: str = None, m
 
     if content is None and src is None:
         raise LogicError("Either src or content must be given.")
-    elif content is not None and src is not None:
+    if content is not None and src is not None:
         raise LogicError("Exactly one of src or content must be given.")
 
     def get_content():

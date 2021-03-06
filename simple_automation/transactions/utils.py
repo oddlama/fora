@@ -201,6 +201,6 @@ def remote_upload(context: Context, get_content, title: str, name: str, dst: str
         # Return success
         return action.success()
 
-def user(context: Context, name: str, primary_group=None, password_hash=None):
+def user(context: Context, name: str, group: str = None, password_hash: str = None, home: str = None, create_home = False):
     # TODO
     pass

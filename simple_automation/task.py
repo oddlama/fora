@@ -3,7 +3,6 @@ Provides the Task class.
 """
 
 import os
-import time
 from pathlib import PurePosixPath
 
 from simple_automation.checks import check_valid_path, check_valid_relative_path
@@ -127,14 +126,15 @@ class Task:
         if not self.enabled(context):
             return
 
-        self.pre_run(context)
-        # This should not be necessary, but as an added security measure,
-        # we reset the context to it's initial defaults after executing the
-        # pre_run function.
-        context._set_defaults(user="root", umask=0o077, dir_mode=0o700, file_mode=0o600,
-                              owner="root", group="root")
-        self.run(context)
-        self.post_run(context)
+        # We run each hook in its separate context state. This should not be necessary,
+        # but as an added security measure, we hereby ensure that a misuse of the
+        # library doesn't spread into other parts of the script.
+        with context.defaults(user="root", umask=0o077, dir_mode=0o700, file_mode=0o600, owner="root", group="root"):
+            self.pre_run(context)
+        with context.defaults(user="root", umask=0o077, dir_mode=0o700, file_mode=0o600, owner="root", group="root"):
+            self.run(context)
+        with context.defaults(user="root", umask=0o077, dir_mode=0o700, file_mode=0o600, owner="root", group="root"):
+            self.post_run(context)
 
 class TrackedTask(Task):
     """
