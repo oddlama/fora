@@ -93,7 +93,7 @@ def directory_all(context: Context, paths: list[str], mode=None, owner=None, gro
     for path in paths:
         directory(context, path, mode, owner, group)
 
-def template(context: Context, src: str = None, content: str = None, dst: str, mode=None, owner=None, group=None):
+def template(context: Context, dst: str, src: str = None, content: str = None, mode=None, owner=None, group=None):
     """
     Templates the given src file or given content and copies the output to the remote host at dst.
     Either content or src must be specified.
