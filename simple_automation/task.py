@@ -220,6 +220,17 @@ class TrackedTask(Task):
     It defaults to the identifier of the machine.
     """
 
+    tracking_user = "root"
+    """
+    The user to execute all tracking commands as, and the user which will own all related files.
+    The rsync will always be called as root so it may access arbitrary paths.
+    """
+
+    tracking_group = "root"
+    """
+    The group which will own tracking related files.
+    """
+
     tracking_paths = []
     """
     A list of directories and/or files that should be tracked.
@@ -346,8 +357,8 @@ class TrackedTask(Task):
         Uses rsync to copy the tracking paths into the repository, and
         creates and pushes a commit if there are any changes.
         """
-        context.defaults(user="root", umask=0o077, dir_mode=0o700, file_mode=0o600,
-                         owner="root", group="root")
+        context.defaults(user=self.tracking_user, umask=0o077, dir_mode=0o700, file_mode=0o600,
+                         owner=self.tracking_user, group=self.tracking_group)
         (_, dst, sub) = context.cache["tracking"][self.tracking_id]
 
         # Check source paths
@@ -377,10 +388,9 @@ class TrackedTask(Task):
 
                 # Use rsync to backup all paths into the repository
                 for src in srcs:
-                    time.sleep(1)
                     context.remote_exec(["rsync", "--quiet", "--recursive", "--one-file-system",
                                          "--links", "--times", "--relative", str(PurePosixPath(src)), rsync_dst],
-                                        checked=True)
+                                        checked=True, user="root", umask=0o022)
 
                 # Add all changes
                 context.remote_exec(["git", "-C", dst, "add", "--all"], checked=True)
