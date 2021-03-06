@@ -33,14 +33,11 @@ class Task:
             description = "Installs a global zsh configuration"
 
             def run(self, context):
-                # Set defaults
-                context.defaults(user="root", umask=0o022, dir_mode=0o755, file_mode=0o644,
-                                 owner="root", group="root")
-
-                # Copy configuration
-                directory(context, path="/etc/zsh")
-                template(context, src="templates/zsh/zshrc.j2", dst="/etc/zsh/zshrc")
-                template(context, src="templates/zsh/zprofile.j2", dst="/etc/zsh/zprofile")
+                with context.defaults(umask=0o022, dir_mode=0o755, file_mode=0o644):
+                    # Copy configuration
+                    directory(context, path="/etc/zsh")
+                    template(context, src="templates/zsh/zshrc.j2", dst="/etc/zsh/zshrc")
+                    template(context, src="templates/zsh/zprofile.j2", dst="/etc/zsh/zprofile")
     """
 
     identifier = None
@@ -131,9 +128,11 @@ class Task:
             return
 
         self.pre_run(context)
-        # Set safe context defaults
-        context.defaults(user="root", umask=0o077, dir_mode=0o700, file_mode=0o600,
-                         owner="root", group="root")
+        # This should not be necessary, but as an added security measure,
+        # we reset the context to it's initial defaults after executing the
+        # pre_run function.
+        context._set_defaults(user="root", umask=0o077, dir_mode=0o700, file_mode=0o600,
+                              owner="root", group="root")
         self.run(context)
         self.post_run(context)
 
@@ -274,10 +273,6 @@ class TrackedTask(Task):
             return True
 
         def run(self, context):
-            # Set defaults
-            context.defaults(user="root", umask=0o077, dir_mode=0o700, file_mode=0o600,
-                             owner="root", group="root")
-
             # Get tracking specific variables
             (url, dst, _) = context.cache["tracking"][self.tracked_task.tracking_id]
 
@@ -357,71 +352,70 @@ class TrackedTask(Task):
         Uses rsync to copy the tracking paths into the repository, and
         creates and pushes a commit if there are any changes.
         """
-        context.defaults(user=self.tracking_user, umask=0o077, dir_mode=0o700, file_mode=0o600,
-                         owner=self.tracking_user, group=self.tracking_group)
-        (_, dst, sub) = context.cache["tracking"][self.tracking_id]
+        with context.defaults(user=self.tracking_user, owner=self.tracking_user, group=self.tracking_group):
+            (_, dst, sub) = context.cache["tracking"][self.tracking_id]
 
-        # Check source paths
-        srcs = []
-        for src in self.tracking_paths:
-            src = template_str(context, src)
-            check_valid_path(src)
-            srcs.append(src)
+            # Check source paths
+            srcs = []
+            for src in self.tracking_paths:
+                src = template_str(context, src)
+                check_valid_path(src)
+                srcs.append(src)
 
-        # Begin transaction
-        with context.transaction(title="track", name=f"{srcs}") as action:
-            action.initial_state(added=0, modified=0, deleted=0)
+            # Begin transaction
+            with context.transaction(title="track", name=f"{srcs}") as action:
+                action.initial_state(added=0, modified=0, deleted=0)
 
-            if not context.pretend:
-                mode, owner, group = resolve_mode_owner_group(context, None, None, None, context.dir_mode)
-                rsync_dst = f"{dst}/{sub}/"
-                base_parts = PurePosixPath(dst).parts
-                parts = PurePosixPath(rsync_dst).parts
+                if not context.pretend:
+                    mode, owner, group = resolve_mode_owner_group(context, None, None, None, context.dir_mode)
+                    rsync_dst = f"{dst}/{sub}/"
+                    base_parts = PurePosixPath(dst).parts
+                    parts = PurePosixPath(rsync_dst).parts
 
-                # Create tracking destination subdirectories if they don't exist
-                cur = dst
-                for p in parts[len(base_parts):]:
-                    cur = os.path.join(cur, p)
-                    context.remote_exec(["mkdir", "-p", "--", cur], checked=True)
-                    context.remote_exec(["chown", f"{owner}:{group}", cur], checked=True)
-                    context.remote_exec(["chmod", mode, cur], checked=True)
+                    # Create tracking destination subdirectories if they don't exist
+                    cur = dst
+                    for p in parts[len(base_parts):]:
+                        cur = os.path.join(cur, p)
+                        context.remote_exec(["mkdir", "-p", "--", cur], checked=True)
+                        context.remote_exec(["chown", f"{owner}:{group}", cur], checked=True)
+                        context.remote_exec(["chmod", mode, cur], checked=True)
 
-                # Use rsync to backup all paths into the repository
-                for src in srcs:
-                    context.remote_exec(["rsync", "--quiet", "--recursive", "--one-file-system",
-                                         "--links", "--times", "--relative", str(PurePosixPath(src)), rsync_dst],
-                                        checked=True, user="root", umask=0o022)
+                    # Use rsync to backup all paths into the repository
+                    for src in srcs:
+                        context.remote_exec(["rsync", "--quiet", "--recursive", "--one-file-system",
+                                             "--links", "--times", "--relative", str(PurePosixPath(src)), rsync_dst],
+                                            checked=True, user="root", umask=0o022)
 
-                # Add all changes
-                context.remote_exec(["git", "-C", dst, "add", "--all"], checked=True)
+                    # Add all changes
+                    context.remote_exec(["git", "-C", dst, "add", "--all"], checked=True)
 
-                # Query changes for message
-                remote_status = context.remote_exec(["git", "-C", dst, "status", "--porcelain"], checked=True)
-                if remote_status.stdout.strip() != "":
-                    # We have changes
-                    added = 0
-                    modified = 0
-                    deleted = 0
-                    for line in remote_status.stdout.splitlines():
-                        if line.startswith("A"):
-                            added += 1
-                        elif line.startswith("M"):
-                            modified += 1
-                        elif line.startswith("D"):
-                            deleted += 1
-                    action.final_state(added=added, modified=modified, deleted=deleted)
+                    # Query changes for message
+                    remote_status = context.remote_exec(["git", "-C", dst, "status", "--porcelain"], checked=True)
+                    if remote_status.stdout.strip() != "":
+                        # We have changes
+                        added = 0
+                        modified = 0
+                        deleted = 0
+                        for line in remote_status.stdout.splitlines():
+                            if line.startswith("A"):
+                                added += 1
+                            elif line.startswith("M"):
+                                modified += 1
+                            elif line.startswith("D"):
+                                deleted += 1
+                        action.final_state(added=added, modified=modified, deleted=deleted)
 
-                    # Create commit
-                    commit_opts = [template_str(context, o) for o in self.tracking_git_commit_opts]
-                    context.remote_exec(["git", "-C", dst, "commit"] + commit_opts + ["--message", f"task {self.identifier}: {added=}, {modified=}, {deleted=}"], checked=True)
+                        # Create commit
+                        commit_opts = [template_str(context, o) for o in self.tracking_git_commit_opts]
+                        context.remote_exec(["git", "-C", dst, "commit"] + commit_opts + ["--message", f"task {self.identifier}: {added=}, {modified=}, {deleted=}"], checked=True)
 
-                    # Push commit
-                    context.remote_exec(["git", "-C", dst, "push", "origin", "master"], checked=True)
+                        # Push commit
+                        context.remote_exec(["git", "-C", dst, "push", "origin", "master"], checked=True)
 
-                    action.success()
+                        action.success()
+                    else:
+                        # Repo is still clean
+                        action.unchanged()
                 else:
-                    # Repo is still clean
-                    action.unchanged()
-            else:
-                action.final_state(added="? (pretend)", modified="? (pretend)", deleted="? (pretend)")
-                action.success()
+                    action.final_state(added="? (pretend)", modified="? (pretend)", deleted="? (pretend)")
+                    action.success()

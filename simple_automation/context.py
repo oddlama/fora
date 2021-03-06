@@ -120,12 +120,12 @@ class RemoteDispatcher:
         """
         # Set user to execute as
         self.write_mode("user")
-        self.write_str(user or self.context.as_user)
+        self.write_str(user or self.context.user)
         self.expect("ok")
 
         # Set umask value
         self.write_mode("umask")
-        self.write_str(str(umask or self.context.umask_value))
+        self.write_str(str(umask or self.context.umask))
         self.expect("ok")
 
         # Set input value
@@ -151,6 +151,45 @@ class Context:
     over the connection lifetime.
     """
 
+    class ContextDefaults:
+        """
+        Creates a resource object, which sets the given defaults when it is entered, and
+        resets them when it is exited. Always use in a with statement. Statements may be nested.
+        """
+        def __init__(self, context: Context, user: str, umask: int, dir_mode: int, file_mode: int, owner: str, group: str):
+            self.context   = context
+            self.user      = user
+            self.umask     = umask
+            self.dir_mode  = dir_mode
+            self.file_mode = file_mode
+            self.owner     = owner
+            self.group     = group
+
+        def __enter__(self):
+            """
+            Incrementally sets the associated context defaults,
+            and remembers the previous settings.
+            """
+            self.saved_user      = self.context.user
+            self.saved_umask     = self.context.umask
+            self.saved_dir_mode  = self.context.dir_mode
+            self.saved_file_mode = self.context.file_mode
+            self.saved_owner     = self.context.owner
+            self.saved_group     = self.context.group
+            # Set incremental defaults
+            self.context._set_defaults(user=self.user, umask=self.umask, dir_mode=self.dir_mode, file_mode=self.file_mode, owner=self.owner, group=self.group)
+
+        def __exit__(self, type_t, value, traceback):
+            """
+            Reset's the context defaults to the previous values.
+            """
+            self.context.user      = self.saved_user
+            self.context.umask     = self.saved_umask
+            self.context.dir_mode  = self.saved_dir_mode
+            self.context.file_mode = self.saved_file_mode
+            self.context.owner     = self.saved_owner
+            self.context.group     = self.saved_group
+
     def __init__(self, manager, host):
         """
         Initializes a new context. For internal use only.
@@ -164,14 +203,13 @@ class Context:
         # A cache for internal purposes only.
         self.cache = {}
 
-        # Initial defaults for remote actions. Should be called by every task.
-        self.as_user = None
-        self.umask_value = None
-        self.dir_mode = None
-        self.file_mode = None
-        self.owner = None
-        self.group = None
-        self.defaults(user="root", umask=0o022, dir_mode=0o700, file_mode=0o600, owner="root", group="root")
+        # Initial defaults for remote actions.
+        self.user = "root"
+        self.umask = 0o077
+        self.dir_mode = 0o700
+        self.file_mode = 0o600
+        self.owner = "root"
+        self.group = "root"
 
     @property
     def pretend(self):
@@ -210,71 +248,71 @@ class Context:
         # this will never go horribly wrong.
         self.remote_dispatcher.stop_and_wait()
 
-    def defaults(self, user: str, umask: int, dir_mode: int, file_mode: int, owner: str, group: str):
+    def _set_defaults(self, user: str = None, umask: int = None, dir_mode: int = None, file_mode: int = None, owner: str = None, group: str = None):
         """
         Overwrite the defaults for command execution on the remote machine.
 
         Parameters
         ----------
-        user : str
+        user : str, optional
             The user to execute commands as on the remote.
-        umask : int
+        umask : int, optional
             The umask to execute commands with on the remote.
-        dir_mode : int
+        dir_mode : int, optional
             The directory mode for newly created directories on the remote.
-        file_mode : int
+        file_mode : int, optional
             The directory mode for newly created directories on the remote.
-        owner : str
+        owner : str, optional
             The owner of newly created files or directories on the remote.
-        group : str
+        group : str, optional
             The group of newly created files or directories on the remote.
         """
-        self.user(user)
-        self.umask(umask)
-        self.mode(dir_mode, file_mode, owner, group)
+        if user is not None:
+            self.user = user
+        if umask is not None:
+            self.umask = umask
+        if dir_mode is not None:
+            self.dir_mode = dir_mode
+        if file_mode is not None:
+            self.file_mode = file_mode
+        if owner is not None:
+            self.owner = owner
+        if group is not None:
+            self.group = group
 
-    def umask(self, value: int):
+    def defaults(self, user: str = None, umask: int = None, dir_mode: int = None, file_mode: int = None, owner: str = None, group: str = None):
         """
-        Sets the umask for executed commands on the remote machine.
+        Creates a resource object, which sets the given defaults when it is entered, and
+        resets them when it is exited. Always use in a with statement. Statements may be nested.
+
+        Example
+        -------
+
+        .. highlight:: python
+        .. code-block:: python
+
+            def run(self, context):
+                # Default context permissions apply here
+                with context.defaults(owner="www", group="www"):
+                    # The directory owner and group will both be "www"
+                    directory(context, path="/var/www/test")
 
         Parameters
         ----------
-        value : int
-            The umask to execute commands with on the remote.
-        """
-        self.umask_value = value
-
-    def user(self, user: str):
-        """
-        Sets the user to execute commands on the remote machine.
-
-        Parameters
-        ----------
-        user : str
+        user : str, optional
             The user to execute commands as on the remote.
-        """
-        self.as_user = user
-
-    def mode(self, dir_mode: int, file_mode: int, owner: str, group: str):
-        """
-        Sets default modes for created directories and files,
-        as well as default owner and group
-
-        Parameters
-        ----------
-        dir_mode : int
+        umask : int, optional
+            The umask to execute commands with on the remote.
+        dir_mode : int, optional
             The directory mode for newly created directories on the remote.
-        file_mode : int
+        file_mode : int, optional
             The directory mode for newly created directories on the remote.
-        owner : str
+        owner : str, optional
             The owner of newly created files or directories on the remote.
-        group : str
+        group : str, optional
             The group of newly created files or directories on the remote.
         """
-        self.dir_mode = dir_mode
-        self.file_mode = file_mode
-        self.owner = owner
-        self.group = group
+        return ContextDefaults(self, user, umask, dir_mode, file_mode, owner, group)
 
     def transaction(self, title: str, name: str):
         """

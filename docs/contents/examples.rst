@@ -86,20 +86,17 @@ for related variables. The description will be printed in verbose mode.
             description = "Just copies some files"
 
             def run(self, context):
-                # Execute as root and set permission defaults
-                context.defaults(user="root", umask=0o022, dir_mode=0o755, file_mode=0o644,
-                                 owner="root", group="root")
+                # Change permission defaults
+                with context.defaults(umask=0o022, dir_mode=0o755, file_mode=0o644):
+                    # Create a directory and copy some files
+                    directory(context, path="/etc/zsh")
+                    copy(context, src="files/zsh/zshrc", dst="/etc/zsh/zshrc")
+                    copy(context, src="files/zsh/zprofile", dst="/etc/zsh/zprofile")
 
-                # Create a directory and copy some files
-                directory(context, path="/etc/zsh")
-                copy(context, src="files/zsh/zshrc", dst="/etc/zsh/zshrc")
-                copy(context, src="files/zsh/zprofile", dst="/etc/zsh/zprofile")
+.. hint::
 
-.. warning::
-
-    You should always set your desired defaults at the beginning of a task,
-    so there will be no surprises later on. Be as strict as possible. If you
-    don't set your own defaults, the task will use ``user='root', umask=0o077, dir_mode=0o700, file_mode=0o600, owner='root', group='root'``.
+    Default for user, umask, file/dir modes, file owner/group are strict by default.
+    If not changed explicitly as shown above, the task will use ``user='root', umask=0o077, dir_mode=0o700, file_mode=0o600, owner='root', group='root'``.
 
 Task specific variables
 -----------------------

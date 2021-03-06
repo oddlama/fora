@@ -11,17 +11,15 @@ class TaskZsh(TrackedTask):
 
     def run(self, context):
         # Set defaults
-        context.defaults(user="root", umask=0o022, dir_mode=0o755, file_mode=0o644,
-                         owner="root", group="root")
+        with context.defaults(umask=0o022, dir_mode=0o755, file_mode=0o644):
+            # Install zsh
+            portage.package(context, atom="app-shells/zsh", oneshot=True)
 
-        # Install zsh
-        portage.package(context, atom="app-shells/zsh", oneshot=True)
+            # Clone or update plugin repositories
+            git.checkout(context,
+                      url="https://github.com/romkatv/powerlevel10k",
+                      dst="/usr/share/zsh/repos/romkatv/powerlevel10k")
 
-        # Clone or update plugin repositories
-        git.checkout(context,
-                  url="https://github.com/romkatv/powerlevel10k",
-                  dst="/usr/share/zsh/repos/romkatv/powerlevel10k")
-
-        # Copy configuration
-        directory(context, path="/etc/zsh")
-        template(context, src="templates/zsh/zshrc.j2", dst="/etc/zsh/zshrc")
+            # Copy configuration
+            directory(context, path="/etc/zsh")
+            template(context, src="templates/zsh/zshrc.j2", dst="/etc/zsh/zshrc")

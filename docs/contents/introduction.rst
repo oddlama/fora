@@ -29,14 +29,12 @@ Here is an example of how to use simple automation to manage some global config 
         description = "Installs global zsh configuration"
 
         def run(self, context):
-            # Execute as root and set permission defaults
-            context.defaults(user="root", umask=0o022, dir_mode=0o755, file_mode=0o644,
-                             owner="root", group="root")
-
-            # Template the zshrc, copy the zprofile
-            directory(context, path="/etc/zsh")
-            template(context, src="templates/zsh/zshrc.j2", dst="/etc/zsh/zshrc")
-            copy(context, src="files/zsh/zprofile", dst="/etc/zsh/zprofile")
+            # Change permission defaults
+            with context.defaults(umask=0o022, dir_mode=0o755, file_mode=0o644):
+                # Template the zshrc, copy the zprofile
+                directory(context, path="/etc/zsh")
+                template(context, src="templates/zsh/zshrc.j2", dst="/etc/zsh/zshrc")
+                copy(context, src="files/zsh/zprofile", dst="/etc/zsh/zprofile")
 
     # -------- Setup your inventory --------
     class MySite(Inventory):
