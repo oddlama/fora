@@ -93,16 +93,19 @@ def directory_all(context: Context, paths: list[str], mode=None, owner=None, gro
     for path in paths:
         directory(context, path, mode, owner, group)
 
-def template(context: Context, src: str, dst: str, mode=None, owner=None, group=None):
+def template(context: Context, src: str = None, content: str = None, dst: str, mode=None, owner=None, group=None):
     """
-    Templates the given src file and copies the output to the remote host at dst.
+    Templates the given src file or given content and copies the output to the remote host at dst.
+    Either content or src must be specified.
 
     Parameters
     ----------
     context : Context
         The context providing the execution context and templating dictionary.
-    src : str
-        The local source file path relative to the project directory. Will be templated.
+    src : str, optional
+        The local source file path relative to the project directory. Will be templated. Mutually exclusive with content.
+    content : str, optional
+        The content for the file. Will be templated. Mutually exclusive with src.
     dst : str
         The remote destination file path. Will be templated.
     mode : int, optional
@@ -121,7 +124,15 @@ def template(context: Context, src: str, dst: str, mode=None, owner=None, group=
     dst = template_str(context, dst)
     check_valid_path(dst)
 
+    if content is None and src is None:
+        raise LogicError("Either src or content must be given.")
+    elif content is not None and src is not None:
+        raise LogicError("Exactly one of src or content must be given.")
+
     def get_content():
+        if content is not None:
+            return template_str(context, content)
+
         # Get templated content
         try:
             templ = context.host.manager.jinja2_env.get_template(src)
