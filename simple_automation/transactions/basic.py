@@ -11,6 +11,8 @@ from simple_automation.exceptions import LogicError, MessageError, RemoteExecErr
 from simple_automation.checks import check_valid_path
 from simple_automation.transactions.utils import template_str, resolve_mode_owner_group, remote_stat, remote_upload
 
+# pylint: disable=W0621
+
 def directory(context: Context, path: str, mode=None, owner=None, group=None):
     """
     Creates the given directory on the remote.
@@ -353,6 +355,7 @@ def user(context: Context,
          password: str = None,
          home: str = None,
          create_home = True):
+    # pylint: disable=R0912,R0915
     """
     Creates or modifies a unix user. Because we interally call ``userdel``, removing a user will also remove
     it's associated primary group if no other user belongs to it.
