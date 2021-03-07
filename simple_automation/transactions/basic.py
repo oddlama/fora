@@ -380,7 +380,14 @@ def user(context: Context,
     shell: str
         Specifies the shell for the user. Defaults to ``/sbin/nologin`` if not given but a user needs to be created. Will be templated.
     password : str, optional
-        Will update the password hash to the given vaule of the user. Use ``!`` to lock the account. You can generate a password hash by using the following command: ``python -c 'import crypt,getpass; print(crypt.crypt(getpass.getpass(), crypt.mksalt(crypt.METHOD_SHA512)))'``. Defaults to '!' if not given but a user needs to be created. Will be templated.
+        Will update the password hash to the given vaule of the user. Use ``!`` to lock the account.
+        Defaults to '!' if not given but a user needs to be created. Will be templated.
+        You can generate a password hash by using the following script:
+
+        >>> import crypt, getpass
+        >>> crypt.crypt(getpass.getpass(), crypt.mksalt(crypt.METHOD_SHA512))
+        '$6$rwn5z9MlYvcnE222$9wOP6Y6EcnF.cZ7BUjttWeSQNdOQWI...'
+
     home: str, optional
         The home directory for the user. Will be left empty if not given but a user needs to be created. Will be templated.
     create_home: bool
