@@ -273,17 +273,18 @@ class TrackedTask(Task):
             return True
 
         def run(self, context):
-            # Get tracking specific variables
-            (url, dst, _) = context.cache["tracking"][self.tracked_task.tracking_id]
+            with context.defaults(user=self.tracked_task.tracking_user, owner=self.tracked_task.tracking_user, group=self.tracked_task.tracking_group):
+                # Get tracking specific variables
+                (url, dst, _) = context.cache["tracking"][self.tracked_task.tracking_id]
 
-            # Clone or update remote tracking repository
-            git.checkout(context, url, dst)
+                # Clone or update remote tracking repository
+                git.checkout(context, url, dst)
 
-            if not context.pretend:
-                # Set given git repo configs
-                for k,v in self.tracked_task.tracking_repo_configs.items():
-                    v = template_str(context, v)
-                    context.remote_exec(["git", "-C", dst, "config", "--local", k, v], checked=True)
+                if not context.pretend:
+                    # Set given git repo configs
+                    for k,v in self.tracked_task.tracking_repo_configs.items():
+                        v = template_str(context, v)
+                        context.remote_exec(["git", "-C", dst, "config", "--local", k, v], checked=True)
 
 
     def __init__(self, manager):
@@ -341,11 +342,12 @@ class TrackedTask(Task):
         """
         (_, dst, _) = context.cache["tracking"][self.tracking_id]
 
-        if not context.pretend:
-            # Assert that the repository is clean
-            remote_status = context.remote_exec(["git", "-C", dst, "status", "--porcelain"], checked=True)
-            if remote_status.stdout.strip() != "":
-                raise LogicError("Refusing operation: Tracking repository is not clean!")
+        with context.defaults(user=self.tracking_user, owner=self.tracking_user, group=self.tracking_group):
+            if not context.pretend:
+                # Assert that the repository is clean
+                remote_status = context.remote_exec(["git", "-C", dst, "status", "--porcelain"], checked=True)
+                if remote_status.stdout.strip() != "":
+                    raise LogicError("Refusing operation: Tracking repository is not clean!")
 
     def _track(self, context):
         """
@@ -364,7 +366,7 @@ class TrackedTask(Task):
 
             # Begin transaction
             with context.transaction(title="track", name=f"{srcs}") as action:
-                action.initial_state(added=0, modified=0, deleted=0)
+                action.initial_state(added=None, modified=None, deleted=None)
 
                 if not context.pretend:
                     mode, owner, group = resolve_mode_owner_group(context, None, None, None, context.dir_mode)
@@ -385,6 +387,9 @@ class TrackedTask(Task):
                         context.remote_exec(["rsync", "--quiet", "--recursive", "--one-file-system",
                                              "--links", "--times", "--relative", str(PurePosixPath(src)), rsync_dst],
                                             checked=True, user="root", umask=0o022)
+                    # Make files accessible to the tracking user
+                    context.remote_exec(["chown", "--recursive", "--preserve-root", f"{self.tracking_user}:{self.tracking_group}", dst],
+                                        checked=True, user="root")
 
                     # Add all changes
                     context.remote_exec(["git", "-C", dst, "add", "--all"], checked=True)
