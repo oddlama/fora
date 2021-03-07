@@ -89,7 +89,8 @@ Focus on minimalism and simplicity
     Because this library is small, you will be capable of building the rest yourself,
     if you require more.
 
-    The whole implementation of this library has just under 1300 LoC.
+    The heart of this library is the remote execution framework and the transaction system, which consists of less than 1000 LoC.
+    The rest is mostly predefined transactions which are provided for ease of use.
     Additionally, it has very few dependencies:
 
     - jinja2 for templating

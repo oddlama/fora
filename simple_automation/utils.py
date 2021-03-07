@@ -80,14 +80,17 @@ def print_transaction(context, transaction):
         # Add ellipsis on long strings
         str_k = ellipsis(k, 12)
         str_initial_v = ellipsis(str(initial_v), 9)
-        str_final_v = ellipsis(str(final_v), 9)
+        str_final_v = ellipsis(str(final_v), 9+3+9 if initial_v is None else 9)
 
         if initial_v == final_v:
             if context.verbose >= 1:
                 entry_str = f"[37m{str_k}: {str_initial_v}[m"
                 state_infos.append(entry_str)
         else:
-            entry_str = f"[33m{str_k}: [31m{str_initial_v}[33m → [32m{str_final_v}[m"
+            if initial_v is None:
+                entry_str = f"[33m{str_k}: [32m{str_final_v}[m"
+            else:
+                entry_str = f"[33m{str_k}: [31m{str_initial_v}[33m → [32m{str_final_v}[m"
             state_infos.append(entry_str)
     print("[37m,[m ".join(state_infos))
 

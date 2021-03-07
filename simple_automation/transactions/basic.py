@@ -120,7 +120,8 @@ def template(context: Context, dst: str, src: str = None, content: str = None, m
     CompletedTransaction
         The completed transaction
     """
-    src = template_str(context, src)
+    if src is not None:
+        src = template_str(context, src)
     dst = template_str(context, dst)
     check_valid_path(dst)
 
@@ -270,3 +271,234 @@ def save_output(context: Context, command: list[str], dst: str, desc=None, mode=
 
     name = f"{command}" if desc is None else desc
     return remote_upload(context, get_content, title="save out", name=name, dst=dst, mode=mode, owner=owner, group=group)
+
+def group(context: Context,
+          name: str,
+          state: str = "present",
+          system: bool = False):
+    """
+    Creates or deletes a unix group.
+
+    Parameters
+    ----------
+    context : Context
+        The context providing the execution context and templating dictionary.
+    name : str
+        The name of the user to create or modify. Will be templated.
+    state: str
+        If "present" the user will be added / modified, if "absent" the user will be deleted ignoring all other parameters.
+    system: bool
+        If ``True`` the user will be created as a system user. This has no effect on existing users.
+
+    Returns
+    -------
+    CompletedTransaction
+        The completed transaction
+    """
+    name = template_str(context, name)
+
+    # pylint: disable=R0801
+    if state not in ["present", "absent"]:
+        raise LogicError(f"Invalid user state '{state}'")
+
+    with context.transaction(title="group", name=name) as action:
+        grinfo = context.remote_exec(["python", "-c", (
+            'import sys,grp\n'
+            'try:\n'
+            '    g=grp.getgrnam(sys.argv[1])\n'
+            'except KeyError:\n'
+            '    print("0")\n'
+            '    sys.exit(0)\n'
+            'print("1")')
+            , name], checked=True)
+        exists = grinfo.stdout.strip().startswith('1')
+
+        if state == "absent":
+            action.initial_state(exists=exists)
+            if not exists:
+                return action.unchanged()
+            action.final_state(exists=False)
+
+            if not context.pretend:
+                try:
+                    context.remote_exec(["groupdel", name], checked=True)
+                except RemoteExecError as e:
+                    return action.failure(e)
+        else:
+            action.initial_state(exists=exists)
+            if exists:
+                return action.unchanged()
+            action.final_state(exists=True)
+
+            if not context.pretend:
+                try:
+                    command = ["groupadd"]
+                    if system:
+                        command.append("--system")
+                    command.append(name)
+                    context.remote_exec(command, checked=True)
+                except RemoteExecError as e:
+                    return action.failure(e)
+
+        return action.success()
+
+def user(context: Context,
+         name: str,
+         group: str = None,
+         groups: list[str] = None,
+         append_groups: bool = False,
+         state: str = "present",
+         system: bool = False,
+         shell: str = None,
+         password: str = None,
+         home: str = None,
+         create_home = True):
+    """
+    Creates or modifies a unix user. Because we interally call ``userdel``, removing a user will also remove
+    it's associated primary group if no other user belongs to it.
+
+    Parameters
+    ----------
+    context : Context
+        The context providing the execution context and templating dictionary.
+    name : str
+        The name of the user to create or modify. Will be templated.
+    group: str, optional
+        The primary group of the user. If given, the group must already exists. Otherwise, a group will be created with the same name as the user,
+        if a user is created by this action. Will be templated.
+    groups: list[str], optional
+        Supplementary groups for the user.
+    append_groups: bool
+        If ``True``, the user will be added to all given supplementary groups. If ``False``, the user will be added to exactly the given supplementary groups and removed from other groups.
+    state: str
+        If "present" the user will be added / modified, if "absent" the user will be deleted ignoring all other parameters.
+    system: bool
+        If ``True`` the user will be created as a system user. This has no effect on existing users.
+    shell: str
+        Specifies the shell for the user. Defaults to ``/sbin/nologin`` if not given but a user needs to be created. Will be templated.
+    password : str, optional
+        Will update the password hash to the given vaule of the user. Use ``!`` to lock the account. You can generate a password hash by using the following command: ``python -c 'import crypt,getpass; print(crypt.crypt(getpass.getpass(), crypt.mksalt(crypt.METHOD_SHA512)))'``. Defaults to '!' if not given but a user needs to be created. Will be templated.
+    home: str, optional
+        The home directory for the user. Will be left empty if not given but a user needs to be created. Will be templated.
+    create_home: bool
+        If ``True`` and home was given, create the home directory of the user if it doesn't exist.
+
+    Returns
+    -------
+    CompletedTransaction
+        The completed transaction
+    """
+    name     = template_str(context, name)
+    group    = template_str(context, group)    if group    is not None else None
+    home     = template_str(context, home)     if home     is not None else None
+    password = template_str(context, password) if password is not None else None
+    shell    = template_str(context, shell)    if shell    is not None else None
+
+    # pylint: disable=R0801
+    if state not in ["present", "absent"]:
+        raise LogicError(f"Invalid user state '{state}'")
+
+    if home is not None:
+        check_valid_path(home)
+
+    with context.transaction(title="user", name=name) as action:
+        pwinfo = context.remote_exec(["python", "-c", (
+            'import sys,grp,pwd,spwd\n'
+            'try:\n'
+            '    p=pwd.getpwnam(sys.argv[1])\n'
+            'except KeyError:\n'
+            '    print("0:")\n'
+            '    sys.exit(0)\n'
+            'g=grp.getgrgid(p.pw_gid)\n'
+            's=spwd.getspnam(p.pw_name)\n'
+            'grps=\',\'.join([sg.gr_name for sg in grp.getgrall() if p.pw_name in sg.gr_mem])\n'
+            'print(f"1:{g.gr_name}:{grps}:{p.pw_dir}:{p.pw_shell}:{s.sp_pwdp}")')
+            , name], checked=True)
+        exists = pwinfo.stdout.strip().startswith('1:')
+        if exists:
+            ( _
+            , cur_group
+            , cur_groups
+            , cur_home
+            , cur_shell
+            , cur_password
+            ) = pwinfo.stdout.strip().split(':')
+            cur_groups = list(sorted(set([] if cur_groups == '' else cur_groups.split(','))))
+        else:
+            cur_group    = None
+            cur_groups   = []
+            cur_home     = None
+            cur_shell    = None
+            cur_password = None
+
+        if state == "absent":
+            action.initial_state(exists=exists)
+            if not exists:
+                return action.unchanged()
+            action.final_state(exists=False)
+
+            if not context.pretend:
+                try:
+                    context.remote_exec(["userdel", name], checked=True)
+                except RemoteExecError as e:
+                    return action.failure(e)
+        else:
+            action.initial_state(exists=exists, group=cur_group, groups=cur_groups, home=cur_home, shell=cur_shell, pw=cur_password)
+            fin_group    = group or cur_group or name
+            fin_groups   = cur_groups if groups is None else list(sorted(set(cur_groups + groups if append_groups else groups)))
+            fin_home     = home or cur_home
+            fin_shell    = shell or cur_shell or '/sbin/nologin'
+            fin_password = password or cur_password or '!'
+            action.final_state(exists=True, group=fin_group, groups=fin_groups, home=fin_home, shell=fin_shell, pw=fin_password)
+
+            if not context.pretend:
+                try:
+                    if exists:
+                        # Only apply changes to the existing user
+                        if cur_group != fin_group:
+                            context.remote_exec(["usermod", "--gid", fin_group, name], checked=True)
+
+                        if cur_groups != fin_groups:
+                            context.remote_exec(["usermod", "--groups", ','.join(fin_groups), name], checked=True)
+
+                        if cur_home != fin_home:
+                            context.remote_exec(["usermod", "--home", fin_home, name], checked=True)
+
+                        if cur_shell != fin_shell:
+                            context.remote_exec(["usermod", "--shell", fin_shell, name], checked=True)
+
+                        if cur_password != fin_password:
+                            context.remote_exec(["usermod", "--password", fin_password, name], checked=True)
+                    else:
+                        # Create a new user so that is results in the given final state
+                        command = ["useradd"]
+                        if system:
+                            command.append("--system")
+
+                        # Primary group
+                        if group is None:
+                            command.append("--user-group")
+                        else:
+                            command.extend(["--no-user-group", "--gid", group])
+
+                        # Supplementary groups
+                        if len(fin_groups) > 0:
+                            command.extend(["--groups", ','.join(fin_groups)])
+
+                        command.extend(["--no-create-home", "--home-dir", fin_home or ''])
+                        command.extend(["--shell", fin_shell])
+                        command.extend(["--password", fin_password])
+                        command.append(name)
+
+                        context.remote_exec(command, checked=True)
+                except RemoteExecError as e:
+                    return action.failure(e)
+
+        # Remember result
+        action_result = action.success()
+
+    # Create home directory afterwards if necessary
+    if state == "present" and create_home and cur_home is None and fin_home:
+        directory(context, path=fin_home, mode=0o700, owner=name, group=fin_group)
+
+    return action_result
