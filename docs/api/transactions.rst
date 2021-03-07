@@ -18,6 +18,8 @@ Basic transactions
     simple_automation.transactions.basic.copy
     simple_automation.transactions.basic.copy_all
     simple_automation.transactions.basic.save_output
+    simple_automation.transactions.basic.user
+    simple_automation.transactions.basic.group
 
 Git transactions
 ----------------
