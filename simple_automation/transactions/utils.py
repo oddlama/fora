@@ -67,14 +67,36 @@ def resolve_mode_owner_group(context: Context, mode, owner, group, fallback_mode
 
     # Resolve owner name/uid to name
     owner = context.owner if owner is None else owner
-    remote_cmd_owner_id = context.remote_exec(["id", "-nu", owner])
+
+    remote_cmd_owner_id = context.remote_exec(["python", "-c", (
+        'import sys,pwd\n'
+        'try:\n'
+        '    p=pwd.getpwnam(sys.argv[1])\n'
+        'except KeyError:\n'
+        '    try:\n'
+        '        p=pwd.getpwuid(int(sys.argv[1]))\n'
+        '    except (KeyError, ValueError):\n'
+        '        sys.exit(1)\n'
+        'print(p.pw_name)')
+        , owner])
     if remote_cmd_owner_id.return_code != 0:
         raise LogicError(f"Could not resolve remote user '{owner}'")
     resolved_owner = remote_cmd_owner_id.stdout.strip()
 
+    # TODO use python because id -ng is wrng
     # Resolve group name/gid to name
     group = context.group if group is None else group
-    remote_cmd_group_id = context.remote_exec(["id", "-ng", group])
+    remote_cmd_group_id = context.remote_exec(["python", "-c", (
+        'import sys,grp\n'
+        'try:\n'
+        '    g=grp.getgrnam(sys.argv[1])\n'
+        'except KeyError:\n'
+        '    try:\n'
+        '        g=grp.getgrgid(int(sys.argv[1]))\n'
+        '    except (KeyError, ValueError):\n'
+        '        sys.exit(1)\n'
+        'print(g.gr_name)')
+        , group])
     if remote_cmd_group_id.return_code != 0:
         raise LogicError(f"Could not resolve remote group '{group}'")
     resolved_group = remote_cmd_group_id.stdout.strip()
