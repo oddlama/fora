@@ -11,6 +11,8 @@
 
 # About simple automation
 
+**ATTENTION: This project is currently in beta development. The API may change at anytime until we reach version 1.0.0.**
+
 Simple automation is an ansible-inspired infrastructure and configuration management tool,
 but with a focus on minimalism and simplicity. Its intended uses are small-scale machine administation, system configuration tracking,
 or even just dotfiles management. Although it can certainly be used to administer larger
@@ -32,7 +34,7 @@ and how they work together, please have a look at the [Architecture](https://sim
 You can use pip to install simple_automation. If you want to help maintaining a package
 for your favourite distribution, feel free to reach out.
 
-You will need `python>=3.9`.
+Simple automation requires `python>=3.9`.
 
 ```bash
 pip install simple_automation
