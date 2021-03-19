@@ -29,7 +29,7 @@ and how they work together, please have a look at the [Architecture](https://sim
 
 ## Installation
 
-Use can use pip to install simple_automation. If you want to help maintaining a package
+You can use pip to install simple_automation. If you want to help maintaining a package
 for your favourite distribution, feel free to reach out.
 
 You will need `python>=3.9`.
