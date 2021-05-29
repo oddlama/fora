@@ -31,6 +31,16 @@ In this document you will find a high-level overview of the library architecture
                                        └───→ │ Vault │ ┘          │ Transaction │ ┘
                                              └───────┘            └─────────────┘
 
+Program start
+-------------
+
+1. A manager (and your inventory) is instanciated
+2. Command line options are parsed
+3. register_vaults is called
+4. register_globals is called
+5. register_inventory is called
+6. The given entry function (run(context) by default) is called
+
 Class functionality
 -------------------
 
