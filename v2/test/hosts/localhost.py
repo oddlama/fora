@@ -8,4 +8,4 @@ ssh_host = "root@localhost"
 install_sshd = True
 
 vault = load_vault(f"vaults/{name}.py")
-xyz = vault.afea
+#TODO xyz = vault.afea

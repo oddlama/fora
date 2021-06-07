@@ -1,2 +1,7 @@
 from .main import main
-x=None
+
+class NotYetLoaded:
+    pass
+
+inventory = NotYetLoaded()
+hosts = NotYetLoaded()
