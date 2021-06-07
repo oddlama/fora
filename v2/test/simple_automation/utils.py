@@ -3,6 +3,10 @@ Provides utility functions.
 """
 
 import sys
+import uuid
+
+import importlib.machinery
+import importlib.util
 
 def print_error(msg: str):
     """
@@ -16,6 +20,18 @@ def die_error(msg: str, status_code=1):
     """
     print_error(msg)
     sys.exit(status_code)
+
+def load_py_module(file: str):
+    """
+    Loads a module from the given filename and assigns a unique module name to it.
+    Calling this function twice for the same file will yield distinct instances.
+    """
+    module_id = str(uuid.uuid4()).replace('-', '_')
+    loader = importlib.machinery.SourceFileLoader(f"__simple_automation_dynamic_module_{module_id}", file)
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    mod = importlib.util.module_from_spec(spec)
+    loader.exec_module(mod)
+    return mod
 
 def merge_dicts(source, destination):
     """
