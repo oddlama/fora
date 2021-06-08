@@ -1,6 +1,7 @@
+from simple_automation import host
+
 description = "Deploys something"
 
-def run(host):
-    if "desktops" in host.groups:
-        pass
+if "desktops" in host.groups:
     pass
+pass

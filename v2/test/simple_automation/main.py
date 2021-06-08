@@ -1,28 +1,14 @@
 """
 Provides the top-level logic of simple_automation such as
-the CLI interface and submodule loading.
+the CLI interface and coordination of submodule loading.
 """
 
 import argparse
 
 import simple_automation
-from simple_automation.utils import die_error, load_py_module
+from simple_automation.loader import load_host, load_inventory
+from simple_automation.utils import die_error
 from simple_automation.version import __version__
-
-class ArgumentParserError(Exception):
-    """
-    Error class for argument parsing errors.
-    """
-
-class ThrowingArgumentParser(argparse.ArgumentParser):
-    """
-    An argument parser that throws when invalid argument types are passed.
-    """
-    def error(self, message):
-        """
-        Raises an exception on error.
-        """
-        raise ArgumentParserError(message)
 
 # TODO self.set("simple_automation_managed", "This file is managed by simple automation.")
 
@@ -32,39 +18,27 @@ def main_edit_vault(args):
     #vault.decrypt()
     #vault.edit()
 
-class HostDefinition:
-    def __init__(self, name, definition_file):
-        self.name = name
-        self.definition_file = definition_file
-
-def load_host(host):
-    print(f"loading host {host.name} from {host.definition_file}")
-    simple_automation.host = host
-    return load_py_module(host.definition_file)
-
-def main_run(args):
+def init_runtime():
     from jinja2 import Environment, FileSystemLoader, StrictUndefined
-
     simple_automation.jinja2_env = Environment(
             loader=FileSystemLoader('.', followlinks=True),
             autoescape=False,
             undefined=StrictUndefined)
 
-    simple_automation.inventory = load_py_module('inventory.py')
-    if not hasattr(simple_automation.inventory, 'hosts'):
-        die_error("inventory.py: Inventory must define a list of hosts!")
-    if not isinstance(simple_automation.inventory.hosts, list):
-        die_error("inventory.py: hosts variable must be a list!")
+def main_run(args):
+    init_runtime()
 
+    # Load all hosts defined in the inventory
+    load_inventory()
+
+    # Load all hosts defined in the inventory
     loaded_hosts = []
     for host in simple_automation.inventory.hosts:
         if isinstance(host, str):
-            loaded_hosts.append(load_host(HostDefinition(host, f"hosts/{host}.py")))
+            loaded_hosts.append(load_host(host_id=host, module_file=f"hosts/{host}.py"))
         elif isinstance(host, tuple):
-            (name, definition_py) = host
-            loaded_hosts.append(load_host(HostDefinition(name, definition_py)))
-        elif isinstance(host, HostDefinition):
-            loaded_hosts.append(load_host(host))
+            (name, module_py) = host
+            loaded_hosts.append(load_host(name=name, module_file=module_py))
         else:
             die_error(f"inventory.py: invalid host '{str(host)}'")
     simple_automation.inventory.hosts = loaded_hosts
@@ -83,6 +57,21 @@ def main_run(args):
     #        for script in args.scripts.split(','):
     #            fn = getattr(self.inventory, script)
     #            fn(c)
+
+class ArgumentParserError(Exception):
+    """
+    Error class for argument parsing errors.
+    """
+
+class ThrowingArgumentParser(argparse.ArgumentParser):
+    """
+    An argument parser that throws when invalid argument types are passed.
+    """
+    def error(self, message):
+        """
+        Raises an exception on error.
+        """
+        raise ArgumentParserError(message)
 
 def main():
     """

@@ -1,11 +1,8 @@
+from simple_automation import host_id
 from simple_automation.vault import load_vault
 
-name = "localhost"
+ssh_host = "root@localhost"
 groups = ["desktops"]
 
-ssh_host = "root@localhost"
-
-install_sshd = True
-
-vault = load_vault(f"vaults/{name}.py")
+vault = load_vault(f"vaults/{host_id}.py")
 #TODO xyz = vault.afea
