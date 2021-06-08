@@ -10,6 +10,11 @@ This is loaded from the inventory definition file (inventory.py).
 inventory = NotYetLoaded()
 
 """
+The list of all group modules loaded from groups/*.py.
+"""
+groups = NotYetLoaded()
+
+"""
 The list of all instanciated host modules, after they were all loaded.
 """
 hosts = NotYetLoaded()
