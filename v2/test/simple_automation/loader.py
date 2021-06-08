@@ -24,3 +24,22 @@ def load_inventory():
         die_error("inventory.py: inventory must define a list of hosts!")
     if not isinstance(simple_automation.inventory.hosts, list):
         die_error("inventory.py: hosts variable must be a list!")
+
+def load_site():
+    # Load the inventory
+    load_inventory()
+
+    # Load all hosts defined in the inventory
+    loaded_hosts = []
+    for host in simple_automation.inventory.hosts:
+        if isinstance(host, str):
+            loaded_hosts.append(load_host(host_id=host, module_file=f"hosts/{host}.py"))
+        elif isinstance(host, tuple):
+            (name, module_py) = host
+            loaded_hosts.append(load_host(name=name, module_file=module_py))
+        else:
+            die_error(f"inventory.py: invalid host '{str(host)}'")
+    simple_automation.inventory.hosts = loaded_hosts
+
+    # Load all groups from groups/*.py
+    # TODO
