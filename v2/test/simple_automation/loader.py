@@ -7,10 +7,134 @@ import glob
 import os
 from simple_automation.utils import die_error, load_py_module
 
+def load_inventory():
+    inventory = load_py_module('inventory.py')
+    if not hasattr(inventory, 'hosts'):
+        die_error("inventory.py: inventory must define a list of hosts!")
+    if not isinstance(inventory.hosts, list):
+        die_error("inventory.py: hosts variable must be a list!")
+    return inventory
+
 def load_group(module_file: str):
     ret = load_py_module(module_file)
     ret.name = os.path.splitext(os.path.basename(module_file))[0]
+    ret.loaded_from = module_file
+
+    # Dependent groups (before this)
+    if not hasattr(ret, 'before'):
+        ret.before = []
+    if not isinstance(ret.before, list):
+        die_error(f"{module_file}: 'before' must be a list!")
+
+    # Dependent groups (after this)
+    if not hasattr(ret, 'after'):
+        ret.after = [] if ret.name == 'all' else ['all']
+    if not isinstance(ret.after, list):
+        die_error(f"{module_file}: 'after' must be a list!")
+
     return ret
+
+def load_groups():
+    # Load all groups defined in groups/*.py
+    loaded_groups = {}
+    for file in glob.glob('groups/*.py'):
+        group = load_group(file)
+        loaded_groups[group.name] = group
+
+    # Create default all group if it wasn't defined
+    if 'all' not in loaded_groups:
+        # TODO instanciate default all module
+        from simple_automation import default_group_all
+        loaded_groups['all'] = default_group_all
+
+    return loaded_groups
+
+def rank_sort
+
+def sort_groups(groups):
+    # Check that all groups used in dependencies do exist.
+    for _,group in groups.items():
+        for g in group.before:
+            if g not in groups:
+                die_error(f"{group.loaded_from}: definition of before: Invalid group '{g}' or missing definition groups/{g}.py!")
+        for g in group.after:
+            if g not in groups:
+                die_error(f"{group.loaded_from}: definition of after: Invalid group '{g}' or missing definition groups/{g}.py!")
+
+    # Detect self-cycles
+    for g,group in groups.items():
+        if g in group.before:
+            die_error(f"{group.loaded_from}: definition of before: Group '{g}' cannot depend on itself!")
+        if g in group.after:
+            die_error(f"{group.loaded_from}: definition of after: Group '{g}' cannot depend on itself!")
+
+    # Unify before and after dependencies
+    for g in groups:
+        for before in groups[g].before:
+            groups[before].after.append(g)
+
+    # Deduplicate after, clear before
+    for _,group in groups.items():
+        group.before = []
+        group.after = list(set(group.after))
+
+    # Recalculate before from after
+    for g in groups:
+        for after in groups[g].after:
+            groups[after].before.append(g)
+
+    # Deduplicate before
+    for _,group in groups.items():
+        group.before = list(set(group.before))
+
+    # TODO find strongly connected components. This is an error.
+
+    # Rank sort from bottom-up and top-down to calculate minimum rank and maximum rank.
+    # This is basically the earliest time a group might be applied (exactly after all dependencies
+    # were processed), and the latest time (any other group requires this one to be processed first).
+    #
+    # Rank numbers are already 0-based. This means in the top-down view, the root node
+    # has top-rank 0 and a high bottom-rank, and all leaves have bottom_rank 0 a high top-rank.
+    ranks_t = rank_sort(groups, order='top_down')
+    ranks_b = rank_sort(groups, order='bottom_up')
+
+    # Find the maximum rank. Both ranking systems have the same number of ranks. This is
+    # true because the longest dependency chain determines the amount of ranks, and all dependencies
+    # are the same.
+    ranks_t_max = max(ranks_t.values())
+    ranks_b_max = max(ranks_b.values())
+    assert ranks_t_max == ranks_b_max
+    n_ranks = ranks_b_max
+
+    # Rebase bottom-ranks on top-ranks. We now want to transform top-ranks into minimum-ranks and
+    # bottom-ranks into maximum-ranks, as viewed from a top-down scheme. I.e. we want to know the
+    # range of ranks a module could occupy in any valid topological order. Therefore, we will simply
+    # subtract all bottom-ranks from the highest rank number to get maximum-ranks. The top-down ranks
+    # are already the minimum ranks.
+    ranks_min = ranks_t
+    ranks_max = {k: n_ranks - v for k,v in ranks_b}
+
+    # For each group find all other groups that share at lease one rank. This means
+    # that there exists a topological order where A comes before B as well as a topological order where
+    # this order is reversed. These pairs will then be tested for any variable that is assigned in both.
+    # This would be an error, as the order of assignment and therfore the final value is ambiguous.
+    # Although these kind of errors are not fatal, we collect all and exit if necessary,
+    # because this constitutes a group design issue and should be fixed.
+    for group in groups:
+        for other in rank_intersections(group, ranks_t, ranks_b):
+            # group shares at least one rank with other.
+            pass
+
+
+    for _,group in groups.items():
+        group.after = list(set(group.after))
+        print(f"{group.name}.after = {group.after}")
+    for _,group in groups.items():
+        print(f"{group.name}.before = {group.before}")
+
+    # TODO ambiguity detection
+
+    return groups
 
 def load_host(host_id: str, module_file: str):
     simple_automation.host_id = host_id
@@ -32,30 +156,6 @@ def load_host(host_id: str, module_file: str):
 
     return ret
 
-def load_inventory():
-    simple_automation.inventory = load_py_module('inventory.py')
-    if not hasattr(simple_automation.inventory, 'hosts'):
-        die_error("inventory.py: inventory must define a list of hosts!")
-    if not isinstance(simple_automation.inventory.hosts, list):
-        die_error("inventory.py: hosts variable must be a list!")
-
-def load_groups():
-    # Load all groups defined in groups/
-    loaded_groups = {}
-    for file in glob.glob('groups/*.py'):
-        group = load_group(file)
-        loaded_groups[group.name] = group
-
-    # Create default all group if it wasn't defined
-    if 'all' not in loaded_groups:
-        loaded_groups['all'] = { 'name': 'all' }
-
-    simple_automation.groups = loaded_groups
-
-def sort_groups():
-    # TODO
-    pass
-
 def load_hosts():
     # Load all hosts defined in the inventory
     loaded_hosts = []
@@ -67,22 +167,21 @@ def load_hosts():
             loaded_hosts.append(load_host(name=name, module_file=module_py))
         else:
             die_error(f"inventory.py: invalid host '{str(host)}'")
-    simple_automation.hosts = loaded_hosts
+    return loaded_hosts
 
 def load_tasks():
-    pass
+    return None
 
 def load_site():
     # Load the inventory
-    load_inventory()
+    simple_automation.inventory = load_inventory()
 
-    # Load all groups from groups/*.py
-    load_groups()
-    # Sort groups respecting their defined dependencies
-    sort_groups()
+    # Load all groups from groups/*.py, then sort
+    # groups respecting their declared dependencies
+    simple_automation.groups = sort_groups(load_groups())
 
     # Load all hosts defined in the inventory
-    load_hosts()
+    simple_automation.hosts = load_hosts()
 
     # Load all tasks recursively from tasks/
-    load_tasks()
+    simple_automation.tasks = load_tasks()

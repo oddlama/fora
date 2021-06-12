@@ -20,6 +20,11 @@ The list of all instanciated host modules, after they were all loaded.
 hosts = NotYetLoaded()
 
 """
+The list of all loaded task modules.
+"""
+tasks = NotYetLoaded()
+
+"""
 The identifier of the host that is currently active or being loaded.
 This corresponds to the identifier defined via hosts list in the inventory.
 """
