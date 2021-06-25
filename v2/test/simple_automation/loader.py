@@ -5,6 +5,7 @@ Provides the submodule loading functions.
 import simple_automation
 import glob
 import os
+from itertools import combinations
 from simple_automation.utils import die_error, load_py_module
 
 def load_inventory():
@@ -72,8 +73,9 @@ def rank_sort(vertices: list, preds_of, childs_of):
         while len(preds_of(root)) > 0:
             root = preds_of(root)[0]
             if visited[root]:
-                cycle_nodes = list(filter(lambda v: visited[v], vertices))
-                raise ValueError(f"Cannot apply rank_sort to cyclic graph. Cycle includes: {cycle_nodes}")
+                e = ValueError(f"Cannot apply rank_sort to cyclic graph.")
+                e.cycle = list(filter(lambda v: visited[v], vertices))
+                raise e
 
             visited[root] = True
 
@@ -102,7 +104,7 @@ def rank_sort(vertices: list, preds_of, childs_of):
     return ranks
 
 def sort_groups(groups):
-    # Check that all groups used in dependencies do exist.
+    # Check that all groups used in dependencies do actually exist.
     for _,group in groups.items():
         for g in group.before:
             if g not in groups:
@@ -137,8 +139,6 @@ def sort_groups(groups):
     for _,group in groups.items():
         group.before = list(set(group.before))
 
-    # TODO find strongly connected components. This is an error.
-
     # Rank sort from bottom-up and top-down to calculate minimum rank and maximum rank.
     # This is basically the earliest time a group might be applied (exactly after all dependencies
     # were processed), and the latest time (any other group requires this one to be processed first).
@@ -147,8 +147,19 @@ def sort_groups(groups):
     # has top-rank 0 and a high bottom-rank, and all leaves have bottom_rank 0 a high top-rank.
     l_before = lambda g: groups[g].before
     l_after = lambda g: groups[g].after
-    ranks_t = rank_sort(groups.keys(), l_before, l_after) # Top-down
-    ranks_b = rank_sort(groups.keys(), l_after, l_before) # Bottom-up
+
+    try:
+        ranks_t = rank_sort(groups.keys(), l_before, l_after) # Top-down
+        ranks_b = rank_sort(groups.keys(), l_after, l_before) # Bottom-up
+    except ValueError as e:
+        die_error(f"Dependency cycle detected! The cycle includes {[groups[g].loaded_from for g in e.cycle]}.")
+
+    # Find cycles in dependencies by checking for the existence of any edge that doesn't increase the rank.
+    # This is an error.
+    for g in groups:
+        for c in groups[g].after:
+            if ranks_t[c] <= ranks_t[g]:
+                die_error(f"Dependency cycle detected! The cycle includes '{groups[g].loaded_from}' and '{groups[c].loaded_from}'.")
 
     # Find the maximum rank. Both ranking systems have the same number of ranks. This is
     # true because the longest dependency chain determines the amount of ranks, and all dependencies
@@ -172,18 +183,14 @@ def sort_groups(groups):
     # This would be an error, as the order of assignment and therfore the final value is ambiguous.
     # Although these kind of errors are not fatal, we collect all and exit if necessary,
     # because this constitutes a group design issue and should be fixed.
-    for group in groups:
-        for other in rank_intersections(group, ranks_min, ranks_max):
-            # group shares at least one rank with other.
-            pass
+    for a, b in combinations(groups, 2):
+        # Skip pair if the ranks don't overlap
+        if ranks_max[a] < ranks_min[b] or ranks_min[a] > ranks_max[b]:
+            continue
 
-    for _,group in groups.items():
-        group.after = list(set(group.after))
-        print(f"{group.name}.after = {group.after}")
-    for _,group in groups.items():
-        print(f"{group.name}.before = {group.before}")
-
-    # TODO ambiguity detection
+        # The two groups a and b share at least one rank with other,
+        # so we need to make sure they can't conflict
+        check_modules_for_conflicts(groups[a], groups[b])
 
     return groups
 
