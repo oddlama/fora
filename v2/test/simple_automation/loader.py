@@ -5,8 +5,9 @@ Provides the submodule loading functions.
 import simple_automation
 import glob
 import os
+import sys
 from itertools import combinations
-from simple_automation.utils import die_error, load_py_module
+from simple_automation.utils import die_error, print_error, load_py_module, rank_sort
 
 def load_inventory():
     inventory = load_py_module('inventory.py')
@@ -18,20 +19,20 @@ def load_inventory():
 
 def load_group(module_file: str):
     ret = load_py_module(module_file)
-    ret.name = os.path.splitext(os.path.basename(module_file))[0]
-    ret.loaded_from = module_file
+    ret._name = os.path.splitext(os.path.basename(module_file))[0]
+    ret._loaded_from = module_file
 
     # Dependent groups (before this)
-    if not hasattr(ret, 'before'):
-        ret.before = []
-    if not isinstance(ret.before, list):
-        die_error(f"{module_file}: 'before' must be a list!")
+    if not hasattr(ret, '_before'):
+        ret._before = []
+    if not isinstance(ret._before, list):
+        die_error(f"{module_file}: '_before' must be a list!")
 
     # Dependent groups (after this)
-    if not hasattr(ret, 'after'):
-        ret.after = [] if ret.name == 'all' else ['all']
-    if not isinstance(ret.after, list):
-        die_error(f"{module_file}: 'after' must be a list!")
+    if not hasattr(ret, '_after'):
+        ret._after = [] if ret._name == 'all' else ['all']
+    if not isinstance(ret._after, list):
+        die_error(f"{module_file}: '_after' must be a list!")
 
     return ret
 
@@ -40,7 +41,7 @@ def load_groups():
     loaded_groups = {}
     for file in glob.glob('groups/*.py'):
         group = load_group(file)
-        loaded_groups[group.name] = group
+        loaded_groups[group._name] = group
 
     # Create default all group if it wasn't defined
     if 'all' not in loaded_groups:
@@ -50,94 +51,48 @@ def load_groups():
 
     return loaded_groups
 
-def rank_sort(vertices: list, preds_of, childs_of):
-    # FIXME in description: must be cycle free already. Might detect cycle when
-    # searching for root node, but this is not guaranteed to detect any cycle.
-
-    # Create a mapping of vertices to ranks.
-    ranks = {v: -1 for v in vertices}
-
-    # While there is at least one node without a rank,
-    # find the "tree root" of that portion of the graph and
-    # assign ranks to all reachable children without ranks.
-    while -1 in ranks.values():
-        # Start at any unvisited node
-        root = next(filter(lambda k: ranks[k] == -1, ranks.keys()))
-
-        # Initialize a visited mapping to detect cycles
-        visited = {v: False for v in vertices}
-        visited[root] = True
-
-        # Find the root of the current subtree,
-        # or detect a cycle and abort.
-        while len(preds_of(root)) > 0:
-            root = preds_of(root)[0]
-            if visited[root]:
-                e = ValueError(f"Cannot apply rank_sort to cyclic graph.")
-                e.cycle = list(filter(lambda v: visited[v], vertices))
-                raise e
-
-            visited[root] = True
-
-        # The root node has rank 0
-        ranks[root] = 0
-
-        # Now assign increasing ranks to children in a breadth-first manner
-        # to avoid transitive dependencies from causing additional subtree-updates.
-        # We start with a list of nodes to process and their parents stored as pairs.
-        needs_rank_list = list([(c, root) for c in childs_of(root)])
-        while len(needs_rank_list) > 0:
-            # Take the next node to process
-            n, p = needs_rank_list.pop(0)
-            r = ranks[p] + 1
-
-            # Skip nodes that already have a rank
-            # higher than the one we would assign
-            if ranks[n] >= r:
-                continue
-
-            # Assign rank
-            ranks[n] = r
-            # Queue childen for rank assignment
-            needs_rank_list.extend([(c, n) for c in childs_of(n)])
-
-    return ranks
+def check_modules_for_conflicts(a, b):
+    get_attrs = lambda x: set([attr for attr in dir(x) if not callable(getattr(x, attr)) and not attr.startswith("_")])
+    conflicts = list(get_attrs(a) & get_attrs(b))
+    for conflict in conflicts:
+        print_error(f"'{a._loaded_from}': Definition of '{conflict}' is in conflict with definition at '{b._loaded_from}'. (Group order is ambiguous, insert dependency or remove one definition.)")
+    return len(conflicts) > 0
 
 def sort_groups(groups):
     # Check that all groups used in dependencies do actually exist.
     for _,group in groups.items():
-        for g in group.before:
+        for g in group._before:
             if g not in groups:
-                die_error(f"{group.loaded_from}: definition of before: Invalid group '{g}' or missing definition groups/{g}.py!")
-        for g in group.after:
+                die_error(f"{group._loaded_from}: definition of _before: Invalid group '{g}' or missing definition groups/{g}.py!")
+        for g in group._after:
             if g not in groups:
-                die_error(f"{group.loaded_from}: definition of after: Invalid group '{g}' or missing definition groups/{g}.py!")
+                die_error(f"{group._loaded_from}: definition of _after: Invalid group '{g}' or missing definition groups/{g}.py!")
 
     # Detect self-cycles
     for g,group in groups.items():
-        if g in group.before:
-            die_error(f"{group.loaded_from}: definition of before: Group '{g}' cannot depend on itself!")
-        if g in group.after:
-            die_error(f"{group.loaded_from}: definition of after: Group '{g}' cannot depend on itself!")
+        if g in group._before:
+            die_error(f"{group._loaded_from}: definition of _before: Group '{g}' cannot depend on itself!")
+        if g in group._after:
+            die_error(f"{group._loaded_from}: definition of _after: Group '{g}' cannot depend on itself!")
 
-    # Unify before and after dependencies
+    # Unify _before and _after dependencies
     for g in groups:
-        for before in groups[g].before:
-            groups[before].after.append(g)
+        for before in groups[g]._before:
+            groups[before]._after.append(g)
 
-    # Deduplicate after, clear before
+    # Deduplicate _after, clear before
     for _,group in groups.items():
-        group.before = []
-        group.after = list(set(group.after))
+        group._before = []
+        group._after = list(set(group._after))
 
-    # Recalculate before from after
+    # Recalculate _before from _after
     for g in groups:
-        for after in groups[g].after:
-            groups[after].before.append(g)
+        for after in groups[g]._after:
+            groups[after]._before.append(g)
 
     # Deduplicate before
     for _,group in groups.items():
-        group.before = list(set(group.before))
+        group._before = list(set(group._before))
 
     # Rank sort from bottom-up and top-down to calculate minimum rank and maximum rank.
     # This is basically the earliest time a group might be applied (exactly after all dependencies
@@ -145,21 +100,21 @@ def sort_groups(groups):
     #
     # Rank numbers are already 0-based. This means in the top-down view, the root node
     # has top-rank 0 and a high bottom-rank, and all leaves have bottom_rank 0 a high top-rank.
-    l_before = lambda g: groups[g].before
-    l_after = lambda g: groups[g].after
+    l_before = lambda g: groups[g]._before
+    l_after = lambda g: groups[g]._after
 
     try:
         ranks_t = rank_sort(groups.keys(), l_before, l_after) # Top-down
         ranks_b = rank_sort(groups.keys(), l_after, l_before) # Bottom-up
     except ValueError as e:
-        die_error(f"Dependency cycle detected! The cycle includes {[groups[g].loaded_from for g in e.cycle]}.")
+        die_error(f"Dependency cycle detected! The cycle includes {[groups[g]._loaded_from for g in e.cycle]}.")
 
     # Find cycles in dependencies by checking for the existence of any edge that doesn't increase the rank.
     # This is an error.
     for g in groups:
-        for c in groups[g].after:
+        for c in groups[g]._after:
             if ranks_t[c] <= ranks_t[g]:
-                die_error(f"Dependency cycle detected! The cycle includes '{groups[g].loaded_from}' and '{groups[c].loaded_from}'.")
+                die_error(f"Dependency cycle detected! The cycle includes '{groups[g]._loaded_from}' and '{groups[c]._loaded_from}'.")
 
     # Find the maximum rank. Both ranking systems have the same number of ranks. This is
     # true because the longest dependency chain determines the amount of ranks, and all dependencies
@@ -183,6 +138,7 @@ def sort_groups(groups):
     # This would be an error, as the order of assignment and therfore the final value is ambiguous.
     # Although these kind of errors are not fatal, we collect all and exit if necessary,
     # because this constitutes a group design issue and should be fixed.
+    has_conflicts = False
     for a, b in combinations(groups, 2):
         # Skip pair if the ranks don't overlap
         if ranks_max[a] < ranks_min[b] or ranks_min[a] > ranks_max[b]:
@@ -190,7 +146,10 @@ def sort_groups(groups):
 
         # The two groups a and b share at least one rank with other,
         # so we need to make sure they can't conflict
-        check_modules_for_conflicts(groups[a], groups[b])
+        has_conflicts |= check_modules_for_conflicts(groups[a], groups[b])
+
+    if has_conflicts:
+        sys.exit(1)
 
     return groups
 

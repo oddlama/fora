@@ -8,6 +8,12 @@ import uuid
 import importlib.machinery
 import importlib.util
 
+def print_warning(msg: str):
+    """
+    Prints a message with a colored 'warning: ' prefix.
+    """
+    print(f"[1;33mwarning:[m {msg}")
+
 def print_error(msg: str):
     """
     Prints a message with a colored 'error: ' prefix.
@@ -144,3 +150,56 @@ def choice_yes(msg: str) -> bool:
             return False
 
         print(f"Response '{choice}' not understood.")
+
+def rank_sort(vertices: list, preds_of, childs_of):
+    # FIXME in description: must be cycle free already. Might detect cycle when
+    # searching for root node, but this is not guaranteed to detect any cycle.
+
+    # Create a mapping of vertices to ranks.
+    ranks = {v: -1 for v in vertices}
+
+    # While there is at least one node without a rank,
+    # find the "tree root" of that portion of the graph and
+    # assign ranks to all reachable children without ranks.
+    while -1 in ranks.values():
+        # Start at any unvisited node
+        root = next(filter(lambda k: ranks[k] == -1, ranks.keys()))
+
+        # Initialize a visited mapping to detect cycles
+        visited = {v: False for v in vertices}
+        visited[root] = True
+
+        # Find the root of the current subtree,
+        # or detect a cycle and abort.
+        while len(preds_of(root)) > 0:
+            root = preds_of(root)[0]
+            if visited[root]:
+                e = ValueError(f"Cannot apply rank_sort to cyclic graph.")
+                e.cycle = list(filter(lambda v: visited[v], vertices))
+                raise e
+
+            visited[root] = True
+
+        # The root node has rank 0
+        ranks[root] = 0
+
+        # Now assign increasing ranks to children in a breadth-first manner
+        # to avoid transitive dependencies from causing additional subtree-updates.
+        # We start with a list of nodes to process and their parents stored as pairs.
+        needs_rank_list = list([(c, root) for c in childs_of(root)])
+        while len(needs_rank_list) > 0:
+            # Take the next node to process
+            n, p = needs_rank_list.pop(0)
+            r = ranks[p] + 1
+
+            # Skip nodes that already have a rank
+            # higher than the one we would assign
+            if ranks[n] >= r:
+                continue
+
+            # Assign rank
+            ranks[n] = r
+            # Queue childen for rank assignment
+            needs_rank_list.extend([(c, n) for c in childs_of(n)])
+
+    return ranks
