@@ -49,7 +49,57 @@ def load_groups():
 
     return loaded_groups
 
-def rank_sort
+def rank_sort(vertices: list, preds_of, childs_of):
+    # FIXME in description: must be cycle free already. Might detect cycle when
+    # searching for root node, but this is not guaranteed to detect any cycle.
+
+    # Create a mapping of vertices to ranks.
+    ranks = {v: -1 for v in vertices}
+
+    # While there is at least one node without a rank,
+    # find the "tree root" of that portion of the graph and
+    # assign ranks to all reachable children without ranks.
+    while -1 in ranks.values():
+        # Start at any unvisited node
+        root = next(filter(lambda k: ranks[k] == -1, ranks.keys()))
+
+        # Initialize a visited mapping to detect cycles
+        visited = {v: False for v in vertices}
+        visited[root] = True
+
+        # Find the root of the current subtree,
+        # or detect a cycle and abort.
+        while len(preds_of(root)) > 0:
+            root = preds_of(root)[0]
+            if visited[root]:
+                cycle_nodes = list(filter(lambda v: visited[v], vertices))
+                raise ValueError(f"Cannot apply rank_sort to cyclic graph. Cycle includes: {cycle_nodes}")
+
+            visited[root] = True
+
+        # The root node has rank 0
+        ranks[root] = 0
+
+        # Now assign increasing ranks to children in a breadth-first manner
+        # to avoid transitive dependencies from causing additional subtree-updates.
+        # We start with a list of nodes to process and their parents stored as pairs.
+        needs_rank_list = list([(c, root) for c in childs_of(root)])
+        while len(needs_rank_list) > 0:
+            # Take the next node to process
+            n, p = needs_rank_list.pop(0)
+            r = ranks[p] + 1
+
+            # Skip nodes that already have a rank
+            # higher than the one we would assign
+            if ranks[n] >= r:
+                continue
+
+            # Assign rank
+            ranks[n] = r
+            # Queue childen for rank assignment
+            needs_rank_list.extend([(c, n) for c in childs_of(n)])
+
+    return ranks
 
 def sort_groups(groups):
     # Check that all groups used in dependencies do exist.
@@ -95,8 +145,10 @@ def sort_groups(groups):
     #
     # Rank numbers are already 0-based. This means in the top-down view, the root node
     # has top-rank 0 and a high bottom-rank, and all leaves have bottom_rank 0 a high top-rank.
-    ranks_t = rank_sort(groups, order='top_down')
-    ranks_b = rank_sort(groups, order='bottom_up')
+    l_before = lambda g: groups[g].before
+    l_after = lambda g: groups[g].after
+    ranks_t = rank_sort(groups.keys(), l_before, l_after) # Top-down
+    ranks_b = rank_sort(groups.keys(), l_after, l_before) # Bottom-up
 
     # Find the maximum rank. Both ranking systems have the same number of ranks. This is
     # true because the longest dependency chain determines the amount of ranks, and all dependencies
@@ -112,7 +164,7 @@ def sort_groups(groups):
     # subtract all bottom-ranks from the highest rank number to get maximum-ranks. The top-down ranks
     # are already the minimum ranks.
     ranks_min = ranks_t
-    ranks_max = {k: n_ranks - v for k,v in ranks_b}
+    ranks_max = {k: n_ranks - v for k,v in ranks_b.items()}
 
     # For each group find all other groups that share at lease one rank. This means
     # that there exists a topological order where A comes before B as well as a topological order where
@@ -121,10 +173,9 @@ def sort_groups(groups):
     # Although these kind of errors are not fatal, we collect all and exit if necessary,
     # because this constitutes a group design issue and should be fixed.
     for group in groups:
-        for other in rank_intersections(group, ranks_t, ranks_b):
+        for other in rank_intersections(group, ranks_min, ranks_max):
             # group shares at least one rank with other.
             pass
-
 
     for _,group in groups.items():
         group.after = list(set(group.after))
