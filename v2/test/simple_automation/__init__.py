@@ -1,54 +1,61 @@
-from typing import Optional, Union
-from types import ModuleType
+"""
+This is the main module of simple_automation.
+"""
+
+from typing import Optional, Union, cast
+from .types import InventoryType, GroupType, HostType, TaskType
 
 class NotYetLoaded:
-    pass
+    """
+    A dummy class which instances are used to provoke runtime-errors when
+    using a part of simple_automation that hasn't been initialized yet.
+    """
 
+inventory = cast(InventoryType, NotYetLoaded())
 """
 The inventory module we are operating on.
 This is loaded from the inventory definition file (inventory.py).
 """
-inventory = NotYetLoaded()
 
+groups: dict[str, GroupType] = cast(dict[str, GroupType], NotYetLoaded())
 """
 The list of all group modules loaded from groups/*.py.
 """
-groups: dict[str, ModuleType] = NotYetLoaded()
 
+group_order: list[str] = cast(list[str], NotYetLoaded())
 """
 A topological order of all groups
 """
-group_order = NotYetLoaded()
 
+hosts: list[HostType] = cast(list[HostType], NotYetLoaded())
 """
 The list of all instanciated host modules, after they were all loaded.
 """
-hosts = NotYetLoaded()
 
+tasks: dict[str, TaskType] = cast(dict[str, TaskType], NotYetLoaded())
 """
 The list of all loaded task modules.
 """
-tasks = NotYetLoaded()
 
+host_id: Optional[str] = None
 """
 The identifier of the host that is currently active or being loaded.
 This corresponds to the identifier defined via hosts list in the inventory.
 """
-host_id: Optional[str] = None
 
+host: HostType = cast(HostType, NotYetLoaded())
 """
 The currently active host. Only set when a user script is being executed
 and not while the host is being loaded.
 """
-host = None
 
+# TODO dict[str, Vault]
+loaded_vaults: dict[str, int] = {}
 """
 A list of all loaded and unlocked vaults. Used to prevent asking multiple times to decrypt the same vault.
 """
-# TODO dict[str, Vault]
-loaded_vaults: dict[str, int] = {}
 
+jinja2_env = NotYetLoaded()
 """
 The jinja2 environment used for templating
 """
-jinja2_env = NotYetLoaded()

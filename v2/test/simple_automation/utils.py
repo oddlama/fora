@@ -30,6 +30,15 @@ def die_error(msg: str, status_code=1):
     print_error(msg)
     sys.exit(status_code)
 
+class CycleError(ValueError):
+    def __init__(self, msg, cycle):
+        """
+        This error is thrown when a cycle is detected in a graph, and
+        the throwing function can't deal with cyclic graphs.
+        """
+        super().__init__(msg)
+        self.cycle = cycle
+
 def load_py_module(file: str):
     """
     Loads a module from the given filename and assigns a unique module name to it.
@@ -38,6 +47,8 @@ def load_py_module(file: str):
     module_id = str(uuid.uuid4()).replace('-', '_')
     loader = importlib.machinery.SourceFileLoader(f"__simple_automation_dynamic_module_{module_id}", file)
     spec = importlib.util.spec_from_loader(loader.name, loader)
+    if spec is None:
+        raise ValueError(f"Failed to load module from file '{file}'")
     mod = importlib.util.module_from_spec(spec)
     loader.exec_module(mod)
     return mod
@@ -143,6 +154,16 @@ def print_transaction(context, transaction):
 def choice_yes(msg: str) -> bool:
     """
     Awaits user choice (Y/n).
+
+    Parameters
+    ----------
+    msg : str
+        The message to print.
+
+    Returns
+    -------
+    bool
+        True if the choice was yes, False otherwise.
     """
     while True:
         print(f"{msg} (Y/n) ", end="", flush=True)
@@ -155,6 +176,27 @@ def choice_yes(msg: str) -> bool:
         print(f"Response '{choice}' not understood.")
 
 def rank_sort(vertices: list[T], preds_of: Callable[[T], list[T]], childs_of: Callable[[T], list[T]]) -> dict[T, int]:
+    """
+    Calculates the top-down rank for each vertex. Supports graphs with multiple components.
+    The graph must not have any cycles. If it does, a CycleError might be thrown, but this
+    is not guaranteed and can also result in the resulting rank containing back-edges.
+    By checking if the rank assignment contains a back-edge, a cycle in the graph can be detected
+    retroactively.
+
+    Parameters
+    ----------
+    vertices : list[T]
+        A list of vertices
+    preds_of : Callable[[T], list[T]]
+        A function that returns a list of predecessors given a vertex
+    childs_of : Callable[[T], list[T]]
+        A function that returns a list of successors given a vertex
+
+    Returns
+    -------
+    dict[T, int]
+        A dict associating a rank to each vertex
+    """
     # FIXME in description: must be cycle free already. Might detect cycle when
     # searching for root node, but this is not guaranteed to detect any cycle.
 
@@ -177,9 +219,8 @@ def rank_sort(vertices: list[T], preds_of: Callable[[T], list[T]], childs_of: Ca
         while len(preds_of(root)) > 0:
             root = preds_of(root)[0]
             if visited[root]:
-                e = ValueError("Cannot apply rank_sort to cyclic graph.")
-                e.cycle = list(filter(lambda v: visited[v], vertices))
-                raise e
+                cycle = list(filter(lambda v: visited[v], vertices))
+                raise CycleError("Cannot apply rank_sort to cyclic graph.", cycle)
 
             visited[root] = True
 
