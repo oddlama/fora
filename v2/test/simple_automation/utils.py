@@ -4,9 +4,12 @@ Provides utility functions.
 
 import sys
 import uuid
+from typing import TypeVar, Callable
 
 import importlib.machinery
 import importlib.util
+
+T = TypeVar('T')
 
 def print_warning(msg: str):
     """
@@ -151,7 +154,7 @@ def choice_yes(msg: str) -> bool:
 
         print(f"Response '{choice}' not understood.")
 
-def rank_sort(vertices: list, preds_of, childs_of):
+def rank_sort(vertices: list[T], preds_of: Callable[[T], list[T]], childs_of: Callable[[T], list[T]]) -> dict[T, int]:
     # FIXME in description: must be cycle free already. Might detect cycle when
     # searching for root node, but this is not guaranteed to detect any cycle.
 
@@ -174,7 +177,7 @@ def rank_sort(vertices: list, preds_of, childs_of):
         while len(preds_of(root)) > 0:
             root = preds_of(root)[0]
             if visited[root]:
-                e = ValueError(f"Cannot apply rank_sort to cyclic graph.")
+                e = ValueError("Cannot apply rank_sort to cyclic graph.")
                 e.cycle = list(filter(lambda v: visited[v], vertices))
                 raise e
 
@@ -186,7 +189,7 @@ def rank_sort(vertices: list, preds_of, childs_of):
         # Now assign increasing ranks to children in a breadth-first manner
         # to avoid transitive dependencies from causing additional subtree-updates.
         # We start with a list of nodes to process and their parents stored as pairs.
-        needs_rank_list = list([(c, root) for c in childs_of(root)])
+        needs_rank_list = list((c, root) for c in childs_of(root))
         while len(needs_rank_list) > 0:
             # Take the next node to process
             n, p = needs_rank_list.pop(0)

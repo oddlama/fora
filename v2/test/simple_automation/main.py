@@ -19,6 +19,7 @@ def main_edit_vault(args):
     #vault.edit()
 
 def init_runtime():
+    # pylint: disable=import-outside-toplevel
     from jinja2 import Environment, FileSystemLoader, StrictUndefined
     simple_automation.jinja2_env = Environment(
             loader=FileSystemLoader('.', followlinks=True),

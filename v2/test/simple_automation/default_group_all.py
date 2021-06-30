@@ -1,3 +1,3 @@
 _name = 'all'
-_after = []
-_before = []
+_after: list[str] = []
+_before: list[str] = []

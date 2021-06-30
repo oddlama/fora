@@ -5,8 +5,8 @@
 # The instanciated module has access to the name of the host via simple_automation.host_definition.name
 # and may adapt it's behavior dynamically based on this information.
 hosts = [ "localhost"
-#        , {name="mail1", definition="hosts/mail.py", groups=[]}
-#        , {name="mail2", definition="hosts/mail.py", groups=[]}
+#        , ("mail1", "hosts/mail.py")
+#        , ("mail2", "hosts/mail.py")
         ]
 
 """

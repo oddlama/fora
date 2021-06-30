@@ -2,14 +2,27 @@
 Provides the submodule loading functions.
 """
 
-import simple_automation
+# Disable protected access warnings, because this is intended for this module.
+# pylint: disable=protected-access
+
 import glob
 import os
 import sys
 from itertools import combinations
+from types import ModuleType
+
+import simple_automation
 from simple_automation.utils import die_error, print_error, load_py_module, rank_sort
 
-def load_inventory():
+def load_inventory() -> ModuleType:
+    """
+    Loads and validates the inventory definition from ./inventory.py.
+
+    Returns
+    -------
+    ModuleType
+        The loaded group module
+    """
     inventory = load_py_module('inventory.py')
     if not hasattr(inventory, 'hosts'):
         die_error("inventory.py: inventory must define a list of hosts!")
@@ -17,7 +30,20 @@ def load_inventory():
         die_error("inventory.py: hosts variable must be a list!")
     return inventory
 
-def load_group(module_file: str):
+def load_group(module_file: str) -> ModuleType:
+    """
+    Loads and validates a group definition from the given file.
+
+    Parameters
+    ----------
+    module_file : str
+        The path to the file containing to the group definition
+
+    Returns
+    -------
+    ModuleType
+        The loaded group module
+    """
     ret = load_py_module(module_file)
     ret._name = os.path.splitext(os.path.basename(module_file))[0]
     ret._loaded_from = module_file
@@ -36,29 +62,57 @@ def load_group(module_file: str):
 
     return ret
 
-def load_groups():
-    # Load all groups defined in groups/*.py
-    loaded_groups = {}
-    for file in glob.glob('groups/*.py'):
-        group = load_group(file)
-        loaded_groups[group._name] = group
+def get_group_variables(group: ModuleType) -> set[str]:
+    """
+    Returns the list of all user-defined attributes for a group.
 
-    # Create default all group if it wasn't defined
-    if 'all' not in loaded_groups:
-        # TODO instanciate default all module
-        from simple_automation import default_group_all
-        loaded_groups['all'] = default_group_all
+    Parameters
+    ----------
+    group : ModuleType
+        The group module
 
-    return loaded_groups
+    Returns
+    -------
+    set[str]
+        The user-defined attributes for the given group
+    """
+    return set(attr for attr in dir(group) if not callable(getattr(group, attr)) and not attr.startswith("_"))
 
-def check_modules_for_conflicts(a, b):
-    get_attrs = lambda x: set([attr for attr in dir(x) if not callable(getattr(x, attr)) and not attr.startswith("_")])
-    conflicts = list(get_attrs(a) & get_attrs(b))
+def check_modules_for_conflicts(a: ModuleType, b: ModuleType) -> bool:
+    """
+    Asserts that two modules don't contain conflicting attributes.
+    Exits with an error in case any conflicts are detected.
+
+    Parameters
+    ----------
+    a : ModuleType
+        The first group module
+    b : ModuleType
+        The second group module
+
+    Returns
+    -------
+    bool
+        True when at least one conflicting attribute was found
+    """
+    conflicts = list(get_group_variables(a) & get_group_variables(b))
     for conflict in conflicts:
         print_error(f"'{a._loaded_from}': Definition of '{conflict}' is in conflict with definition at '{b._loaded_from}'. (Group order is ambiguous, insert dependency or remove one definition.)")
     return len(conflicts) > 0
 
-def sort_groups(groups):
+def merge_group_dependencies(groups: dict[str, ModuleType]):
+    """
+    Merges the dependencies of a group module.
+    This means that before and after dependencies are duplicated to the referenced group,
+    and duplicated afterwards. Any self-references are detected and will cause the program to exit
+    with an error.
+
+    Parameters
+    ----------
+    groups : dict[str, ModuleType]
+        The dictionary of groups
+    """
+    # pylint: disable=too-many-branches
     # Check that all groups used in dependencies do actually exist.
     for _,group in groups.items():
         for g in group._before:
@@ -94,6 +148,22 @@ def sort_groups(groups):
     for _,group in groups.items():
         group._before = list(set(group._before))
 
+def sort_and_validate_groups(groups: dict[str, ModuleType]) -> list[str]:
+    """
+    Topologically sorts a dictionary of group modules (indexed by name), by their declared dependencies.
+    Also validates that the dependencies don't contain any cycles and don't contain any conflicting assignments.
+
+    Parameters
+    ----------
+    groups : dict[str, ModuleType]
+        The sorted dictionary of groups.
+
+    Returns
+    -------
+    list[ModuleType]
+        The topologically sorted list of groups
+    """
+
     # Rank sort from bottom-up and top-down to calculate minimum rank and maximum rank.
     # This is basically the earliest time a group might be applied (exactly after all dependencies
     # were processed), and the latest time (any other group requires this one to be processed first).
@@ -104,8 +174,9 @@ def sort_groups(groups):
     l_after = lambda g: groups[g]._after
 
     try:
-        ranks_t = rank_sort(groups.keys(), l_before, l_after) # Top-down
-        ranks_b = rank_sort(groups.keys(), l_after, l_before) # Bottom-up
+        gkeys = list(groups.keys())
+        ranks_t = rank_sort(gkeys, l_before, l_after) # Top-down
+        ranks_b = rank_sort(gkeys, l_after, l_before) # Bottom-up
     except ValueError as e:
         die_error(f"Dependency cycle detected! The cycle includes {[groups[g]._loaded_from for g in e.cycle]}.")
 
@@ -151,9 +222,62 @@ def sort_groups(groups):
     if has_conflicts:
         sys.exit(1)
 
-    return groups
+    # Return a topological order based on the top-rank
+    return sorted(list(g for g in groups.keys()), key=lambda g: ranks_min[g])
 
-def load_host(host_id: str, module_file: str):
+def load_groups() -> tuple[dict[str, ModuleType], list[str]]:
+    """
+    Loads all groups from their definition files in `./groups/`,
+    validates their dependencies and returns the groups and a topological
+    order respecting the dependency declarations.
+
+    Parameters
+    ----------
+    groups : dict[str, ModuleType]
+        The sorted dictionary of groups.
+
+    Returns
+    -------
+    tuple[dict[str, ModuleType], list[str]]
+        A dictionary of all loaded group modules index by their name, and a valid topological order
+    """
+    # Load all groups defined in groups/*.py
+    loaded_groups = {}
+    for file in glob.glob('groups/*.py'):
+        group = load_group(file)
+        loaded_groups[group._name] = group
+
+    # Create default all group if it wasn't defined
+    if 'all' not in loaded_groups:
+        # pylint: disable=import-outside-toplevel
+        from simple_automation import default_group_all
+        loaded_groups['all'] = default_group_all
+
+    # Firstly, deduplicate and unify each group's before and after dependencies,
+    # and check for any self-dependencies.
+    merge_group_dependencies(loaded_groups)
+
+    # Find a topological order and check the groups for attribute conflicts.
+    topological_order = sort_and_validate_groups(loaded_groups)
+
+    return (loaded_groups, topological_order)
+
+def load_host(host_id: str, module_file: str) -> ModuleType:
+    """
+    Load and validates the host with the given id from the given module file path.
+
+    Parameters
+    ----------
+    host_id: str
+        The host id of the host to be loaded
+    module_file: str
+        The path to the host module file that will be instanciated
+
+    Returns
+    -------
+    ModuleType
+        The host module
+    """
     simple_automation.host_id = host_id
     ret = load_py_module(module_file)
     simple_automation.host_id = None
@@ -173,32 +297,79 @@ def load_host(host_id: str, module_file: str):
 
     return ret
 
-def load_hosts():
-    # Load all hosts defined in the inventory
+def load_hosts() -> list[ModuleType]:
+    """
+    Loads all hosts defined in the inventory from their respective definition file in `./hosts/`.
+
+    Returns
+    -------
+    list[ModuleType]
+        A list of the loaded hosts
+    """
     loaded_hosts = []
     for host in simple_automation.inventory.hosts:
         if isinstance(host, str):
             loaded_hosts.append(load_host(host_id=host, module_file=f"hosts/{host}.py"))
         elif isinstance(host, tuple):
-            (name, module_py) = host
-            loaded_hosts.append(load_host(name=name, module_file=module_py))
+            (host_id, module_py) = host
+            loaded_hosts.append(load_host(host_id=host_id, module_file=module_py))
         else:
             die_error(f"inventory.py: invalid host '{str(host)}'")
     return loaded_hosts
 
-def load_tasks():
-    return None
+def load_task(module_file: str) -> ModuleType:
+    """
+    Load and validates a task from the given module file path.
+
+    Parameters
+    ----------
+    module_file: str
+        The path to the task module file that will be instanciated
+
+    Returns
+    -------
+    ModuleType
+        The task module
+    """
+    ret = load_py_module(module_file)
+    ret._name = os.path.splitext(os.path.basename(module_file))[0]
+    ret._loaded_from = module_file
+    return ret
+
+def load_tasks() -> dict[str, ModuleType]:
+    """
+    Loads all tasks defined either by single-file modules as `./tasks/*.py` or by directory modules
+    as `./tasks/*/__init__.py`.
+
+    Returns
+    -------
+    list[ModuleType]
+        A list of the loaded tasks
+    """
+    # Load all tasks defined as single-file modules (tasks/*.py) or module directories (tasks/*/__init__.py)
+    loaded_tasks = {}
+    for file in glob.glob('tasks/*.py'):
+        task = load_task(file)
+        loaded_tasks[task._name] = task
+
+    # TODO module directory tasks
+
+    return loaded_tasks
 
 def load_site():
+    """
+    Loads the whole site and exposes it globally via the corresponding variables
+    in the simple_automation module.
+    """
     # Load the inventory
     simple_automation.inventory = load_inventory()
 
     # Load all groups from groups/*.py, then sort
     # groups respecting their declared dependencies
-    simple_automation.groups = sort_groups(load_groups())
+    simple_automation.groups, simple_automation.group_order = load_groups()
 
     # Load all hosts defined in the inventory
     simple_automation.hosts = load_hosts()
 
-    # Load all tasks recursively from tasks/
+    # Load all tasks from tasks/
     simple_automation.tasks = load_tasks()
