@@ -54,6 +54,7 @@ class ThrowingArgumentParser(argparse.ArgumentParser):
     """
     An argument parser that throws when invalid argument types are passed.
     """
+
     def error(self, message):
         """
         Raises an exception on error.

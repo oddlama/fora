@@ -37,12 +37,6 @@ tasks: dict[str, TaskType] = cast(dict[str, TaskType], NotYetLoaded())
 The list of all loaded task modules.
 """
 
-host_id: Optional[str] = None
-"""
-The identifier of the host that is currently active or being loaded.
-This corresponds to the identifier defined via hosts list in the inventory.
-"""
-
 host: HostType = cast(HostType, NotYetLoaded())
 """
 The currently active host. Only set when a user script is being executed

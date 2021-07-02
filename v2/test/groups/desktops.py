@@ -1,3 +1,6 @@
-_after = ["all"]
-_before = ["servers"]
+from simple_automation.group import this
+
+this.after("all")
+this.before("servers")
+
 test = 1

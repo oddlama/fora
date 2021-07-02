@@ -2,9 +2,6 @@
 Provides the submodule loading functions.
 """
 
-# Disable protected access warnings, because this is intended for this module.
-# pylint: disable=protected-access
-
 import glob
 import os
 import sys
