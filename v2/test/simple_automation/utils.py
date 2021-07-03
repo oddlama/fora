@@ -39,7 +39,7 @@ class CycleError(ValueError):
         super().__init__(msg)
         self.cycle = cycle
 
-def load_py_module(file: str):
+def load_py_module(file: str, print_on_error=True):
     """
     Loads a module from the given filename and assigns a unique module name to it.
     Calling this function twice for the same file will yield distinct instances.
@@ -50,7 +50,12 @@ def load_py_module(file: str):
     if spec is None:
         raise ValueError(f"Failed to load module from file '{file}'")
     mod = importlib.util.module_from_spec(spec)
-    loader.exec_module(mod)
+    try:
+        loader.exec_module(mod)
+    except Exception as e:
+        if print_on_error:
+            print_error(f"An exception occurred while loading module '{file}'!")
+        raise e
     return mod
 
 def merge_dicts(source, destination):

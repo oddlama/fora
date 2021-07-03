@@ -3,13 +3,14 @@ This is the main module of simple_automation.
 """
 
 from typing import Optional, Union, cast
-from .types import InventoryType, GroupType, HostType, TaskType
+from .types import InventoryType, GroupType, HostType
 
 class NotYetLoaded:
     """
     A dummy class which instances are used to provoke runtime-errors when
     using a part of simple_automation that hasn't been initialized yet.
     """
+
 
 inventory = cast(InventoryType, NotYetLoaded())
 """
@@ -32,24 +33,16 @@ hosts: list[HostType] = cast(list[HostType], NotYetLoaded())
 The list of all instanciated host modules, after they were all loaded.
 """
 
-tasks: dict[str, TaskType] = cast(dict[str, TaskType], NotYetLoaded())
-"""
-The list of all loaded task modules.
-"""
 
-host: HostType = cast(HostType, NotYetLoaded())
+# TODO name clash with submodule
+_host: HostType = cast(HostType, None)
 """
 The currently active host. Only set when a user script is being executed
 and not while the host is being loaded.
 """
 
-# TODO dict[str, Vault]
-loaded_vaults: dict[str, int] = {}
-"""
-A list of all loaded and unlocked vaults. Used to prevent asking multiple times to decrypt the same vault.
-"""
 
-jinja2_env = NotYetLoaded()
+_jinja2_env = NotYetLoaded()
 """
 The jinja2 environment used for templating
 """

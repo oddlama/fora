@@ -1,7 +1,3 @@
 """
-The default global group 'all'.
+The default definition for the global group 'all'.
 """
-
-_name = 'all'
-_after: list[str] = []
-_before: list[str] = []

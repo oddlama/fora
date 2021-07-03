@@ -9,8 +9,11 @@ from itertools import combinations
 from typing import cast
 
 import simple_automation
+import simple_automation.host
+import simple_automation.group
+
 from simple_automation.utils import die_error, print_error, load_py_module, rank_sort, CycleError
-from simple_automation.types import GroupType, HostType, InventoryType, TaskType
+from simple_automation.types import GroupType, HostType, InventoryType
 
 def load_inventory() -> InventoryType:
     """
@@ -42,22 +45,20 @@ def load_group(module_file: str) -> GroupType:
     GroupType
         The loaded group module
     """
+
+    name = os.path.splitext(os.path.basename(module_file))[0]
+    meta = simple_automation.group.GroupMeta(name, module_file)
+
+    # Normal groups have a dependency on the global 'all' group.
+    if not name == 'all':
+        meta.after("all")
+
+    # Instanciate module
+    simple_automation.group.this = meta
     ret = load_py_module(module_file)
-    ret._name = os.path.splitext(os.path.basename(module_file))[0]
-    ret._loaded_from = module_file
+    simple_automation.group.this = None
 
-    # Dependent groups (before this)
-    if not hasattr(ret, '_before'):
-        ret._before = []
-    if not isinstance(ret._before, list):
-        die_error(f"{module_file}: '_before' must be a list!")
-
-    # Dependent groups (after this)
-    if not hasattr(ret, '_after'):
-        ret._after = [] if ret._name == 'all' else ['all']
-    if not isinstance(ret._after, list):
-        die_error(f"{module_file}: '_after' must be a list!")
-
+    ret.meta = meta
     return ret
 
 def get_group_variables(group: GroupType) -> set[str]:
@@ -95,7 +96,7 @@ def check_modules_for_conflicts(a: GroupType, b: GroupType) -> bool:
     """
     conflicts = list(get_group_variables(a) & get_group_variables(b))
     for conflict in conflicts:
-        print_error(f"'{a._loaded_from}': Definition of '{conflict}' is in conflict with definition at '{b._loaded_from}'. (Group order is ambiguous, insert dependency or remove one definition.)")
+        print_error(f"'{a.meta.loaded_from}': Definition of '{conflict}' is in conflict with definition at '{b.meta.loaded_from}'. (Group order is ambiguous, insert dependency or remove one definition.)")
     return len(conflicts) > 0
 
 def merge_group_dependencies(groups: dict[str, GroupType]):
@@ -110,41 +111,24 @@ def merge_group_dependencies(groups: dict[str, GroupType]):
     groups : dict[str, GroupType]
         The dictionary of groups
     """
-    # pylint: disable=too-many-branches
-    # Check that all groups used in dependencies do actually exist.
-    for _,group in groups.items():
-        for g in group._before:
-            if g not in groups:
-                die_error(f"{group._loaded_from}: definition of _before: Invalid group '{g}' or missing definition groups/{g}.py!")
-        for g in group._after:
-            if g not in groups:
-                die_error(f"{group._loaded_from}: definition of _after: Invalid group '{g}' or missing definition groups/{g}.py!")
-
-    # Detect self-cycles
-    for g,group in groups.items():
-        if g in group._before:
-            die_error(f"{group._loaded_from}: definition of _before: Group '{g}' cannot depend on itself!")
-        if g in group._after:
-            die_error(f"{group._loaded_from}: definition of _after: Group '{g}' cannot depend on itself!")
-
     # Unify _before and _after dependencies
     for g in groups:
-        for before in groups[g]._before:
-            groups[before]._after.append(g)
+        for before in groups[g].meta.groups_before:
+            groups[before].meta.groups_after.add(g)
 
     # Deduplicate _after, clear before
     for _,group in groups.items():
-        group._before = []
-        group._after = list(set(group._after))
+        group.meta.groups_before = set()
+        group.meta.groups_after = list(set(group.meta.groups_after))
 
     # Recalculate _before from _after
     for g in groups:
-        for after in groups[g]._after:
-            groups[after]._before.append(g)
+        for after in groups[g].meta.groups_after:
+            groups[after].meta.groups_before.add(g)
 
     # Deduplicate before
     for _,group in groups.items():
-        group._before = list(set(group._before))
+        group.meta.groups_before = list(set(group.meta.groups_before))
 
 def sort_and_validate_groups(groups: dict[str, GroupType]) -> list[str]:
     """
@@ -168,22 +152,22 @@ def sort_and_validate_groups(groups: dict[str, GroupType]) -> list[str]:
     #
     # Rank numbers are already 0-based. This means in the top-down view, the root node
     # has top-rank 0 and a high bottom-rank, and all leaves have bottom_rank 0 a high top-rank.
-    l_before = lambda g: groups[g]._before
-    l_after = lambda g: groups[g]._after
+    l_before = lambda g: groups[g].meta.groups_before
+    l_after = lambda g: groups[g].meta.groups_after
 
     try:
         gkeys = list(groups.keys())
         ranks_t = rank_sort(gkeys, l_before, l_after) # Top-down
         ranks_b = rank_sort(gkeys, l_after, l_before) # Bottom-up
     except CycleError as e:
-        die_error(f"Dependency cycle detected! The cycle includes {[groups[g]._loaded_from for g in e.cycle]}.")
+        die_error(f"Dependency cycle detected! The cycle includes {[groups[g].meta.loaded_from for g in e.cycle]}.")
 
     # Find cycles in dependencies by checking for the existence of any edge that doesn't increase the rank.
     # This is an error.
     for g in groups:
-        for c in groups[g]._after:
+        for c in groups[g].meta.groups_after:
             if ranks_t[c] <= ranks_t[g]:
-                die_error(f"Dependency cycle detected! The cycle includes '{groups[g]._loaded_from}' and '{groups[c]._loaded_from}'.")
+                die_error(f"Dependency cycle detected! The cycle includes '{groups[g].meta.loaded_from}' and '{groups[c].meta.loaded_from}'.")
 
     # Find the maximum rank. Both ranking systems have the same number of ranks. This is
     # true because the longest dependency chain determines the amount of ranks, and all dependencies
@@ -239,11 +223,20 @@ def load_groups() -> tuple[dict[str, GroupType], list[str]]:
     tuple[dict[str, GroupType], list[str]]
         A dictionary of all loaded group modules index by their name, and a valid topological order
     """
+    # Pre-load available group names
+    group_files = list(glob.glob('groups/*.py'))
+    available_groups = []
+    for file in group_files:
+        available_groups.append(os.path.splitext(os.path.basename(file))[0])
+
+    # Store available_groups so it can be accessed while groups are actually loaded.
+    simple_automation.available_groups = available_groups
+
     # Load all groups defined in groups/*.py
     loaded_groups = {}
-    for file in glob.glob('groups/*.py'):
+    for file in group_files:
         group = load_group(file)
-        loaded_groups[group._name] = cast(GroupType, group)
+        loaded_groups[group.meta.name] = cast(GroupType, group)
 
     # Create default all group if it wasn't defined
     if 'all' not in loaded_groups:
@@ -276,23 +269,15 @@ def load_host(host_id: str, module_file: str) -> HostType:
     HostType
         The host module
     """
-    simple_automation.host_id = host_id
+    meta = simple_automation.host.HostMeta(host_id, module_file)
+    meta.add_group("all")
+
+    # Instanciate module
+    simple_automation.host.this = meta
     ret = load_py_module(module_file)
-    simple_automation.host_id = None
+    simple_automation.host.this = None
 
-    ret.id = host_id
-    if not hasattr(ret, 'ssh_host'):
-        die_error(f"{module_file}: ssh_host not defined!")
-    if not hasattr(ret, 'groups'):
-        ret.groups = []
-    else:
-        for group in ret.groups:
-            if group not in simple_automation.groups:
-                die_error(f"{module_file}: Invalid group '{group}' or missing definition groups/{group}.py!")
-
-    # Add all hosts to the group "all", and deduplicate the groups list.
-    ret.groups = list(set(ret.groups + ["all"]))
-
+    ret.meta = meta
     return ret
 
 def load_hosts() -> list[HostType]:
@@ -315,45 +300,6 @@ def load_hosts() -> list[HostType]:
             die_error(f"inventory.py: invalid host '{str(host)}'")
     return loaded_hosts
 
-def load_task(module_file: str) -> TaskType:
-    """
-    Load and validates a task from the given module file path.
-
-    Parameters
-    ----------
-    module_file: str
-        The path to the task module file that will be instanciated
-
-    Returns
-    -------
-    TaskType
-        The task module
-    """
-    ret = load_py_module(module_file)
-    ret._name = os.path.splitext(os.path.basename(module_file))[0]
-    ret._loaded_from = module_file
-    return ret
-
-def load_tasks() -> dict[str, TaskType]:
-    """
-    Loads all tasks defined either by single-file modules as `./tasks/*.py` or by directory modules
-    as `./tasks/*/__init__.py`.
-
-    Returns
-    -------
-    list[TaskType]
-        A list of the loaded tasks
-    """
-    # Load all tasks defined as single-file modules (tasks/*.py) or module directories (tasks/*/__init__.py)
-    loaded_tasks = {}
-    for file in glob.glob('tasks/*.py'):
-        task = load_task(file)
-        loaded_tasks[task._name] = task
-
-    # TODO module directory tasks
-
-    return loaded_tasks
-
 def load_site():
     """
     Loads the whole site and exposes it globally via the corresponding variables
@@ -368,6 +314,3 @@ def load_site():
 
     # Load all hosts defined in the inventory
     simple_automation.hosts = load_hosts()
-
-    # Load all tasks from tasks/
-    simple_automation.tasks = load_tasks()

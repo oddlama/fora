@@ -1,3 +1,4 @@
+import simple_automation
 from typing import Optional
 
 class GroupMeta:
@@ -6,24 +7,75 @@ class GroupMeta:
     It allows a module to access and modify its associated meta-information.
     """
 
-    def __init__(self, name, loaded_from):
-        self.name = name
-        self.loaded_from = loaded_from
+    def __init__(self, name: str, loaded_from: str):
+        self.name: str = name
+        """
+        The name of the group. Must not be changed.
+        """
 
-        self.groups_before = set()
-        self.groups_after = set()
+        self.loaded_from: str = loaded_from
+        """
+        The original file path of the instanciated module.
+        """
 
-    def before(self, group):
+        self.groups_before: set[str] = set()
+        self.groups_after: set[str] = set()
+
+    def before(self, group: str):
+        """
+        Adds a reverse-dependency on the given group.
+
+        Parameters
+        ----------
+        group : str
+            The group that must be loaded before this group.
+        """
+        if group not in simple_automation.available_groups:
+            raise ValueError(f"Referenced invalid group '{group}'!")
+        if group == self.name:
+            raise ValueError(f"Cannot add reverse-dependency to self!")
+
         self.groups_before.add(group)
 
-    def before_all(self, groups):
-        self.groups_before.update(groups)
+    def before_all(self, groups: list[str]):
+        """
+        Adds a reverse-dependency on all given groups.
 
-    def after(self, group):
+        Parameters
+        ----------
+        groups : list[str]
+            The groups
+        """
+        for g in groups:
+            self.before(g)
+
+    def after(self, group: str):
+        """
+        Adds a dependency on the given group.
+
+        Parameters
+        ----------
+        group : str
+            The group that must be loaded after this group.
+        """
+        if group not in simple_automation.available_groups:
+            raise ValueError(f"Referenced invalid group '{group}'!")
+        if group == self.name:
+            raise ValueError(f"Cannot add dependency to self!")
+
         self.groups_after.add(group)
 
-    def after_all(self, groups):
-        self.groups_after.update(groups)
+    def after_all(self, groups: list[str]):
+        """
+        Adds a dependency on all given groups.
+
+        Parameters
+        ----------
+        groups : list[str]
+            The groups
+        """
+        for g in groups:
+            self.after(g)
 
 this: Optional[GroupMeta] = None
 """
