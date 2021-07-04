@@ -17,17 +17,20 @@ def print_warning(msg: str):
     """
     print(f"[1;33mwarning:[m {msg}")
 
-def print_error(msg: str):
+def print_error(msg: str, loc=None):
     """
     Prints a message with a colored 'error: ' prefix.
     """
-    print(f"[1;31merror:[m {msg}")
+    if loc is None:
+        print(f"[1;31merror:[m {msg}")
+    else:
+        print(f"[1m{loc}: [1;31merror:[m {msg}")
 
-def die_error(msg: str, status_code=1):
+def die_error(msg: str, loc=None, status_code=1):
     """
     Prints a message with a colored 'error: ' prefix, and exit with the given status code afterwards.
     """
-    print_error(msg)
+    print_error(msg, loc=loc)
     sys.exit(status_code)
 
 class CycleError(ValueError):

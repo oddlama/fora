@@ -6,6 +6,7 @@ import glob
 import os
 import sys
 from itertools import combinations
+from types import ModuleType
 from typing import cast
 
 import simple_automation
@@ -24,11 +25,14 @@ def load_inventory() -> InventoryType:
     InventoryType
         The loaded group module
     """
+    # TODO make inventory.py the default, but not the only option.
+    # e.g. "localhost" should be a valid inventory, as long as ssh localhost works.
+    # ./sa.py root@localhost deploy.py should work same as ./sa.py inventory.py deploy.py
     inventory = load_py_module('inventory.py')
     if not hasattr(inventory, 'hosts'):
-        die_error("inventory.py: inventory must define a list of hosts!")
+        die_error("inventory must define a list of hosts!", loc="inventory.py")
     if not isinstance(inventory.hosts, list):
-        die_error("inventory.py: hosts variable must be a list!")
+        die_error("hosts variable must be a list!", loc="inventory.py")
     return inventory
 
 def load_group(module_file: str) -> GroupType:
@@ -58,6 +62,10 @@ def load_group(module_file: str) -> GroupType:
     ret = load_py_module(module_file)
     simple_automation.group.this = None
 
+    for reserved in GroupType.reserved_vars:
+        if hasattr(ret, reserved):
+            die_error(f"'{reserved}' is a reserved variable.", loc=meta.loaded_from)
+
     ret.meta = meta
     return ret
 
@@ -75,7 +83,13 @@ def get_group_variables(group: GroupType) -> set[str]:
     set[str]
         The user-defined attributes for the given group
     """
-    return set(attr for attr in dir(group) if not callable(getattr(group, attr)) and not attr.startswith("_"))
+    group_vars = set(attr for attr in dir(group) if
+                     not callable(getattr(group, attr)) and
+                     not attr.startswith("_") and
+                     not isinstance(getattr(group, attr), ModuleType))
+    group_vars -= GroupType.reserved_vars
+    group_vars.remove('this')
+    return group_vars
 
 def check_modules_for_conflicts(a: GroupType, b: GroupType) -> bool:
     """
@@ -95,9 +109,13 @@ def check_modules_for_conflicts(a: GroupType, b: GroupType) -> bool:
         True when at least one conflicting attribute was found
     """
     conflicts = list(get_group_variables(a) & get_group_variables(b))
+    had_conflicts = False
     for conflict in conflicts:
-        print_error(f"'{a.meta.loaded_from}': Definition of '{conflict}' is in conflict with definition at '{b.meta.loaded_from}'. (Group order is ambiguous, insert dependency or remove one definition.)")
-    return len(conflicts) > 0
+        if not had_conflicts:
+            print_error("Found group variables with ambiguous evaluation order, insert group dependency or remove one definition.")
+            had_conflicts = True
+        print_error(f"Definition of '{conflict}' is in conflict with definition at '{b.meta.loaded_from}", loc=a.meta.loaded_from)
+    return had_conflicts
 
 def merge_group_dependencies(groups: dict[str, GroupType]):
     """
@@ -277,6 +295,10 @@ def load_host(host_id: str, module_file: str) -> HostType:
     ret = load_py_module(module_file)
     simple_automation.host.this = None
 
+    for reserved in HostType.reserved_vars:
+        if hasattr(ret, reserved):
+            die_error(f"'{reserved}' is a reserved variable.", loc=meta.loaded_from)
+
     ret.meta = meta
     return ret
 
@@ -297,7 +319,7 @@ def load_hosts() -> list[HostType]:
             (host_id, module_py) = host
             loaded_hosts.append(load_host(host_id=host_id, module_file=module_py))
         else:
-            die_error(f"inventory.py: invalid host '{str(host)}'")
+            die_error(f"invalid host '{str(host)}'", loc="inventory.py")
     return loaded_hosts
 
 def load_site():

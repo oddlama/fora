@@ -15,12 +15,22 @@ class GroupType(ModuleType):
     module, but will reflect some of it's properties better than ModuleType.
     """
 
+    reserved_vars: set[str] = set(["meta"])
+    """
+    A list of variable names that are reserved and must not be set by the module.
+    """
+
     meta: GroupMeta = cast(GroupMeta, None)
 
 class HostType(ModuleType):
     """
     A mockup type for host modules. This is not the actual type of an instanciated
     module, but will reflect some of it's properties better than ModuleType.
+    """
+
+    reserved_vars: set[str] = set(["meta"])
+    """
+    A list of variable names that are reserved and must not be set by the module.
     """
 
     meta: HostMeta = cast(HostMeta, None)
