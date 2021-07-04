@@ -4,7 +4,7 @@ Provides utility functions.
 
 import sys
 import uuid
-from typing import TypeVar, Callable
+from typing import TypeVar, Callable, Iterable
 
 import importlib.machinery
 import importlib.util
@@ -180,7 +180,7 @@ def choice_yes(msg: str) -> bool:
 
         print(f"Response '{choice}' not understood.")
 
-def rank_sort(vertices: list[T], preds_of: Callable[[T], list[T]], childs_of: Callable[[T], list[T]]) -> dict[T, int]:
+def rank_sort(vertices: Iterable[T], preds_of: Callable[[T], Iterable[T]], childs_of: Callable[[T], Iterable[T]]) -> dict[T, int]:
     """
     Calculates the top-down rank for each vertex. Supports graphs with multiple components.
     The graph must not have any cycles. If it does, a CycleError might be thrown, but this
@@ -190,11 +190,11 @@ def rank_sort(vertices: list[T], preds_of: Callable[[T], list[T]], childs_of: Ca
 
     Parameters
     ----------
-    vertices : list[T]
+    vertices : Iterable[T]
         A list of vertices
-    preds_of : Callable[[T], list[T]]
+    preds_of : Callable[[T], Iterable[T]]
         A function that returns a list of predecessors given a vertex
-    childs_of : Callable[[T], list[T]]
+    childs_of : Callable[[T], Iterable[T]]
         A function that returns a list of successors given a vertex
 
     Returns
@@ -221,8 +221,8 @@ def rank_sort(vertices: list[T], preds_of: Callable[[T], list[T]], childs_of: Ca
 
         # Find the root of the current subtree,
         # or detect a cycle and abort.
-        while len(preds_of(root)) > 0:
-            root = preds_of(root)[0]
+        while any(True for _ in preds_of(root)):
+            root = next(x for x in preds_of(root))
             if visited[root]:
                 cycle = list(filter(lambda v: visited[v], vertices))
                 raise CycleError("Cannot apply rank_sort to cyclic graph.", cycle)

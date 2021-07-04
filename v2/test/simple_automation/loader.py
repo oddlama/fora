@@ -119,7 +119,7 @@ def merge_group_dependencies(groups: dict[str, GroupType]):
     # Deduplicate _after, clear before
     for _,group in groups.items():
         group.meta.groups_before = set()
-        group.meta.groups_after = list(set(group.meta.groups_after))
+        group.meta.groups_after = set(group.meta.groups_after)
 
     # Recalculate _before from _after
     for g in groups:
@@ -128,7 +128,7 @@ def merge_group_dependencies(groups: dict[str, GroupType]):
 
     # Deduplicate before
     for _,group in groups.items():
-        group.meta.groups_before = list(set(group.meta.groups_before))
+        group.meta.groups_before = set(group.meta.groups_before)
 
 def sort_and_validate_groups(groups: dict[str, GroupType]) -> list[str]:
     """

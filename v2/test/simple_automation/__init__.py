@@ -18,6 +18,12 @@ The inventory module we are operating on.
 This is loaded from the inventory definition file (inventory.py).
 """
 
+available_groups: list[str] = cast(list[str], NotYetLoaded())
+"""
+All groups that will be available after loading. Useful to raise
+errors early when referencing undefined groups.
+"""
+
 groups: dict[str, GroupType] = cast(dict[str, GroupType], NotYetLoaded())
 """
 The list of all group modules loaded from groups/*.py.
