@@ -10,6 +10,8 @@ from simple_automation.loader import load_site
 from simple_automation.utils import die_error
 from simple_automation.version import __version__
 
+from jinja2 import Environment, FileSystemLoader, StrictUndefined
+
 # TODO self.set("simple_automation_managed", "This file is managed by simple automation.")
 
 def main_edit_vault(args):
@@ -19,8 +21,6 @@ def main_edit_vault(args):
     #vault.edit()
 
 def init_runtime():
-    # pylint: disable=import-outside-toplevel
-    from jinja2 import Environment, FileSystemLoader, StrictUndefined
     simple_automation.jinja2_env = Environment(
             loader=FileSystemLoader('.', followlinks=True),
             autoescape=False,
@@ -28,7 +28,7 @@ def init_runtime():
 
 def main_run(args):
     init_runtime()
-    load_site()
+    load_site(args.inventory)
 
     ## Check if host selection is valid
     #hosts = []
@@ -67,34 +67,26 @@ def main():
     definitions and run the given user script.
     """
 
-    parser = ThrowingArgumentParser(description="Runs this simple automation script.")
-    subparsers = parser.add_subparsers(title="commands",
-            description="Use '%(prog)s command --help' to view the help for a given command.",
-            metavar='command')
+    parser = ThrowingArgumentParser(description="Runs a simple automation script.")
 
     # General options
     parser.add_argument('--version', action='version',
             version=f"%(prog)s version {__version__}")
 
-    # Edit-vault options
-    parser_edit_vault = subparsers.add_parser('edit', help='Edit or create the given vault file with $EDITOR.')
-    parser_edit_vault.add_argument('vault_file', type=str, nargs=1,
-            help="The vault file to edit or create. Launches $EDITOR.")
-    parser_edit_vault.set_defaults(func=main_edit_vault)
-
-    # Run options
-    parser_run = subparsers.add_parser('run', help='Run a given user script on the inventory.')
-    parser_run.add_argument('-H', '--hosts', dest='hosts', default=None, type=str,
+    # Run script options
+    parser.add_argument('-H', '--hosts', dest='hosts', default=None, type=str,
             help="Specifies a comma separated list of hosts to run on. By default all hosts are selected. Duplicates will be ignored.")
-    parser_run.add_argument('-p', '--pretend', '--dry', '--dry-run', dest='pretend', action='store_true',
+    parser.add_argument('-p', '--pretend', '--dry', '--dry-run', dest='pretend', action='store_true',
             help="Print what would be done instead of performing any actions. Probing commands will still be executed to determine the current state of a system.")
-    parser_run.add_argument('-v', '--verbose', dest='verbose', action='count', default=0,
+    parser.add_argument('-v', '--verbose', dest='verbose', action='count', default=0,
             help="Increase output verbosity. Can be given multiple times. Typically, everything will be printed with -vvv.")
-    parser_run.add_argument('--debug', dest='debug', action='store_true',
+    parser.add_argument('--debug', dest='debug', action='store_true',
             help="Enable debugging output.")
-    parser_run.add_argument('script', type=str, nargs=1,
+    parser.add_argument('script', type=str, nargs=1,
             help="The user script containing the logic of what should be executed on the inventory.")
-    parser_run.set_defaults(func=main_run)
+    parser.add_argument('inventory', type=str, nargs='+',
+            help="The inventories on which the script should be run on. A inventory is either a full inventory module file (determined by the presenence of a .py extension, e.g. inventory.py), or a single-host defined in any syntax that is accepted by ssh (e.g. root@localhost or ssh://[user]@host)")
+    parser.set_defaults(func=main_run)
 
     try:
         args = parser.parse_args()

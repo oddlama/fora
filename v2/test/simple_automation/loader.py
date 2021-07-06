@@ -16,23 +16,32 @@ import simple_automation.group
 from simple_automation.utils import die_error, print_error, load_py_module, rank_sort, CycleError
 from simple_automation.types import GroupType, HostType, InventoryType
 
-def load_inventory() -> InventoryType:
+class DefaultGroup:
+    pass
+
+class DefaultHost:
+    pass
+
+def load_inventory(file: str) -> InventoryType:
     """
-    Loads and validates the inventory definition from ./inventory.py.
+    Loads and validates the inventory definition from the given module file.
+
+    Parameters
+    ----------
+    file : str
+        The inventory module file to load
 
     Returns
     -------
     InventoryType
         The loaded group module
     """
-    # TODO make inventory.py the default, but not the only option.
-    # e.g. "localhost" should be a valid inventory, as long as ssh localhost works.
-    # ./sa.py root@localhost deploy.py should work same as ./sa.py inventory.py deploy.py
-    inventory = load_py_module('inventory.py')
+    inventory = load_py_module(file)
     if not hasattr(inventory, 'hosts'):
         die_error("inventory must define a list of hosts!", loc="inventory.py")
-    if not isinstance(inventory.hosts, list):
-        die_error("hosts variable must be a list!", loc="inventory.py")
+
+    # Convert hosts to list to ensure list type
+    inventory.hosts = list(inventory.hosts)
     return inventory
 
 def load_group(module_file: str) -> GroupType:
@@ -69,28 +78,6 @@ def load_group(module_file: str) -> GroupType:
     ret.meta = meta
     return ret
 
-def get_group_variables(group: GroupType) -> set[str]:
-    """
-    Returns the list of all user-defined attributes for a group.
-
-    Parameters
-    ----------
-    group : GroupType
-        The group module
-
-    Returns
-    -------
-    set[str]
-        The user-defined attributes for the given group
-    """
-    group_vars = set(attr for attr in dir(group) if
-                     not callable(getattr(group, attr)) and
-                     not attr.startswith("_") and
-                     not isinstance(getattr(group, attr), ModuleType))
-    group_vars -= GroupType.reserved_vars
-    group_vars.remove('this')
-    return group_vars
-
 def check_modules_for_conflicts(a: GroupType, b: GroupType) -> bool:
     """
     Asserts that two modules don't contain conflicting attributes.
@@ -108,7 +95,7 @@ def check_modules_for_conflicts(a: GroupType, b: GroupType) -> bool:
     bool
         True when at least one conflicting attribute was found
     """
-    conflicts = list(get_group_variables(a) & get_group_variables(b))
+    conflicts = list(GroupType.get_variables(a) & GroupType.get_variables(b))
     had_conflicts = False
     for conflict in conflicts:
         if not had_conflicts:
@@ -258,9 +245,9 @@ def load_groups() -> tuple[dict[str, GroupType], list[str]]:
 
     # Create default all group if it wasn't defined
     if 'all' not in loaded_groups:
-        # pylint: disable=import-outside-toplevel
-        from simple_automation import default_group_all
-        loaded_groups['all'] = cast(GroupType, default_group_all)
+        default_group = cast(GroupType, DefaultGroup())
+        default_group.meta = simple_automation.group.GroupMeta("all", "__internal__")
+        loaded_groups['all'] = default_group
 
     # Firstly, deduplicate and unify each group's before and after dependencies,
     # and check for any self-dependencies.
@@ -290,9 +277,14 @@ def load_host(host_id: str, module_file: str) -> HostType:
     meta = simple_automation.host.HostMeta(host_id, module_file)
     meta.add_group("all")
 
-    # Instanciate module
     simple_automation.host.this = meta
-    ret = load_py_module(module_file)
+    # Instanciate module
+    if os.path.exists(module_file):
+        ret = load_py_module(module_file)
+    else:
+        # Instanciate default module and set ssh_host to the host_id
+        ret = cast(HostType, DefaultHost())
+        meta.ssh_host = host_id
     simple_automation.host.this = None
 
     for reserved in HostType.reserved_vars:
@@ -314,7 +306,9 @@ def load_hosts() -> list[HostType]:
     loaded_hosts = []
     for host in simple_automation.inventory.hosts:
         if isinstance(host, str):
-            loaded_hosts.append(load_host(host_id=host, module_file=f"hosts/{host}.py"))
+            module_file = f"hosts/{host}.py"
+            # Load from existing module file
+            loaded_hosts.append(load_host(host_id=host, module_file=module_file))
         elif isinstance(host, tuple):
             (host_id, module_py) = host
             loaded_hosts.append(load_host(host_id=host_id, module_file=module_py))
@@ -322,13 +316,44 @@ def load_hosts() -> list[HostType]:
             die_error(f"invalid host '{str(host)}'", loc="inventory.py")
     return loaded_hosts
 
-def load_site():
+def load_site(inventories: list[str]):
     """
     Loads the whole site and exposes it globally via the corresponding variables
     in the simple_automation module.
+
+    Parameters
+    ----------
+    inventories : list[str]
+        A possibly mixed list of inventory definition files (e.g. inventory.py) and single
+        host definitions in any ssh accepted syntax. The .py extension is used to disscern
+        between these cases. If multiple python inventory modules are given, the first will
+        become the main module stored in simple_automation.inventory, and the others will
+        just have their hosts appended to the first module.
     """
-    # Load the inventory
-    simple_automation.inventory = load_inventory()
+
+    # Separate inventory modules from single host definitions
+    module_files = []
+    single_hosts = []
+    for i in inventories:
+        if i.endswith(".py"):
+            module_files.append(i)
+        else:
+            single_hosts.append(i)
+
+    # Load inventory module
+    if len(module_files) == 0:
+        # Use a default empty inventory
+        simple_automation.inventory = InventoryType()
+    else:
+        # Load first inventory module file and append hosts from other inventory modules
+        simple_automation.inventory = load_inventory(module_files[0])
+        # Append hosts from other inventory modules
+        for inv in module_files:
+            simple_automation.inventory.hosts.extend(load_inventory(inv).hosts)
+
+    # Append single hosts
+    for shost in single_hosts:
+        simple_automation.inventory.hosts.append(shost)
 
     # Load all groups from groups/*.py, then sort
     # groups respecting their declared dependencies

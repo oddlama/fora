@@ -1,5 +1,6 @@
-import simple_automation
 from typing import Optional
+
+import simple_automation
 
 class GroupMeta:
     """
