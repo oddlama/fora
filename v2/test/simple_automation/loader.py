@@ -293,12 +293,14 @@ def load_host(host_id: str, module_file: str) -> HostType:
         if hasattr(ret, reserved):
             die_error(f"'{reserved}' is a reserved variable.", loc=meta.loaded_from)
 
-    # Monkeypatch the __getattr__ method to perform hierachical lookup from now on
+    # Monkeypatch the __hasattr__ and __getattr__ methods to perform hierachical lookup from now on
     ret.meta = meta
     if module_file_exists:
         ret.__getattr__ = lambda attr: HostType.getattr_hierarchical(ret, attr)
+        ret.__hasattr__ = lambda attr: HostType.hasattr_hierarchical(ret, attr)
     else:
         ret.__getattr__ = lambda s, attr: HostType.getattr_hierarchical(ret, attr)
+        ret.__hasattr__ = lambda s, attr: HostType.hasattr_hierarchical(ret, attr)
 
     return ret
 

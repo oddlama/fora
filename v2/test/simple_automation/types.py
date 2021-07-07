@@ -130,7 +130,63 @@ class HostType(ModuleType):
             if hasattr(group, attr):
                 return getattr(group, attr)
 
+        # TODO task variables lookup here
+        # if simple_automation.task is not None:
+        #    if hasattr(simple_automation.task, attr):
+        #        return getattr(simple_automation.task, attr)
+
         raise AttributeError(attr)
+
+    @staticmethod
+    def hasattr_hierarchical(host: HostType, attr: str) -> Any:
+        """
+        Checks whether the given attribute exists in the host's hierarchy.
+        Checks are done in the following order:
+          1. Host variables
+          2. Group variables (respecting topological order), the global "all" group
+             implicitly will be the last in the chain
+          3. Task variables
+          4. False
+
+        If the attribute start with an underscore, the lookup will always be from the host object
+        itself, and won't be propagated.
+
+        Parameters
+        ----------
+        host : HostType
+            The host on which we operate
+        attr : str
+            The attribute to check
+
+        Returns
+        -------
+        bool
+            True if the attribute exists
+        """
+        if attr.startswith("_"):
+            return attr in host.__dict__
+
+        # Look up variable on host module
+        if attr in host.__dict__:
+            return True
+
+        # Look up variable on groups
+        for g in simple_automation.group_order:
+            # Only consider a group if the host is in that group
+            if g not in host.__dict__["meta"].groups:
+                continue
+
+            # Return the attribute if it is set on the group
+            group = simple_automation.groups[g]
+            if hasattr(group, attr):
+                return True
+
+        # TODO task variables lookup here
+        # if simple_automation.task is not None:
+        #    if hasattr(simple_automation.task, attr):
+        #        return True
+
+        return False
 
 class InventoryType(ModuleType):
     """
