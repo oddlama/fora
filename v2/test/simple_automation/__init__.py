@@ -26,17 +26,17 @@ errors early when referencing undefined groups.
 
 groups: dict[str, GroupType] = cast(dict[str, GroupType], NotYetLoaded())
 """
-The list of all group modules loaded from groups/*.py.
+A dict containing all group modules loaded from groups/*.py, mapped by name.
 """
 
 group_order: list[str] = cast(list[str], NotYetLoaded())
 """
-A topological order of all groups
+A topological order of all groups, with highest precedence first.
 """
 
-hosts: list[HostType] = cast(list[HostType], NotYetLoaded())
+hosts: dict[str, HostType] = cast(dict[str, HostType], NotYetLoaded())
 """
-The list of all instanciated host modules, after they were all loaded.
+A dict containing all host definitions, mapped by host_id.
 """
 
 

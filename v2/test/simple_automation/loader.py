@@ -274,12 +274,13 @@ def load_host(host_id: str, module_file: str) -> HostType:
     HostType
         The host module
     """
-    meta = simple_automation.host.HostMeta(host_id, module_file)
+    module_file_exists = os.path.exists(module_file)
+    meta = simple_automation.host.HostMeta(host_id, module_file if module_file_exists else "__internal__")
     meta.add_group("all")
 
     simple_automation.host.this = meta
     # Instanciate module
-    if os.path.exists(module_file):
+    if module_file_exists:
         ret = load_py_module(module_file)
     else:
         # Instanciate default module and set ssh_host to the host_id
@@ -287,31 +288,36 @@ def load_host(host_id: str, module_file: str) -> HostType:
         meta.ssh_host = host_id
     simple_automation.host.this = None
 
+    # Check if the module did set any reserved variables
     for reserved in HostType.reserved_vars:
         if hasattr(ret, reserved):
             die_error(f"'{reserved}' is a reserved variable.", loc=meta.loaded_from)
 
+    # Monkeypatch the __getattr__ method to perform hierachical lookup from now on
     ret.meta = meta
+    if module_file_exists:
+        ret.__getattr__ = lambda attr: HostType.getattr_hierarchical(ret, attr)
+    else:
+        ret.__getattr__ = lambda s, attr: HostType.getattr_hierarchical(ret, attr)
+
     return ret
 
-def load_hosts() -> list[HostType]:
+def load_hosts() -> dict[str, HostType]:
     """
     Loads all hosts defined in the inventory from their respective definition file in `./hosts/`.
 
     Returns
     -------
-    list[HostType]
-        A list of the loaded hosts
+    dict[str, HostType]
+        A mapping from host_id to host module
     """
-    loaded_hosts = []
+    loaded_hosts = {}
     for host in simple_automation.inventory.hosts:
         if isinstance(host, str):
-            module_file = f"hosts/{host}.py"
-            # Load from existing module file
-            loaded_hosts.append(load_host(host_id=host, module_file=module_file))
+            loaded_hosts[host] = load_host(host_id=host, module_file=f"hosts/{host}.py")
         elif isinstance(host, tuple):
             (host_id, module_py) = host
-            loaded_hosts.append(load_host(host_id=host_id, module_file=module_py))
+            loaded_hosts[host_id] = load_host(host_id=host_id, module_file=module_py)
         else:
             die_error(f"invalid host '{str(host)}'", loc="inventory.py")
     return loaded_hosts

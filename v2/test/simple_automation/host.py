@@ -35,7 +35,10 @@ class HostMeta:
         Additional options to the ssh command for this host.
         """
 
-        self._groups: set[str] = set()
+        self.groups: set[str] = set()
+        """
+        The set of groups this host belongs to.
+        """
 
     def add_group(self, group: str):
         """
@@ -48,7 +51,7 @@ class HostMeta:
         """
         if group not in simple_automation.groups:
             raise ValueError(f"Referenced invalid group '{group}'!")
-        self._groups.add(group)
+        self.groups.add(group)
 
     def add_groups(self, groups: list[str]):
         """
@@ -61,17 +64,6 @@ class HostMeta:
         """
         for g in groups:
             self.add_group(g)
-
-    def groups(self):
-        """
-        Returns the set of groups this host belongs to.
-
-        Returns
-        -------
-        set[str]
-            The set of groups this host belongs to
-        """
-        return self._groups
 
 this: Optional[HostMeta] = None
 """

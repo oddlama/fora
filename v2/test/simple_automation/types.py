@@ -6,8 +6,9 @@ has a better understanding of the dynamically loaded modules.
 from __future__ import annotations
 
 from types import ModuleType
-from typing import cast, Union
+from typing import cast, Union, Any
 
+import simple_automation
 from .host import HostMeta
 from .group import GroupMeta
 from .task import TaskMeta
@@ -83,6 +84,53 @@ class HostType(ModuleType):
         host_vars -= HostType.reserved_vars
         host_vars.remove('this')
         return host_vars
+
+    @staticmethod
+    def getattr_hierarchical(host: HostType, attr: str) -> Any:
+        """
+        Looks up and returns the given attribute on the host's hierarchy in the following order:
+          1. Host variables
+          2. Group variables (respecting topological order), the global "all" group
+             implicitly will be the last in the chain
+          3. Task variables
+          4. raises AttributeError
+
+        If the attribute start with an underscore, the lookup will always be from the host object
+        itself, and won't be propagated.
+
+        Parameters
+        ----------
+        host : HostType
+            The host on which we operate
+        attr : str
+            The attribute to get
+
+        Returns
+        -------
+        Any
+            The attributes value if it was found.
+        """
+        if attr.startswith("_"):
+            if attr not in host.__dict__:
+                raise AttributeError(attr)
+            return host.__dict__[attr]
+
+        # Look up variable on host module
+        if attr in host.__dict__:
+            return host.__dict__[attr]
+
+        # Look up variable on groups
+        for g in simple_automation.group_order:
+            # Only consider a group if the host is in that group
+            if g not in host.__dict__["meta"].groups:
+                continue
+
+            # Return the attribute if it is set on the group
+            group = simple_automation.groups[g]
+            if hasattr(group, attr):
+                return getattr(group, attr)
+
+        raise AttributeError(attr)
 
 class InventoryType(ModuleType):
     """

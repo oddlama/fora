@@ -30,13 +30,17 @@ def main_run(args):
     init_runtime()
     load_site(args.inventory)
 
-    ## Check if host selection is valid
-    #hosts = []
-    #for h in args.hosts.split(',') if args.hosts is not None else self.hosts.keys():
-    #    if h not in self.hosts:
-    #        raise MessageError(f"Unkown host '{h}'")
-    #    hosts.append(self.hosts[h])
-    #hosts = sorted(set(hosts))
+    # Check if host selection is valid
+    host_ids = []
+    for h in set(args.hosts.split(',') if args.hosts is not None else simple_automation.hosts.keys()):
+        if h not in simple_automation.hosts:
+            die_error(f"Unknown host '{h}'")
+        host_ids.append(h)
+    host_ids = sorted(host_ids)
+
+    for hid in host_ids:
+        host = simple_automation.hosts[hid]
+        print(hid, host.meta.ssh_host)
 
     ## Run for each selected host
     #for host in hosts:
