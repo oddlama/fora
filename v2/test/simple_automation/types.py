@@ -26,7 +26,11 @@ class GroupType(ModuleType):
     A list of variable names that are reserved and must not be set by the module.
     """
 
-    meta: GroupMeta = cast(GroupMeta, None)
+    def __init__(self):
+        self.meta: GroupMeta = cast('GroupMeta', None)
+        """
+        The associated meta information
+        """
 
 class HostType(ModuleType):
     """
@@ -39,7 +43,11 @@ class HostType(ModuleType):
     A list of variable names that are reserved and must not be set by the module.
     """
 
-    meta: HostMeta = cast(HostMeta, None)
+    def __init__(self):
+        self.meta: HostMeta = cast('HostMeta', None)
+        """
+        The associated meta information
+        """
 
 class InventoryType(ModuleType):
     """
@@ -64,4 +72,8 @@ class TaskType(ModuleType):
     A list of variable names that are reserved and must not be set by the module.
     """
 
-    meta: TaskMeta = cast(TaskMeta, None)
+    def __init__(self):
+        self.meta: TaskMeta = cast('TaskMeta', None)
+        """
+        The associated meta information
+        """
