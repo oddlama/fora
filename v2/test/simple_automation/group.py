@@ -1,6 +1,14 @@
+"""
+This module provides all group related functionality, as well as a global
+variable 'this' that may be used inside a group module to modify it's own meta
+information.
+"""
+
+from types import ModuleType
 from typing import Optional
 
 import simple_automation
+from .types import GroupType
 
 class GroupMeta:
     """
@@ -34,7 +42,7 @@ class GroupMeta:
         if group not in simple_automation.available_groups:
             raise ValueError(f"Referenced invalid group '{group}'!")
         if group == self.name:
-            raise ValueError(f"Cannot add reverse-dependency to self!")
+            raise ValueError("Cannot add reverse-dependency to self!")
 
         self.groups_before.add(group)
 
@@ -62,7 +70,7 @@ class GroupMeta:
         if group not in simple_automation.available_groups:
             raise ValueError(f"Referenced invalid group '{group}'!")
         if group == self.name:
-            raise ValueError(f"Cannot add dependency to self!")
+            raise ValueError("Cannot add dependency to self!")
 
         self.groups_after.add(group)
 
@@ -77,6 +85,29 @@ class GroupMeta:
         """
         for g in groups:
             self.after(g)
+
+    @staticmethod
+    def get_variables(group: GroupType) -> set[str]:
+        """
+        Returns the list of all user-defined attributes for a group.
+
+        Parameters
+        ----------
+        group : GroupType
+            The group module
+
+        Returns
+        -------
+        set[str]
+            The user-defined attributes for the given group
+        """
+        group_vars = set(attr for attr in dir(group) if
+                         not callable(getattr(group, attr)) and
+                         not attr.startswith("_") and
+                         not isinstance(getattr(group, attr), ModuleType))
+        group_vars -= GroupType.reserved_vars
+        group_vars.remove('this')
+        return group_vars
 
 this: Optional[GroupMeta] = None
 """

@@ -4,29 +4,32 @@ the CLI interface and coordination of submodule loading.
 """
 
 import argparse
+from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 import simple_automation
 from simple_automation.loader import load_site
 from simple_automation.utils import die_error
 from simple_automation.version import __version__
 
-from jinja2 import Environment, FileSystemLoader, StrictUndefined
-
-# TODO self.set("simple_automation_managed", "This file is managed by simple automation.")
-
-def main_edit_vault(args):
-    pass
-    # Load vault content, then launch editor
-    #vault.decrypt()
-    #vault.edit()
-
 def init_runtime():
+    """
+    Initializes runtime variables needed to run scripts.
+    """
     simple_automation.jinja2_env = Environment(
             loader=FileSystemLoader('.', followlinks=True),
             autoescape=False,
             undefined=StrictUndefined)
 
-def main_run(args):
+def main_run(args: argparse.Namespace):
+    """
+    Main method used to run a script on an inventory.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        The parsed arguments
+    """
+
     init_runtime()
     load_site(args.inventory)
 
@@ -93,7 +96,7 @@ def main():
     parser.set_defaults(func=main_run)
 
     try:
-        args = parser.parse_args()
+        args: argparse.Namespace = parser.parse_args()
     except ArgumentParserError as e:
         die_error(str(e))
 

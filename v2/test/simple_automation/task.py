@@ -1,6 +1,13 @@
+"""
+This module provides all task related functionality, as well as a global
+variable 'this' that may be used inside a task module to modify it's own meta
+information.
+"""
+
+from types import ModuleType
 from typing import Optional
 
-import simple_automation
+from .types import TaskType
 
 class TaskMeta:
     """
@@ -18,6 +25,29 @@ class TaskMeta:
         """
         The original file path of the instanciated module.
         """
+
+    @staticmethod
+    def get_variables(task: TaskType) -> set[str]:
+        """
+        Returns the list of all user-defined attributes for a task.
+
+        Parameters
+        ----------
+        task : TaskType
+            The task module
+
+        Returns
+        -------
+        set[str]
+            The user-defined attributes for the given task
+        """
+        task_vars = set(attr for attr in dir(task) if
+                         not callable(getattr(task, attr)) and
+                         not attr.startswith("_") and
+                         not isinstance(getattr(task, attr), ModuleType))
+        task_vars -= TaskType.reserved_vars
+        task_vars.remove('this')
+        return task_vars
 
 this: Optional[TaskMeta] = None
 """

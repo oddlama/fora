@@ -6,21 +6,27 @@ import glob
 import os
 import sys
 from itertools import combinations
-from types import ModuleType
 from typing import cast
 
 import simple_automation
 import simple_automation.host
 import simple_automation.group
 
-from simple_automation.utils import die_error, print_error, load_py_module, rank_sort, CycleError
+from simple_automation.group import GroupMeta
+from simple_automation.host import HostMeta
 from simple_automation.types import GroupType, HostType, InventoryType
+from simple_automation.utils import die_error, print_error, load_py_module, rank_sort, CycleError
 
 class DefaultGroup:
-    pass
+    """
+    This class will be instanciated for the 'all' group, if it hasn't been defined externally.
+    """
 
 class DefaultHost:
-    pass
+    """
+    This class will be instanciated for each host that has not been defined by a corresponding
+    host module file, and is used to represent a host with no special configuration.
+    """
 
 def load_inventory(file: str) -> InventoryType:
     """
@@ -60,7 +66,7 @@ def load_group(module_file: str) -> GroupType:
     """
 
     name = os.path.splitext(os.path.basename(module_file))[0]
-    meta = simple_automation.group.GroupMeta(name, module_file)
+    meta = GroupMeta(name, module_file)
 
     # Normal groups have a dependency on the global 'all' group.
     if not name == 'all':
@@ -95,7 +101,7 @@ def check_modules_for_conflicts(a: GroupType, b: GroupType) -> bool:
     bool
         True when at least one conflicting attribute was found
     """
-    conflicts = list(GroupType.get_variables(a) & GroupType.get_variables(b))
+    conflicts = list(GroupMeta.get_variables(a) & GroupMeta.get_variables(b))
     had_conflicts = False
     for conflict in conflicts:
         if not had_conflicts:
@@ -246,8 +252,13 @@ def load_groups() -> tuple[dict[str, GroupType], list[str]]:
     # Create default all group if it wasn't defined
     if 'all' not in loaded_groups:
         default_group = cast(GroupType, DefaultGroup())
-        default_group.meta = simple_automation.group.GroupMeta("all", "__internal__")
+        setattr(default_group, 'meta', GroupMeta("all", "__internal__"))
         loaded_groups['all'] = default_group
+
+    # Define special global variables
+    gall = loaded_groups['all']
+    if not hasattr(gall, 'simple_automation_managed'):
+        setattr(gall, 'simple_automation_managed', "This file is managed by simple automation.")
 
     # Firstly, deduplicate and unify each group's before and after dependencies,
     # and check for any self-dependencies.
@@ -275,7 +286,7 @@ def load_host(host_id: str, module_file: str) -> HostType:
         The host module
     """
     module_file_exists = os.path.exists(module_file)
-    meta = simple_automation.host.HostMeta(host_id, module_file if module_file_exists else "__internal__")
+    meta = HostMeta(host_id, module_file if module_file_exists else "__internal__")
     meta.add_group("all")
 
     simple_automation.host.this = meta
@@ -294,13 +305,13 @@ def load_host(host_id: str, module_file: str) -> HostType:
             die_error(f"'{reserved}' is a reserved variable.", loc=meta.loaded_from)
 
     # Monkeypatch the __hasattr__ and __getattr__ methods to perform hierachical lookup from now on
-    ret.meta = meta
+    setattr(ret, 'meta', meta)
     if module_file_exists:
-        ret.__getattr__ = lambda attr: HostType.getattr_hierarchical(ret, attr)
-        ret.__hasattr__ = lambda attr: HostType.hasattr_hierarchical(ret, attr)
+        setattr(ret, '__getattr__', lambda attr: HostMeta.getattr_hierarchical(ret, attr))
+        setattr(ret, '__hasattr__', lambda attr: HostMeta.hasattr_hierarchical(ret, attr))
     else:
-        ret.__getattr__ = lambda s, attr: HostType.getattr_hierarchical(ret, attr)
-        ret.__hasattr__ = lambda s, attr: HostType.hasattr_hierarchical(ret, attr)
+        setattr(ret, '__getattr__', lambda s, attr: HostMeta.getattr_hierarchical(ret, attr))
+        setattr(ret, '__hasattr__', lambda s, attr: HostMeta.hasattr_hierarchical(ret, attr))
 
     return ret
 

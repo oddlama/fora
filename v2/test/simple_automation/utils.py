@@ -1,5 +1,5 @@
 """
-Provides utility functions.
+Provides utility functions
 """
 
 import sys
@@ -34,6 +34,10 @@ def die_error(msg: str, loc=None, status_code=1):
     sys.exit(status_code)
 
 class CycleError(ValueError):
+    """
+    An error that is throw to report a cycle in a graph that must be cycle free.
+    """
+
     def __init__(self, msg, cycle):
         """
         This error is thrown when a cycle is detected in a graph, and
@@ -205,9 +209,6 @@ def rank_sort(vertices: Iterable[T], preds_of: Callable[[T], Iterable[T]], child
     dict[T, int]
         A dict associating a rank to each vertex
     """
-    # FIXME in description: must be cycle free already. Might detect cycle when
-    # searching for root node, but this is not guaranteed to detect any cycle.
-
     # Create a mapping of vertices to ranks.
     ranks = {v: -1 for v in vertices}
 
