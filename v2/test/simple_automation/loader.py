@@ -394,5 +394,8 @@ def run_script(script: str):
 
     name = os.path.splitext(os.path.basename(script))[0]
     meta = GroupType(name, script)
+
+    simple_automation.script_stack.append(meta)
     with simple_automation.set_this(meta):
         load_py_module(script)
+    simple_automation.script_stack.pop()

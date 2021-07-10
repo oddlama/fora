@@ -19,6 +19,9 @@ class MockupType(ModuleType):
     A set of reserved variables. Defined by the subclass.
     """
 
+    def __str__(self):
+        return f"<'{self.name}' from '{self.loaded_from}'>"
+
     def transfer(self, module: ModuleType):
         """
         Transfers all reserved variables from this object to the given module.

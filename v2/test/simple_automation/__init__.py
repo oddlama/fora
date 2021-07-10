@@ -55,6 +55,11 @@ host: Optional[HostType] = None
 The currently active host. Only set when a script is currently being executed on a host.
 """
 
+script_stack: list[tuple[str, str]] = []
+"""
+A stack of all currently executed scripts (name, file).
+"""
+
 
 _jinja2_env = NotYetLoaded()
 """
@@ -65,18 +70,21 @@ The jinja2 environment used for templating
 class SetVariableContextManager:
     """
     A context manager that sets a variable on enter and resets
-    it to None on exit.
+    it to the previous value on exit.
     """
     def __init__(self, obj: object, var: str, value: Any):
         self.obj: object = obj
         self.var: str = var
         self.value: Any = value
+        self.old_value: Any = getattr(self.obj, self.var)
 
     def __enter__(self):
+        print(f"  set {self.obj}.{self.var} = {self.value}")
         setattr(self.obj, self.var, self.value)
 
     def __exit__(self, exc_type, exc_value, trace):
-        setattr(self.obj, self.var, None)
+        print(f"reset {self.obj}.{self.var} = {self.old_value}")
+        setattr(self.obj, self.var, self.old_value)
 
 def current_host(host: HostType):
     """

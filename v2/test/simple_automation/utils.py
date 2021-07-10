@@ -2,6 +2,7 @@
 Provides utility functions
 """
 
+import os
 import sys
 import uuid
 from typing import TypeVar, Callable, Iterable
@@ -52,7 +53,7 @@ def load_py_module(file: str, print_on_error=True):
     Calling this function twice for the same file will yield distinct instances.
     """
     module_id = str(uuid.uuid4()).replace('-', '_')
-    loader = importlib.machinery.SourceFileLoader(f"__simple_automation_dynamic_module_{module_id}", file)
+    loader = importlib.machinery.SourceFileLoader(f"{os.path.splitext(os.path.basename(file))[0]}__dynamic__{module_id}", file)
     spec = importlib.util.spec_from_loader(loader.name, loader)
     if spec is None:
         raise ValueError(f"Failed to load module from file '{file}'")
