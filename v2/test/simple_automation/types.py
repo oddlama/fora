@@ -31,7 +31,8 @@ class MockupType(ModuleType):
         Transfers all reserved variables from this object to the given module.
         """
         for var in self.reserved_vars:
-            setattr(module, var, getattr(self, var))
+            if hasattr(self, var):
+                setattr(module, var, getattr(self, var))
 
 class GroupType(MockupType):
     """
@@ -184,7 +185,7 @@ class HostType(MockupType):
             this.add_group("desktops")
     """
 
-    reserved_vars: set[str] = set(["name", "loaded_from", "ssh_host", "ssh_port", "ssh_opts", "groups"])
+    reserved_vars: set[str] = set(["name", "loaded_from", "connection", "ssh_host", "ssh_port", "ssh_opts", "groups"])
     """
     A list of variable names that are reserved and must not be set by the module.
     """
@@ -385,7 +386,6 @@ class TaskType(MockupType):
 
     This class also represents all meta information available to a task module when itself
     is being loaded. It allows a module to access and modify its associated meta-information.
-    After the module has been loaded, the meta information will be transferred directly to the module.
 
     When writing a task module, you can simply import :attr:`simple_automation.this`,
     which exposes an API to access/modify this information.
@@ -431,15 +431,9 @@ class ScriptType(MockupType):
 
     This class also represents all meta information available to a script module when itself
     is being loaded. It allows a module to access and modify its associated meta-information.
-    After the module has been loaded, the meta information will be transferred directly to the module.
 
     When writing a script module, you can simply import :attr:`simple_automation.this`,
     which exposes an API to access/modify this information.
-    """
-
-    reserved_vars: set[str] = set(["name", "loaded_from"])
-    """
-    A list of variable names that are reserved and must not be set by the module.
     """
 
     def __init__(self, host_id: str, loaded_from: str):
@@ -452,23 +446,6 @@ class ScriptType(MockupType):
         """
         The original file path of the instanciated module.
         """
-
-    @staticmethod
-    def get_variables(script: ScriptType) -> set[str]:
-        """
-        Returns the list of all user-defined attributes for a script.
-
-        Parameters
-        ----------
-        script : ScriptType
-            The script module
-
-        Returns
-        -------
-        set[str]
-            The user-defined attributes for the given script
-        """
-        return _get_variables(ScriptType, script)
 
 def _get_variables(cls, module: ModuleType) -> set[str]:
     """

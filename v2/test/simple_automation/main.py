@@ -4,6 +4,7 @@ the CLI interface and coordination of submodule loading.
 """
 
 import argparse
+import sys
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 import simple_automation
