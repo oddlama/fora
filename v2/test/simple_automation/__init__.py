@@ -55,7 +55,7 @@ host: Optional[HostType] = None
 The currently active host. Only set when a script is currently being executed on a host.
 """
 
-script_stack: list[tuple[str, str]] = []
+script_stack: list[ScriptType] = []
 """
 A stack of all currently executed scripts (name, file).
 """
@@ -79,11 +79,9 @@ class SetVariableContextManager:
         self.old_value: Any = getattr(self.obj, self.var)
 
     def __enter__(self):
-        print(f"  set {self.obj}.{self.var} = {self.value}")
         setattr(self.obj, self.var, self.value)
 
     def __exit__(self, exc_type, exc_value, trace):
-        print(f"reset {self.obj}.{self.var} = {self.old_value}")
         setattr(self.obj, self.var, self.old_value)
 
 def current_host(host: HostType):

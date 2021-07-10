@@ -9,7 +9,7 @@ from itertools import combinations
 from typing import cast
 
 import simple_automation
-from simple_automation.types import GroupType, HostType, InventoryType
+from simple_automation.types import GroupType, HostType, InventoryType, ScriptType
 from simple_automation.utils import die_error, print_error, load_py_module, rank_sort, CycleError
 
 class DefaultGroup:
@@ -393,7 +393,7 @@ def run_script(script: str):
     """
 
     name = os.path.splitext(os.path.basename(script))[0]
-    meta = GroupType(name, script)
+    meta = ScriptType(name, script)
 
     simple_automation.script_stack.append(meta)
     with simple_automation.set_this(meta):

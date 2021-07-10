@@ -14,13 +14,17 @@ from typing import Union, Any
 import simple_automation
 
 class MockupType(ModuleType):
+    """
+    A base class for all module mockup types.
+    """
+
     reserved_vars: set[str] = set()
     """
     A set of reserved variables. Defined by the subclass.
     """
 
     def __str__(self):
-        return f"<'{self.name}' from '{self.loaded_from}'>"
+        return f"<'{getattr(self, 'name')}' from '{getattr(self, 'loaded_from')}'>"
 
     def transfer(self, module: ModuleType):
         """

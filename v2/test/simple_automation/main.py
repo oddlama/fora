@@ -86,10 +86,10 @@ def main():
             help="Increase output verbosity. Can be given multiple times. Typically, everything will be printed with -vvv.")
     parser.add_argument('--debug', dest='debug', action='store_true',
             help="Enable debugging output.")
-    parser.add_argument('script', type=str,
-            help="The user script containing the logic of what should be executed on the inventory.")
     parser.add_argument('inventory', type=str, nargs='+',
             help="The inventories on which the script should be run on. A inventory is either a full inventory module file (determined by the presenence of a .py extension, e.g. inventory.py), or a single-host defined in any syntax that is accepted by ssh (e.g. root@localhost or ssh://[user]@host)")
+    parser.add_argument('script', type=str,
+            help="The user script containing the logic of what should be executed on the inventory.")
     parser.set_defaults(func=main_run)
 
     try:
