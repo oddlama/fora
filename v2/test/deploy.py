@@ -1,7 +1,12 @@
-from simple_automation import host
+from simple_automation.script import this, host
+from simple_automation.operations import local
 
-description = "Deploys something"
+local.script(name="Run script",
+             script="deploy.py")
 
-if "desktops" in host.groups:
-    pass
-pass
+#print(f"[+] Run script {__file__} on host {host.meta.id}")
+#
+#if "desktops" in host.meta.groups:
+#    print("is desktop")
+#
+#print("[+] Script done")

@@ -73,9 +73,8 @@ def load_group(module_file: str) -> GroupType:
         meta.after("all")
 
     # Instanciate module
-    simple_automation.group.this = meta
-    ret = load_py_module(module_file)
-    simple_automation.group.this = None
+    with simple_automation.set_temporary(simple_automation.group, 'this', meta):
+        ret = load_py_module(module_file)
 
     for reserved in GroupType.reserved_vars:
         if hasattr(ret, reserved):
@@ -289,15 +288,14 @@ def load_host(host_id: str, module_file: str) -> HostType:
     meta = HostMeta(host_id, module_file if module_file_exists else "__internal__")
     meta.add_group("all")
 
-    simple_automation.host.this = meta
-    # Instanciate module
-    if module_file_exists:
-        ret = load_py_module(module_file)
-    else:
-        # Instanciate default module and set ssh_host to the host_id
-        ret = cast(HostType, DefaultHost())
-        meta.ssh_host = host_id
-    simple_automation.host.this = None
+    with simple_automation.set_temporary(simple_automation.host, 'this', meta):
+        # Instanciate module
+        if module_file_exists:
+            ret = load_py_module(module_file)
+        else:
+            # Instanciate default module and set ssh_host to the host_id
+            ret = cast(HostType, DefaultHost())
+            meta.ssh_host = host_id
 
     # Check if the module did set any reserved variables
     for reserved in HostType.reserved_vars:
@@ -380,3 +378,15 @@ def load_site(inventories: list[str]):
 
     # Load all hosts defined in the inventory
     simple_automation.hosts = load_hosts()
+
+def run_script(script: str):
+    """
+    Loads and implicitly runs the given script by creating a new instance.
+
+    Parameters
+    ----------
+    script : str
+        The path to the script that should be instanciated
+    """
+
+    load_py_module(script)

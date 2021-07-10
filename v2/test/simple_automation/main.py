@@ -7,7 +7,7 @@ import argparse
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 import simple_automation
-from simple_automation.loader import load_site
+from simple_automation.loader import load_site, run_script
 from simple_automation.utils import die_error
 from simple_automation.version import __version__
 
@@ -33,7 +33,7 @@ def main_run(args: argparse.Namespace):
     init_runtime()
     load_site(args.inventory)
 
-    # Check if host selection is valid
+    # Deduplicate host selectin and check if every host is valid
     host_ids = []
     for h in set(args.hosts.split(',') if args.hosts is not None else simple_automation.hosts.keys()):
         if h not in simple_automation.hosts:
@@ -41,16 +41,13 @@ def main_run(args: argparse.Namespace):
         host_ids.append(h)
     host_ids = sorted(host_ids)
 
+    # TODO multiprocessing?
+    # Instanciate (run) the given script for each selected host
     for hid in host_ids:
         host = simple_automation.hosts[hid]
-        print(hid, host.meta.ssh_host)
 
-    ## Run for each selected host
-    #for host in hosts:
-    #    with Context(self, host) as c:
-    #        for script in args.scripts.split(','):
-    #            fn = getattr(self.inventory, script)
-    #            fn(c)
+        with simple_automation.current_host(host):
+            run_script(args.script)
 
 class ArgumentParserError(Exception):
     """
@@ -89,7 +86,7 @@ def main():
             help="Increase output verbosity. Can be given multiple times. Typically, everything will be printed with -vvv.")
     parser.add_argument('--debug', dest='debug', action='store_true',
             help="Enable debugging output.")
-    parser.add_argument('script', type=str, nargs=1,
+    parser.add_argument('script', type=str,
             help="The user script containing the logic of what should be executed on the inventory.")
     parser.add_argument('inventory', type=str, nargs='+',
             help="The inventories on which the script should be run on. A inventory is either a full inventory module file (determined by the presenence of a .py extension, e.g. inventory.py), or a single-host defined in any syntax that is accepted by ssh (e.g. root@localhost or ssh://[user]@host)")

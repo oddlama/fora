@@ -13,7 +13,8 @@ from .types import HostType
 class HostMeta:
     """
     This class represents all meta information available to a host module when itself is being loaded.
-    It allows a module to access and modify its associated meta-information.
+    It allows a module to access and modify its associated meta-information. After the module
+    has been loaded, the meta information will be transferred directly to the module.
     """
 
     def __init__(self, host_id: str, loaded_from: str):
