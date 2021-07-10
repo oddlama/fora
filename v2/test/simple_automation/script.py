@@ -10,7 +10,7 @@ from .types import HostType
 
 class ScriptMeta:
     """
-    This class represents all meta information available to a task module when itself is being loaded.
+    This class represents all meta information available to a script module when itself is being loaded.
     It allows a module to access and modify its associated meta-information.
     """
 
@@ -43,13 +43,6 @@ which exposes an API to access/modify this information.
 
         from simple_automation.script import this, host
 
-        # The task id used for instanciation as defined in the inventory
-        print(f"Running {__name__} on {host.meta.id}")
-
+        print(f"Running {__name__} on {host.meta.name}")
         this.status("Some status message")
-"""
-
-host: Optional[HostType] = None
-"""
-The currently active host. Only set when a script is being executed.
 """

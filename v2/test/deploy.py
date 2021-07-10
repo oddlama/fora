@@ -4,7 +4,7 @@ from simple_automation.operations import local
 local.script(name="Run script",
              script="deploy.py")
 
-#print(f"[+] Run script {__file__} on host {host.meta.id}")
+print(f"[+] Run script {__file__} on host {host.meta.name}")
 #
 #if "desktops" in host.meta.groups:
 #    print("is desktop")

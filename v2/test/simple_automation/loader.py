@@ -268,14 +268,14 @@ def load_groups() -> tuple[dict[str, GroupType], list[str]]:
 
     return (loaded_groups, topological_order)
 
-def load_host(host_id: str, module_file: str) -> HostType:
+def load_host(name: str, module_file: str) -> HostType:
     """
-    Load and validates the host with the given id from the given module file path.
+    Load and validates the host with the given name from the given module file path.
 
     Parameters
     ----------
-    host_id: str
-        The host id of the host to be loaded
+    name: str
+        The host name of the host to be loaded
     module_file: str
         The path to the host module file that will be instanciated
 
@@ -285,7 +285,7 @@ def load_host(host_id: str, module_file: str) -> HostType:
         The host module
     """
     module_file_exists = os.path.exists(module_file)
-    meta = HostMeta(host_id, module_file if module_file_exists else "__internal__")
+    meta = HostMeta(name, module_file if module_file_exists else "__internal__")
     meta.add_group("all")
 
     with simple_automation.set_temporary(simple_automation.host, 'this', meta):
@@ -293,9 +293,9 @@ def load_host(host_id: str, module_file: str) -> HostType:
         if module_file_exists:
             ret = load_py_module(module_file)
         else:
-            # Instanciate default module and set ssh_host to the host_id
+            # Instanciate default module and set ssh_host to the name
             ret = cast(HostType, DefaultHost())
-            meta.ssh_host = host_id
+            meta.ssh_host = name
 
     # Check if the module did set any reserved variables
     for reserved in HostType.reserved_vars:
@@ -320,15 +320,15 @@ def load_hosts() -> dict[str, HostType]:
     Returns
     -------
     dict[str, HostType]
-        A mapping from host_id to host module
+        A mapping from name to host module
     """
     loaded_hosts = {}
     for host in simple_automation.inventory.hosts:
         if isinstance(host, str):
-            loaded_hosts[host] = load_host(host_id=host, module_file=f"hosts/{host}.py")
+            loaded_hosts[host] = load_host(name=host, module_file=f"hosts/{host}.py")
         elif isinstance(host, tuple):
-            (host_id, module_py) = host
-            loaded_hosts[host_id] = load_host(host_id=host_id, module_file=module_py)
+            (name, module_py) = host
+            loaded_hosts[name] = load_host(name=name, module_file=module_py)
         else:
             die_error(f"invalid host '{str(host)}'", loc="inventory.py")
     return loaded_hosts

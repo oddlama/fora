@@ -33,18 +33,18 @@ def main_run(args: argparse.Namespace):
     init_runtime()
     load_site(args.inventory)
 
-    # Deduplicate host selectin and check if every host is valid
-    host_ids = []
+    # Deduplicate host selection and check if every host is valid
+    host_names = []
     for h in set(args.hosts.split(',') if args.hosts is not None else simple_automation.hosts.keys()):
         if h not in simple_automation.hosts:
             die_error(f"Unknown host '{h}'")
-        host_ids.append(h)
-    host_ids = sorted(host_ids)
+        host_names.append(h)
+    host_names = sorted(host_names)
 
     # TODO multiprocessing?
     # Instanciate (run) the given script for each selected host
-    for hid in host_ids:
-        host = simple_automation.hosts[hid]
+    for h in host_names:
+        host = simple_automation.hosts[h]
 
         with simple_automation.current_host(host):
             run_script(args.script)

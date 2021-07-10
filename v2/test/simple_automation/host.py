@@ -18,9 +18,9 @@ class HostMeta:
     """
 
     def __init__(self, host_id: str, loaded_from: str):
-        self.id: str = host_id
+        self.name: str = host_id
         """
-        The corresponding host id as defined in the inventory.
+        The corresponding host name as defined in the inventory.
         Must not be changed.
         """
 
@@ -206,7 +206,7 @@ This variable holds all meta information available to a host module when itself 
 This variable should only ever be used in the context of a host module as shown below, otherwise
 it will be None.
 
-It allows the module to access meta-variables about itself, such as the host's id
+It allows the module to access meta-variables about itself, such as the host's name
 that has been used to instanciate it in the inventory. It also allows modification of these
 meta properties, such as which groups it should belong to, or what ssh settings should
 be used for connections.
@@ -220,10 +220,10 @@ which exposes an API to access/modify this information.
 
         from simple_automation.host import this
 
-        # The host id used for instanciation as defined in the inventory
-        print(this.id)
+        # The host name used for instanciation as defined in the inventory
+        print(this.name)
 
-        # Set the ssh host (useful if it differs from the id)
+        # Set the ssh host (useful if it differs from the name)
         this.ssh_host = "root@localhost"
 
         # Add the host to a group
