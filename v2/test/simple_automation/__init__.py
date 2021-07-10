@@ -3,9 +3,7 @@ This is the main module of simple_automation.
 """
 
 from typing import Optional, Union, Any, cast
-
-import simple_automation.script
-from .types import InventoryType, GroupType, HostType
+from .types import InventoryType, GroupType, HostType, ScriptType, TaskType
 
 
 class NotYetLoaded:
@@ -42,6 +40,22 @@ A dict containing all host definitions, mapped by host_id.
 """
 
 
+this: Optional[Union[GroupType, HostType, ScriptType, TaskType]] = None
+"""
+This variable holds all meta information available to a module when itself is being loaded.
+The module can be a host, group or task module, and will hold an instance of the mockup type as defined in :module:`simple_automation.types`.
+For more information on how to use the specific meta type objects, refer to the documentation of the respective class.
+
+This variable must not be used anywhere else but inside the primary definition of one of the
+aforementioned modules, otherwise it will be None.
+"""
+
+host: Optional[HostType] = None
+"""
+The currently active host. Only set when a script is currently being executed on a host.
+"""
+
+
 _jinja2_env = NotYetLoaded()
 """
 The jinja2 environment used for templating
@@ -66,12 +80,12 @@ class SetVariableContextManager:
 
 def current_host(host: HostType):
     """
-    A context manager to set the currently active host variable while it is active.
+    A context manager to temporarily set :attr:`simple_automation.host` to the given value.
     """
-    return SetVariableContextManager(simple_automation.script, 'host', host)
+    return SetVariableContextManager(__import__(__name__), 'host', host)
 
-def set_temporary(obj: object, var: str, value: Any):
+def set_this(value: Optional[Union[GroupType, HostType, ScriptType, TaskType]]):
     """
-    A context manager to set the given variable temporarily on the given object.
+    A context manager to temporarily set :attr:`simple_automation.this` to the given value.
     """
-    return SetVariableContextManager(obj, var, value)
+    return SetVariableContextManager(__import__(__name__), 'this', value)

@@ -9,11 +9,6 @@ from itertools import combinations
 from typing import cast
 
 import simple_automation
-import simple_automation.host
-import simple_automation.group
-
-from simple_automation.group import GroupMeta
-from simple_automation.host import HostMeta
 from simple_automation.types import GroupType, HostType, InventoryType
 from simple_automation.utils import die_error, print_error, load_py_module, rank_sort, CycleError
 
@@ -66,21 +61,21 @@ def load_group(module_file: str) -> GroupType:
     """
 
     name = os.path.splitext(os.path.basename(module_file))[0]
-    meta = GroupMeta(name, module_file)
+    meta = GroupType(name, module_file)
 
     # Normal groups have a dependency on the global 'all' group.
     if not name == 'all':
         meta.after("all")
 
     # Instanciate module
-    with simple_automation.set_temporary(simple_automation.group, 'this', meta):
+    with simple_automation.set_this(meta):
         ret = load_py_module(module_file)
 
     for reserved in GroupType.reserved_vars:
         if hasattr(ret, reserved):
             die_error(f"'{reserved}' is a reserved variable.", loc=meta.loaded_from)
 
-    ret.meta = meta
+    meta.transfer(ret)
     return ret
 
 def check_modules_for_conflicts(a: GroupType, b: GroupType) -> bool:
@@ -100,13 +95,13 @@ def check_modules_for_conflicts(a: GroupType, b: GroupType) -> bool:
     bool
         True when at least one conflicting attribute was found
     """
-    conflicts = list(GroupMeta.get_variables(a) & GroupMeta.get_variables(b))
+    conflicts = list(GroupType.get_variables(a) & GroupType.get_variables(b))
     had_conflicts = False
     for conflict in conflicts:
         if not had_conflicts:
             print_error("Found group variables with ambiguous evaluation order, insert group dependency or remove one definition.")
             had_conflicts = True
-        print_error(f"Definition of '{conflict}' is in conflict with definition at '{b.meta.loaded_from}", loc=a.meta.loaded_from)
+        print_error(f"Definition of '{conflict}' is in conflict with definition at '{b.loaded_from}", loc=a.loaded_from)
     return had_conflicts
 
 def merge_group_dependencies(groups: dict[str, GroupType]):
@@ -123,22 +118,22 @@ def merge_group_dependencies(groups: dict[str, GroupType]):
     """
     # Unify _before and _after dependencies
     for g in groups:
-        for before in groups[g].meta.groups_before:
-            groups[before].meta.groups_after.add(g)
+        for before in groups[g].groups_before:
+            groups[before].groups_after.add(g)
 
     # Deduplicate _after, clear before
     for _,group in groups.items():
-        group.meta.groups_before = set()
-        group.meta.groups_after = set(group.meta.groups_after)
+        group.groups_before = set()
+        group.groups_after = set(group.groups_after)
 
     # Recalculate _before from _after
     for g in groups:
-        for after in groups[g].meta.groups_after:
-            groups[after].meta.groups_before.add(g)
+        for after in groups[g].groups_after:
+            groups[after].groups_before.add(g)
 
     # Deduplicate before
     for _,group in groups.items():
-        group.meta.groups_before = set(group.meta.groups_before)
+        group.groups_before = set(group.groups_before)
 
 def sort_and_validate_groups(groups: dict[str, GroupType]) -> list[str]:
     """
@@ -162,22 +157,22 @@ def sort_and_validate_groups(groups: dict[str, GroupType]) -> list[str]:
     #
     # Rank numbers are already 0-based. This means in the top-down view, the root node
     # has top-rank 0 and a high bottom-rank, and all leaves have bottom_rank 0 a high top-rank.
-    l_before = lambda g: groups[g].meta.groups_before
-    l_after = lambda g: groups[g].meta.groups_after
+    l_before = lambda g: groups[g].groups_before
+    l_after = lambda g: groups[g].groups_after
 
     try:
         gkeys = list(groups.keys())
         ranks_t = rank_sort(gkeys, l_before, l_after) # Top-down
         ranks_b = rank_sort(gkeys, l_after, l_before) # Bottom-up
     except CycleError as e:
-        die_error(f"Dependency cycle detected! The cycle includes {[groups[g].meta.loaded_from for g in e.cycle]}.")
+        die_error(f"Dependency cycle detected! The cycle includes {[groups[g].loaded_from for g in e.cycle]}.")
 
     # Find cycles in dependencies by checking for the existence of any edge that doesn't increase the rank.
     # This is an error.
     for g in groups:
-        for c in groups[g].meta.groups_after:
+        for c in groups[g].groups_after:
             if ranks_t[c] <= ranks_t[g]:
-                die_error(f"Dependency cycle detected! The cycle includes '{groups[g].meta.loaded_from}' and '{groups[c].meta.loaded_from}'.")
+                die_error(f"Dependency cycle detected! The cycle includes '{groups[g].loaded_from}' and '{groups[c].loaded_from}'.")
 
     # Find the maximum rank. Both ranking systems have the same number of ranks. This is
     # true because the longest dependency chain determines the amount of ranks, and all dependencies
@@ -217,6 +212,14 @@ def sort_and_validate_groups(groups: dict[str, GroupType]) -> list[str]:
     # Return a topological order based on the top-rank
     return sorted(list(g for g in groups.keys()), key=lambda g: ranks_min[g])
 
+def define_special_global_variables(group_all):
+    """
+    Defines special global variables on the given all group.
+    Respects if the corresponding variable is already set.
+    """
+    if not hasattr(group_all, 'simple_automation_managed'):
+        setattr(group_all, 'simple_automation_managed', "This file is managed by simple automation.")
+
 def load_groups() -> tuple[dict[str, GroupType], list[str]]:
     """
     Loads all groups from their definition files in `./groups/`,
@@ -246,18 +249,17 @@ def load_groups() -> tuple[dict[str, GroupType], list[str]]:
     loaded_groups = {}
     for file in group_files:
         group = load_group(file)
-        loaded_groups[group.meta.name] = cast(GroupType, group)
+        loaded_groups[group.name] = cast(GroupType, group)
 
     # Create default all group if it wasn't defined
     if 'all' not in loaded_groups:
         default_group = cast(GroupType, DefaultGroup())
-        setattr(default_group, 'meta', GroupMeta("all", "__internal__"))
+        setattr(default_group, 'meta', GroupType("all", "__internal__"))
         loaded_groups['all'] = default_group
 
     # Define special global variables
     gall = loaded_groups['all']
-    if not hasattr(gall, 'simple_automation_managed'):
-        setattr(gall, 'simple_automation_managed', "This file is managed by simple automation.")
+    define_special_global_variables(gall)
 
     # Firstly, deduplicate and unify each group's before and after dependencies,
     # and check for any self-dependencies.
@@ -285,10 +287,10 @@ def load_host(name: str, module_file: str) -> HostType:
         The host module
     """
     module_file_exists = os.path.exists(module_file)
-    meta = HostMeta(name, module_file if module_file_exists else "__internal__")
+    meta = HostType(name, module_file if module_file_exists else "__internal__")
     meta.add_group("all")
 
-    with simple_automation.set_temporary(simple_automation.host, 'this', meta):
+    with simple_automation.set_this(meta):
         # Instanciate module
         if module_file_exists:
             ret = load_py_module(module_file)
@@ -302,14 +304,15 @@ def load_host(name: str, module_file: str) -> HostType:
         if hasattr(ret, reserved):
             die_error(f"'{reserved}' is a reserved variable.", loc=meta.loaded_from)
 
+    meta.transfer(ret)
+
     # Monkeypatch the __hasattr__ and __getattr__ methods to perform hierachical lookup from now on
-    setattr(ret, 'meta', meta)
     if module_file_exists:
-        setattr(ret, '__getattr__', lambda attr: HostMeta.getattr_hierarchical(ret, attr))
-        setattr(ret, '__hasattr__', lambda attr: HostMeta.hasattr_hierarchical(ret, attr))
+        setattr(ret, '__getattr__', lambda attr: HostType.getattr_hierarchical(ret, attr))
+        setattr(ret, '__hasattr__', lambda attr: HostType.hasattr_hierarchical(ret, attr))
     else:
-        setattr(ret, '__getattr__', lambda s, attr: HostMeta.getattr_hierarchical(ret, attr))
-        setattr(ret, '__hasattr__', lambda s, attr: HostMeta.hasattr_hierarchical(ret, attr))
+        setattr(ret, '__getattr__', lambda s, attr: HostType.getattr_hierarchical(ret, attr))
+        setattr(ret, '__hasattr__', lambda s, attr: HostType.hasattr_hierarchical(ret, attr))
 
     return ret
 
@@ -389,4 +392,7 @@ def run_script(script: str):
         The path to the script that should be instanciated
     """
 
-    load_py_module(script)
+    name = os.path.splitext(os.path.basename(script))[0]
+    meta = GroupType(name, script)
+    with simple_automation.set_this(meta):
+        load_py_module(script)

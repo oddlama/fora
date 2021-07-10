@@ -1,4 +1,4 @@
-from simple_automation.task import this
+from simple_automation import host, this
 from simple_automation.operations import files, portage
 
 this.description("Installs zsh and a global zsh configuration")
