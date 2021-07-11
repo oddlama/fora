@@ -8,6 +8,7 @@ import sys
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 import simple_automation
+from simple_automation.connection import Connection
 from simple_automation.loader import load_site, run_script
 from simple_automation.utils import die_error
 from simple_automation.version import __version__
@@ -46,9 +47,9 @@ def main_run(args: argparse.Namespace):
     # Instanciate (run) the given script for each selected host
     for h in host_names:
         host = simple_automation.hosts[h]
-
-        with simple_automation.current_host(host):
-            run_script(args.script)
+        with Connection(host):
+            with simple_automation.current_host(host):
+                run_script(args.script)
 
 class ArgumentParserError(Exception):
     """

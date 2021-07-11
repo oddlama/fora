@@ -1,17 +1,20 @@
 """
-Provides a mockup of types for the static type checker so it
-has a better understanding of the dynamically loaded modules.
+Provides a mockup of loadable module types. They are used to store metadata
+that can be accessed by the module that is currently being loaded. These
+types also help the static type checker, as it then has a better understanding
+of the expected contents of the dynamically loaded modules.
 """
 
 from __future__ import annotations
 
 from types import ModuleType
-from typing import Union, Any
+from typing import Union, Optional, Any
 
 # pylint: disable=cyclic-import
 # Cyclic import is correct at this point, as this module will not access anything from simple_automation
 # when it is being loaded, but only when certain functions are used.
 import simple_automation
+from simple_automation.connection import Connection
 
 class MockupType(ModuleType):
     """
@@ -220,6 +223,11 @@ class HostType(MockupType):
         self.groups: set[str] = set()
         """
         The set of groups this host belongs to.
+        """
+
+        self.connection: Optional[Connection] = None
+        """
+        The connection to this host, if it is opened.
         """
 
     def add_group(self, group: str):
