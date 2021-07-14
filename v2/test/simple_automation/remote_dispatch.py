@@ -96,7 +96,6 @@ class ExecutionSettings:
     """
     Execution settings for the next command.
     """
-    # pylint: disable=R0903
     def __init__(self):
         self.uid = 0
         self.gid = 0

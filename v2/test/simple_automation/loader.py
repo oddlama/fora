@@ -304,6 +304,11 @@ def load_host(name: str, module_file: str) -> HostType:
         if hasattr(ret, reserved):
             die_error(f"'{reserved}' is a reserved variable.", loc=meta.loaded_from)
 
+    # Resolve the connector, so if it wasn't set explicitly
+    # it will be defaulted to an ssh connector
+    if meta.connector is None:
+        meta.resolve_connector()
+
     meta.transfer(ret)
 
     # Monkeypatch the __hasattr__ and __getattr__ methods to perform hierachical lookup from now on

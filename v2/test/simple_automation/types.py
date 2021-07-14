@@ -188,7 +188,7 @@ class HostType(MockupType):
             this.add_group("desktops")
     """
 
-    reserved_vars: set[str] = set(["name", "loaded_from", "connection", "ssh_host", "ssh_port", "ssh_opts", "groups"])
+    reserved_vars: set[str] = set(["name", "loaded_from", "connector", "connection", "ssh_host", "ssh_port", "ssh_opts", "groups"])
     """
     A list of variable names that are reserved and must not be set by the module.
     """
@@ -203,6 +203,12 @@ class HostType(MockupType):
         self.loaded_from: str = loaded_from
         """
         The original file path of the instanciated module.
+        """
+
+        # TODO
+        self.connector: Callable[[]] = None
+        """
+        The connector class to use. Defaults to SshConnector when nothing is set explicitly.
         """
 
         self.ssh_host: str = host_id
