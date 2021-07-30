@@ -1,6 +1,10 @@
 - declarative.
 
 
+TODO remove all type hints from docstrings when they
+can be inferred from the real types. Basically very redundant currently.
+
+
 
 Trivia
 ------

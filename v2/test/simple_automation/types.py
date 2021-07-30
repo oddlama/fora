@@ -8,13 +8,14 @@ of the expected contents of the dynamically loaded modules.
 from __future__ import annotations
 
 from types import ModuleType
-from typing import Union, Optional, Any
+from typing import Union, Callable, Optional, Any
 
 # pylint: disable=cyclic-import
 # Cyclic import is correct at this point, as this module will not access anything from simple_automation
 # when it is being loaded, but only when certain functions are used.
 import simple_automation
 from simple_automation.connection import Connection
+from simple_automation.connectors.connector import Connector
 
 class MockupType(ModuleType):
     """
@@ -188,7 +189,7 @@ class HostType(MockupType):
             this.add_group("desktops")
     """
 
-    reserved_vars: set[str] = set(["name", "loaded_from", "connector", "connection", "ssh_host", "ssh_port", "ssh_opts", "groups"])
+    reserved_vars: set[str] = set(["name", "loaded_from", "groups", "connector", "connection"])
     """
     A list of variable names that are reserved and must not be set by the module.
     """
@@ -205,30 +206,14 @@ class HostType(MockupType):
         The original file path of the instanciated module.
         """
 
-        # TODO
-        self.connector: Callable[[]] = None
-        """
-        The connector class to use. Defaults to SshConnector when nothing is set explicitly.
-        """
-
-        self.ssh_host: str = host_id
-        """
-        The ssh destination as accepted by ssh(1).
-        """
-
-        self.ssh_port: int = 22
-        """
-        The port used to for ssh connections.
-        """
-
-        self.ssh_opts: list[str] = []
-        """
-        Additional options to the ssh command for this host.
-        """
-
         self.groups: set[str] = set()
         """
         The set of groups this host belongs to.
+        """
+
+        self.connector: Optional[Callable[[HostType], Connector]] = None
+        """
+        The connector class to use. Defaults to SshConnector when nothing is set explicitly.
         """
 
         self.connection: Optional[Connection] = None

@@ -1,10 +1,16 @@
 """
-Provides the 
+Provides an interface for remote connections.
 """
 
-from connectors.base import Connector
+from simple_automation.connectors.connector import Connector
 
 class Connection:
+    """
+    The connection class represents a connection to a host.
+    It consists of a connector, which is actually responsible for
+    providing remote access, and some internal state, which is used
+    to determine what user code is run as by default, or related settings.
+    """
     def __init__(self, host):
         self.host = host
         self.connector: Connector = self.host.connector(self.host)

@@ -23,6 +23,12 @@ class DefaultHost:
     host module file, and is used to represent a host with no special configuration.
     """
 
+    def __init__(self, name):
+        # TODO depending on name, set different things.
+        # ssh://
+        # connector://
+        self.ssh_host = name
+
 def load_inventory(file: str) -> InventoryType:
     """
     Loads and validates the inventory definition from the given module file.
@@ -270,6 +276,28 @@ def load_groups() -> tuple[dict[str, GroupType], list[str]]:
 
     return (loaded_groups, topological_order)
 
+def resolve_connector(host: HostType):
+    """
+    Resolves the connector for a host, if it hasn't been set manually.
+    We'll try to figure out which connector to use by detecting presence of their
+    configuration options on the host module.
+
+    Parameters
+    ----------
+    host: HostType
+        The host
+    """
+    if host.connector is None:
+        pass
+    elif isinstance(host.connector, str):
+        for c in registered_connectors:
+            if c.matches(host.connector):
+                host.connector = c(host, host.connector)
+    elif: # TODO iscallable(HostType):
+        host.connector = host.connector(host)
+    else:
+        die_error(f"connector: Invalid value", loc=host.loaded_from)
+
 def load_host(name: str, module_file: str) -> HostType:
     """
     Load and validates the host with the given name from the given module file path.
@@ -296,20 +324,15 @@ def load_host(name: str, module_file: str) -> HostType:
             ret = load_py_module(module_file)
         else:
             # Instanciate default module and set ssh_host to the name
-            ret = cast(HostType, DefaultHost())
-            meta.ssh_host = name
+            ret = cast(HostType, DefaultHost(name))
 
     # Check if the module did set any reserved variables
     for reserved in HostType.reserved_vars:
         if hasattr(ret, reserved):
             die_error(f"'{reserved}' is a reserved variable.", loc=meta.loaded_from)
 
-    # Resolve the connector, so if it wasn't set explicitly
-    # it will be defaulted to an ssh connector
-    if meta.connector is None:
-        meta.resolve_connector()
-
     meta.transfer(ret)
+    resolve_connector(ret)
 
     # Monkeypatch the __hasattr__ and __getattr__ methods to perform hierachical lookup from now on
     if module_file_exists:

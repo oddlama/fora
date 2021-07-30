@@ -4,6 +4,7 @@ This is the main module of simple_automation.
 
 from typing import Optional, Union, Any, cast
 from .types import InventoryType, GroupType, HostType, ScriptType, TaskType
+from .log import Logger
 
 
 class NotYetLoaded:
@@ -11,6 +12,13 @@ class NotYetLoaded:
     A dummy class which instances are used to provoke runtime-errors when
     using a part of simple_automation that hasn't been initialized yet.
     """
+
+logger = Logger()
+"""
+The global logger. Should be used for all user-facing information logging to ensure
+that this information is displayed in a proper format and according to the user's
+verbosity preferences.
+"""
 
 inventory = cast(InventoryType, NotYetLoaded())
 """
