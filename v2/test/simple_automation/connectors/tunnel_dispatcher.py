@@ -6,6 +6,8 @@ results over any connection that forwards both stdin/stdout.
 """
 
 import sys
+import struct
+
 from enum import IntEnum
 from struct import pack, unpack
 from typing import cast, Any, TypeVar, Callable, Optional
@@ -125,7 +127,7 @@ class Connection:
         bool
             The deserialized object
         """
-        return cast(bool, unpack(">?", self.read(1)))
+        return cast(bool, unpack(">?", self.read(1))[0])
 
     def read_i32(self) -> int:
         """
@@ -136,7 +138,7 @@ class Connection:
         int
             The deserialized object
         """
-        return cast(int, unpack(">i", self.read(4)))
+        return cast(int, unpack(">i", self.read(4))[0])
 
     def read_u32(self) -> int:
         """
@@ -147,7 +149,7 @@ class Connection:
         int
             The deserialized object
         """
-        return cast(int, unpack(">I", self.read(4)))
+        return cast(int, unpack(">I", self.read(4))[0])
 
     def read_i64(self) -> int:
         """
@@ -158,7 +160,7 @@ class Connection:
         int
             The deserialized object
         """
-        return cast(int, unpack(">q", self.read(8)))
+        return cast(int, unpack(">q", self.read(8))[0])
 
     def read_u64(self) -> int:
         """
@@ -169,7 +171,7 @@ class Connection:
         int
             The deserialized object
         """
-        return cast(int, unpack(">Q", self.read(8)))
+        return cast(int, unpack(">Q", self.read(8))[0])
 
     def write(self, data: bytes, count: int):
         """
@@ -584,11 +586,14 @@ packet_deserializers = {
 }
 
 def receive_packet(conn: Connection) -> Any:
-    packet_id = conn.read_u32()
-    if packet_id not in packet_deserializers:
-        raise IOError(f"Received invalid packet id '{packet_id}'")
+    try:
+        packet_id = conn.read_u32()
+        if packet_id not in packet_deserializers:
+            raise IOError(f"Received invalid packet id '{packet_id}'")
 
-    return packet_deserializers[packet_id](conn)
+        return packet_deserializers[packet_id](conn)
+    except struct.error as e:
+        raise IOError(f"Unexpected EOF in data stream: {str(e)}")
 
 def main():
     """

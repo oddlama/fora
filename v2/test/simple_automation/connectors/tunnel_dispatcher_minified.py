@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import sys
+import struct
 from enum import IntEnum
 from struct import pack,unpack
 from typing import cast,Any,TypeVar,Callable,Optional
@@ -26,15 +27,15 @@ class Connection:
  def read_opt_str(self)->Optional[str]:
   return self._read_opt_generic(self.read_str)
  def read_b(self)->bool:
-  return cast(bool,unpack(">?",self.read(1)))
+  return cast(bool,unpack(">?",self.read(1))[0])
  def read_i32(self)->int:
-  return cast(int,unpack(">i",self.read(4)))
+  return cast(int,unpack(">i",self.read(4))[0])
  def read_u32(self)->int:
-  return cast(int,unpack(">I",self.read(4)))
+  return cast(int,unpack(">I",self.read(4))[0])
  def read_i64(self)->int:
-  return cast(int,unpack(">q",self.read(8)))
+  return cast(int,unpack(">q",self.read(8))[0])
  def read_u64(self)->int:
-  return cast(int,unpack(">Q",self.read(8)))
+  return cast(int,unpack(">Q",self.read(8))[0])
  def write(self,data:bytes,count:int):
   self.buffer_out.write(data[:count])
  def write_bytes(self,v:bytes):
@@ -147,10 +148,13 @@ class PacketProcessCompleted:
   return PacketProcessCompleted(stdout=conn.read_bytes(),stderr=conn.read_bytes(),returncode=conn.read_i32())
 packet_deserializers={Packets.ack:PacketAck.read,Packets.check_alive:PacketCheckAlive.read,Packets.exit:PacketExit.read,Packets.process_run:PacketProcessRun.read,Packets.process_completed:PacketProcessCompleted.read,}
 def receive_packet(conn:Connection)->Any:
- packet_id=conn.read_u32()
- if packet_id not in packet_deserializers:
-  raise IOError(f"Received invalid packet id '{packet_id}'")
- return packet_deserializers[packet_id](conn)
+ try:
+  packet_id=conn.read_u32()
+  if packet_id not in packet_deserializers:
+   raise IOError(f"Received invalid packet id '{packet_id}'")
+  return packet_deserializers[packet_id](conn)
+ except struct.error as e:
+  raise IOError(f"Unexpected EOF in data stream: {str(e)}")
 def main():
  conn=Connection(sys.stdin.buffer,sys.stdout.buffer)
  while not conn.should_close:
