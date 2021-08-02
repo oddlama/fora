@@ -2,7 +2,7 @@
 import sys
 from enum import IntEnum
 from struct import pack,unpack
-from typing import cast,TypeVar,Callable,Optional
+from typing import cast,Any,TypeVar,Callable,Optional
 T=TypeVar('T')
 class Connection:
  def __init__(self,buffer_in,buffer_out):
@@ -64,9 +64,34 @@ class Connection:
  def write_u64(self,v:int):
   self.write(pack(">Q",v),8)
 class Packets(IntEnum):
- exit=0
- process_run=1
- process_completed=2
+ ack=0
+ check_alive=1
+ exit=2
+ process_run=3
+ process_completed=4
+class PacketAck:
+ def write(self,conn:Connection):
+  _=(self)
+  conn.write_u32(Packets.ack)
+  conn.flush()
+ def handle(self,conn:Connection):
+  _=(self,conn)
+ @staticmethod
+ def read(conn:Connection):
+  _=(conn)
+  return PacketAck()
+class PacketCheckAlive:
+ def write(self,conn:Connection):
+  _=(self)
+  conn.write_u32(Packets.check_alive)
+  conn.flush()
+ def handle(self,conn:Connection):
+  _=(self)
+  PacketAck().write(conn)
+ @staticmethod
+ def read(conn:Connection):
+  _=(conn)
+  return PacketCheckAlive()
 class PacketExit:
  def write(self,conn:Connection):
   _=(self)
@@ -120,15 +145,20 @@ class PacketProcessCompleted:
  @staticmethod
  def read(conn:Connection):
   return PacketProcessCompleted(stdout=conn.read_bytes(),stderr=conn.read_bytes(),returncode=conn.read_i32())
-packet_deserializers={Packets.exit:PacketExit.read,Packets.process_run:PacketProcessRun.read,Packets.process_completed:PacketProcessCompleted.read,}
+packet_deserializers={Packets.ack:PacketAck.read,Packets.check_alive:PacketCheckAlive.read,Packets.exit:PacketExit.read,Packets.process_run:PacketProcessRun.read,Packets.process_completed:PacketProcessCompleted.read,}
+def receive_packet(conn:Connection)->Any:
+ packet_id=conn.read_u32()
+ if packet_id not in packet_deserializers:
+  raise IOError(f"Received invalid packet id '{packet_id}'")
+ return packet_deserializers[packet_id](conn)
 def main():
  conn=Connection(sys.stdin.buffer,sys.stdout.buffer)
  while not conn.should_close:
-  packet_id=conn.read_u32()
-  if packet_id not in packet_deserializers:
-   print(f"Received invalid packet id '{packet_id}'. Aborting.",file=sys.stderr,flush=True)
+  try:
+   packet=receive_packet(conn)
+  except IOError as e:
+   print(f"{str(e)}. Aborting.",file=sys.stderr,flush=True)
    sys.exit(3)
-  packet=packet_deserializers[packet_id](conn)
   packet.handle(conn)
 if __name__=='__main__':
  main()

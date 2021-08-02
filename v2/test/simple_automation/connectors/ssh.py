@@ -5,7 +5,7 @@ Contains a connector which handles connections to hosts via SSH.
 from simple_automation import logger
 from simple_automation.log import ConnectionLogger
 from simple_automation.connectors.connector import Connector, connector
-from simple_automation.connectors.ssh_dispatcher import Connection as SshConnection, PacketExit
+from simple_automation.connectors.ssh_dispatcher import Connection as SshConnection, PacketExit, PacketCheckAlive, PacketAck, receive_packet
 from simple_automation.types import HostType
 
 import simple_automation.connectors.ssh_dispatcher_minified
@@ -38,13 +38,17 @@ class SshConnector(Connector):
 
     def open(self):
         self.log.init()
-        with open(ssh_dispatcher_minified.__file__, 'rb') as f:
-            ssh_dispatcher_gz_b64 = base64.b64encode(zlib.compress(f.read())).decode('ascii')
+        with open(simple_automation.connectors.ssh_dispatcher_minified.__file__, 'rb') as f:
+            ssh_dispatcher_gz_b64 = base64.b64encode(zlib.compress(f.read(), 9)).decode('ascii')
 
         # Start the remote ssh dispatcher by uploading it inline as base64.
-        command = self._base_ssh_command(f"python3 -c \"$(echo '{ssh_dispatcher_gz_b64}' | base64 -d | gunzip)\"")
+        command = self._base_ssh_command(f"python3 -c \"$(echo '{ssh_dispatcher_gz_b64}' | base64 -d | openssl zlib -d)\"")
         self.process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=sys.stderr)
-        self.conn = SshConnection(self.process.stdin.buffer, self.process.stdout.buffer)
+        self.conn = SshConnection(self.process.stdout, self.process.stdin)
+        PacketCheckAlive().write(self.conn)
+        packet = receive_packet(self.conn)
+        assert isinstance(packet, PacketAck)
+        # TODO assert Popen proccess is killed atexit
 
         #self._check_capabilities()
         self.log.established()

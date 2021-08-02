@@ -8,7 +8,7 @@ results over any connection that forwards both stdin/stdout.
 import sys
 from enum import IntEnum
 from struct import pack, unpack
-from typing import cast, TypeVar, Callable, Optional
+from typing import cast, Any, TypeVar, Callable, Optional
 
 T = TypeVar('T')
 
@@ -315,9 +315,98 @@ class Packets(IntEnum):
     """
     An enumeration type assigning an id to each packet.
     """
-    exit = 0
-    process_run = 1
-    process_completed = 2
+    ack = 0
+    check_alive = 1
+    exit = 2
+    process_run = 3
+    process_completed = 4
+
+class PacketAck:
+    """
+    This packet is used to acknowledge the previous packet. Only
+    sent on special occasions (e.g. PacketCheckAlive).
+    """
+
+    def write(self, conn: Connection):
+        """
+        Serializes the whole packet and writes it to the given connection.
+
+        Parameters
+        ----------
+        conn
+            The connection
+        """
+        _ = (self)
+        conn.write_u32(Packets.ack)
+        conn.flush()
+
+    def handle(self, conn: Connection):
+        """
+        Handles this packet.
+
+        Parameters
+        ----------
+        conn
+            The connection
+        """
+        _ = (self, conn)
+
+    @staticmethod
+    def read(conn: Connection):
+        """
+        Deserializes a packet of this type from the given connection.
+
+        Parameters
+        ----------
+        conn
+            The connection
+        """
+        _ = (conn)
+        return PacketAck()
+
+class PacketCheckAlive:
+    """
+    This packet is used to check whether a connection is alive. The receiver must answer with
+    PacketAck immediately.
+    """
+
+    def write(self, conn: Connection):
+        """
+        Serializes the whole packet and writes it to the given connection.
+
+        Parameters
+        ----------
+        conn
+            The connection
+        """
+        _ = (self)
+        conn.write_u32(Packets.check_alive)
+        conn.flush()
+
+    def handle(self, conn: Connection):
+        """
+        Handles this packet.
+
+        Parameters
+        ----------
+        conn
+            The connection
+        """
+        _ = (self)
+        PacketAck().write(conn)
+
+    @staticmethod
+    def read(conn: Connection):
+        """
+        Deserializes a packet of this type from the given connection.
+
+        Parameters
+        ----------
+        conn
+            The connection
+        """
+        _ = (conn)
+        return PacketCheckAlive()
 
 class PacketExit:
     """
@@ -487,10 +576,19 @@ class PacketProcessCompleted:
             returncode=conn.read_i32())
 
 packet_deserializers = {
+    Packets.ack: PacketAck.read,
+    Packets.check_alive: PacketCheckAlive.read,
     Packets.exit: PacketExit.read,
     Packets.process_run: PacketProcessRun.read,
     Packets.process_completed: PacketProcessCompleted.read,
 }
+
+def receive_packet(conn: Connection) -> Any:
+    packet_id = conn.read_u32()
+    if packet_id not in packet_deserializers:
+        raise IOError(f"Received invalid packet id '{packet_id}'")
+
+    return packet_deserializers[packet_id](conn)
 
 def main():
     """
@@ -500,12 +598,11 @@ def main():
     conn = Connection(sys.stdin.buffer, sys.stdout.buffer)
 
     while not conn.should_close:
-        packet_id = conn.read_u32()
-        if packet_id not in packet_deserializers:
-            print(f"Received invalid packet id '{packet_id}'. Aborting.", file=sys.stderr, flush=True)
+        try:
+            packet = receive_packet(conn)
+        except IOError as e:
+            print(f"{str(e)}. Aborting.", file=sys.stderr, flush=True)
             sys.exit(3)
-
-        packet = packet_deserializers[packet_id](conn)
         packet.handle(conn)
 
 if __name__ == '__main__':
