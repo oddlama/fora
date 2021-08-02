@@ -2,6 +2,11 @@
 Defines the connector interface.
 """
 
+from __future__ import annotations
+
+from simple_automation.types import HostType
+from typing import Callable, Optional
+
 class CompletedRemoteCommand:
     """
     The return value of run(), representing a finished remote process.
@@ -15,6 +20,25 @@ class Connector:
     """
     The base class for all connectors.
     """
+
+    schema: str
+    """
+    The schema of the connector. Must match the schema used in urls of this connector,
+    such as `ssh` for `ssh://...`. May also be shown in messages like:
+
+        "Establishing connecting to {host} via {schema}"
+
+    Overwrite this in your connector subclass. Must be unique among all connectors.
+    """
+
+    registered_connectors: dict[str, Callable[[str, HostType], Connector]] = {}
+    """
+    The list of all registered connectors.
+    """
+
+    def __init__(self, url: Optional[str], host: HostType):
+        self.url = url
+        self.host = host
 
     def open(self) -> None:
         """
@@ -34,3 +58,9 @@ class Connector:
         containing the returned information (if any) and the status code.
         """
         raise NotImplementedError("Must be overwritten by subclass.")
+
+def connector(cls):
+    if not hasattr(cls, 'schema'):
+        raise RuntimeError(f"{cls.__name__} was decorated with @connector but is not exposing a '{cls.__name__}.schema' attribute.")
+    Connector.registered_connectors[cls.schema] = cls
+    return cls

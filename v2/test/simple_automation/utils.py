@@ -1,5 +1,5 @@
 """
-Provides utility functions
+Provides utility functions.
 """
 
 import os

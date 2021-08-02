@@ -1,5 +1,6 @@
 """
-Provides an interface for remote connections.
+Provides a class to manage a remote connection via the host's connector.
+Stores state along with the connection.
 """
 
 from simple_automation.connectors.connector import Connector
@@ -13,12 +14,12 @@ class Connection:
     """
     def __init__(self, host):
         self.host = host
-        self.connector: Connector = self.host.connector(self.host)
+        self.connector: Connector = self.host.connector(host.url, host)
 
         # TODO connection = connector + state
-        self.umask = '0755'
-        self.user = 'root'
-        self.group = 'root'
+        self.umask: str = '0755'
+        self.user: str = 'root'
+        self.group: str = 'root'
 
     def __enter__(self):
         # Open the connection

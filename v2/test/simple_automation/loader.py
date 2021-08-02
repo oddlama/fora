@@ -11,6 +11,7 @@ from typing import cast
 import simple_automation
 from simple_automation.types import GroupType, HostType, InventoryType, ScriptType
 from simple_automation.utils import die_error, print_error, load_py_module, rank_sort, CycleError
+from simple_automation.connectors.connector import Connector
 
 class DefaultGroup:
     """
@@ -24,10 +25,7 @@ class DefaultHost:
     """
 
     def __init__(self, name):
-        # TODO depending on name, set different things.
-        # ssh://
-        # connector://
-        self.ssh_host = name
+        self.url = name
 
 def load_inventory(file: str) -> InventoryType:
     """
@@ -288,15 +286,16 @@ def resolve_connector(host: HostType):
         The host
     """
     if host.connector is None:
+        schema = host.url.split(':')[0]
+        if schema in Connector.registered_connectors:
+            host.connector = Connector.registered_connectors[schema]
+        else:
+            die_error(f"No connector found for schema {schema}", loc=host.loaded_from)
+    elif callable(host.connector):
+        # The connector was explicitly given
         pass
-    elif isinstance(host.connector, str):
-        for c in registered_connectors:
-            if c.matches(host.connector):
-                host.connector = c(host, host.connector)
-    elif: # TODO iscallable(HostType):
-        host.connector = host.connector(host)
     else:
-        die_error(f"connector: Invalid value", loc=host.loaded_from)
+        die_error(f"Invalid connector was specified", loc=host.loaded_from)
 
 def load_host(name: str, module_file: str) -> HostType:
     """

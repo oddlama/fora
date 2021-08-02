@@ -92,11 +92,11 @@ class SetVariableContextManager:
     def __exit__(self, exc_type, exc_value, trace):
         setattr(self.obj, self.var, self.old_value)
 
-def current_host(host: HostType):
+def current_host(active_host: HostType):
     """
     A context manager to temporarily set :attr:`simple_automation.host` to the given value.
     """
-    return SetVariableContextManager(__import__(__name__), 'host', host)
+    return SetVariableContextManager(__import__(__name__), 'host', active_host)
 
 def set_this(value: Optional[Union[GroupType, HostType, ScriptType, TaskType]]):
     """

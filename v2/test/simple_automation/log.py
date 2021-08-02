@@ -4,10 +4,13 @@ class ConnectionLogger:
         self.connector = connector
 
     def init(self):
-        print(f"[[32m>[m] Establishing connection to {self.host.name} via {self.connector.name}")
+        print(f"[[32m>[m] Establishing connection to {self.host.name} via {self.connector.schema}")
 
     def established(self):
-        print(f"[[32m>[m] Connection to {self.host.name} established")
+        print(f"[[32m>[m] Connection to {self.host.schema} established")
+
+    def requested_close(self):
+        print(f"[[32m>[m] Requesting to close connection to {self.host.name}")
 
     def closed(self):
         print(f"[[32m>[m] Connection to {self.host.name} closed")

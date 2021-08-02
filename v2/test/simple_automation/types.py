@@ -8,14 +8,16 @@ of the expected contents of the dynamically loaded modules.
 from __future__ import annotations
 
 from types import ModuleType
-from typing import Union, Callable, Optional, Any
+from typing import Union, Callable, Optional, Any, TYPE_CHECKING
 
 # pylint: disable=cyclic-import
 # Cyclic import is correct at this point, as this module will not access anything from simple_automation
 # when it is being loaded, but only when certain functions are used.
 import simple_automation
-from simple_automation.connection import Connection
-from simple_automation.connectors.connector import Connector
+
+if TYPE_CHECKING:
+    from simple_automation.connection import Connection
+    from simple_automation.connectors.connector import Connector
 
 class MockupType(ModuleType):
     """
@@ -189,7 +191,7 @@ class HostType(MockupType):
             this.add_group("desktops")
     """
 
-    reserved_vars: set[str] = set(["name", "loaded_from", "groups", "connector", "connection"])
+    reserved_vars: set[str] = set(["name", "loaded_from", "groups", "url", "connector", "connection"])
     """
     A list of variable names that are reserved and must not be set by the module.
     """
@@ -211,9 +213,16 @@ class HostType(MockupType):
         The set of groups this host belongs to.
         """
 
-        self.connector: Optional[Callable[[HostType], Connector]] = None
+        self.url: str = "ssh:"
         """
-        The connector class to use. Defaults to SshConnector when nothing is set explicitly.
+        The url to the host. A matching connector for the schema must exist.
+        Defaults to an ssh connection if unset. Connection details can be given in the url
+        or via attributes on the host module.
+        """
+
+        self.connector: Optional[Callable[[str, HostType], Connector]] = None
+        """
+        The connector class to use. If unset the connector will be determined by the url.
         """
 
         self.connection: Optional[Connection] = None
