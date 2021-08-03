@@ -4,8 +4,8 @@ Contains a connector which handles connections to hosts via SSH.
 
 from simple_automation import logger
 from simple_automation.log import ConnectionLogger
-from simple_automation.connectors.connector import Connector, connector
-from simple_automation.connectors.tunnel_dispatcher import Connection as SshConnection, PacketExit, PacketCheckAlive, PacketAck, receive_packet
+from simple_automation.connectors.connector import Connector, connector, CompletedRemoteCommand
+from simple_automation.connectors.tunnel_dispatcher import Connection as SshConnection, PacketExit, PacketCheckAlive, PacketAck, PacketProcessRun, PacketProcessCompleted, PacketInvalidField, receive_packet
 from simple_automation.types import HostType
 
 import simple_automation.connectors.tunnel_dispatcher_minified
@@ -27,11 +27,11 @@ class SshConnector(Connector):
     def __init__(self, url: Optional[str], host: HostType):
         super().__init__(url, host)
 
-        self.ssh_opts: list[str] = host.ssh_opts if hasattr(host, 'ssh_opts') else []
+        self.ssh_opts: list[str] = getattr(host, 'ssh_opts') if hasattr(host, 'ssh_opts') else []
         if url is not None and url.startswith("ssh://"):
             self.url = url
         else:
-            self.url: str = f"ssh://{host.ssh_host}:{host.ssh_port}"
+            self.url: str = f"ssh://{getattr(host, 'ssh_host')}:{getattr(host, 'ssh_port')}"
 
         self.log: ConnectionLogger = logger.new_connection(host, self)
         self.conn: SshConnection
@@ -42,7 +42,7 @@ class SshConnector(Connector):
             tunnel_dispatcher_gz_b64 = base64.b64encode(zlib.compress(f.read(), 9)).decode('ascii')
 
         # Start the remote dispatcher by uploading it inline as base64.
-        command = self._base_ssh_command(f"python3 -c \"$(echo '{tunnel_dispatcher_gz_b64}' | base64 -d | openssl zlib -d)\"")
+        command = self._base_ssh_command(f"env python3 -c \"$(echo '{tunnel_dispatcher_gz_b64}' | base64 -d | openssl zlib -d)\"")
         self.process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=sys.stderr)
         self.conn = SshConnection(self.process.stdout, self.process.stdin)
         try:
@@ -55,8 +55,9 @@ class SshConnector(Connector):
             raise RuntimeError("Failed to establish connection to remote host.")
 
         # TODO assert Popen proccess is killed atexit
-
         #self._check_capabilities()
+        # TODO check that we are root.
+
         self.log.established()
 
     def close(self):
@@ -77,3 +78,43 @@ class SshConnector(Connector):
         command.append(self.url)
         command.append(remote_command_escaped)
         return command
+
+    def run(self, command: list[str],
+            input: bytes,
+            capture_output: bool,
+            check: bool,
+            user: Optional[str],
+            group: Optional[str],
+            umask: Optional[str],
+            cwd: Optional[str]) -> CompletedRemoteCommand:
+        try:
+            packet_run = PacketProcessRun(
+                command=command,
+                stdin=input,
+                capture_output=capture_output,
+                user=user,
+                group=group,
+                umask=umask,
+                cwd=cwd,)
+            packet_run.write(self.conn)
+
+            packet = receive_packet(self.conn)
+            if packet is None:
+                raise RuntimeError("Invalid response from remote dispatcher. This is a bug.")
+            elif isinstance(packet, PacketInvalidField):
+                raise ValueError(f"Invalid value '{getattr(packet_run, packet.field)}' given for field '{packet.field}': {packet.error_message}")
+            elif isinstance(packet, PacketProcessCompleted):
+                result = CompletedRemoteCommand(stdout=packet.stdout,
+                                                stderr=packet.stderr,
+                                                returncode=packet.returncode)
+
+                # Check output if requested
+                if check and result.returncode != 0:
+                    raise subprocess.CalledProcessError(returncode=result.returncode,
+                                                        output=result.stdout,
+                                                        stderr=result.stderr,
+                                                        cmd=command)
+        except IOError as _:
+            # TODO log
+            raise IOError("Remote host disconnected.")
+        return result

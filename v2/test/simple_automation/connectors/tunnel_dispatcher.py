@@ -5,14 +5,96 @@ Provides a stdin/stdout based protocol to safely dispatch commands and return th
 results over any connection that forwards both stdin/stdout.
 """
 
-import sys
+import os
 import struct
+import subprocess
+import sys
 
 from enum import IntEnum
+from pwd import getpwnam, getpwuid
+from grp import getgrnam, getgrgid
 from struct import pack, unpack
 from typing import cast, Any, TypeVar, Callable, Optional
 
 T = TypeVar('T')
+
+def resolve_umask(umask: str) -> int:
+    """
+    Resolves an octal string umask to a numeric umask.
+    Raises a ValueError if the umask is malformed.
+
+    Parameters
+    ----------
+    umask
+        The string umask
+
+    Returns
+    -------
+    int
+        The numeric represenation of the umask
+    """
+    try:
+        return int(umask, 8)
+    except ValueError as _:
+        raise ValueError(f"Invalid umask '{umask}': Must be in octal format.")
+
+def resolve_user(user: str) -> tuple[int, int]:
+    """
+    Resolves the given user string to a uid and gid.
+    The string may be either a username or a uid.
+    Raises a ValueError if the user/uid does not exist.
+
+    Parameters
+    ----------
+    user
+        The username or uid to resolve
+
+    Returns
+    -------
+    tuple[int, int]
+        A tuple (uid, gid) with the numeric ids of the user and its primary group
+    """
+    try:
+        pw = getpwnam(user)
+    except KeyError:
+        try:
+            uid = int(user)
+            pw = getpwuid(uid)
+        except KeyError as _:
+            raise ValueError(f"The user with the uid '{uid}' does not exist.")
+        except ValueError as _:
+            raise ValueError(f"The user with the name '{user}' does not exist.")
+
+    return (pw.pw_uid, pw.pw_gid)
+
+def resolve_group(group: str) -> int:
+    """
+    Resolves the given group string to a gid.
+    The string may be either a groupname or a gid.
+    Raises a ValueError if the group/gid does not exist.
+
+    Parameters
+    ----------
+    group
+        The groupname or gid to resolve
+
+    Returns
+    -------
+    int
+        The numeric gid of the group
+    """
+    try:
+        gr = getgrnam(group)
+    except KeyError:
+        try:
+            gid = int(group)
+            gr = getgrgid(gid)
+        except KeyError as _:
+            raise ValueError(f"The group with the gid '{gid}' does not exist.")
+        except ValueError as _:
+            raise ValueError(f"The group with the name '{group}' does not exist.")
+
+    return gr.gr_gid
 
 # pylint: disable=too-many-public-methods
 class Connection:
@@ -94,7 +176,7 @@ class Connection:
         Optional[T]
             The deserialized object
         """
-        return f() if self.read_b() else None
+        return f() if self.read_bool() else None
 
     def read_opt_bytes(self) -> Optional[bytes]:
         """
@@ -118,7 +200,7 @@ class Connection:
         """
         return self._read_opt_generic(self.read_str)
 
-    def read_b(self) -> bool:
+    def read_bool(self) -> bool:
         """
         Deserializes a bool from the input buffer.
 
@@ -232,7 +314,7 @@ class Connection:
         f
             The serializer function for T
         """
-        self.write_b(v is not None)
+        self.write_bool(v is not None)
         if v is not None:
             f(v)
 
@@ -258,7 +340,7 @@ class Connection:
         """
         self._write_opt_generic(v, self.write_str)
 
-    def write_b(self, v: bool):
+    def write_bool(self, v: bool):
         """
         Serializes a bool to the output buffer.
 
@@ -320,8 +402,10 @@ class Packets(IntEnum):
     ack = 0
     check_alive = 1
     exit = 2
-    process_run = 3
-    process_completed = 4
+    invalid_field = 3
+    process_run = 4
+    process_completed = 5
+    process_preexec_error = 6
 
 class PacketAck:
     """
@@ -453,6 +537,56 @@ class PacketExit:
         _ = (conn)
         return PacketExit()
 
+class PacketInvalidField:
+    """
+    This packet is used to indicate that an invalid value was passed to a field of a packet.
+    """
+
+    def __init__(self, field: str, error_message: str):
+        self.field = field
+        self.error_message = error_message
+
+    def write(self, conn: Connection):
+        """
+        Serializes the whole packet and writes it to the given connection.
+
+        Parameters
+        ----------
+        conn
+            The connection
+        """
+        _ = (self)
+        conn.write_u32(Packets.invalid_field)
+        conn.write_str(self.field)
+        conn.write_str(self.error_message)
+        conn.flush()
+
+    def handle(self, conn: Connection):
+        """
+        Handles this packet.
+
+        Parameters
+        ----------
+        conn
+            The connection
+        """
+        _ = (conn)
+        raise ValueError(f"Invalid value given for field '{self.field}': {self.error_message}")
+
+    @staticmethod
+    def read(conn: Connection):
+        """
+        Deserializes a packet of this type from the given connection.
+
+        Parameters
+        ----------
+        conn
+            The connection
+        """
+        return PacketInvalidField(
+            field=conn.read_str(),
+            error_message=conn.read_str())
+
 class PacketProcessRun:
     """
     This packet is used to start a new process.
@@ -460,14 +594,14 @@ class PacketProcessRun:
 
     def __init__(self, command: list[str],
                  stdin: Optional[bytes] = None,
-                 stdout: Optional[bytes] = None,
+                 capture_output: bool = True,
                  user: Optional[str] = None,
                  group: Optional[str] = None,
                  umask: Optional[str] = None,
                  cwd: Optional[str] = None):
         self.command = command
         self.stdin = stdin
-        self.stdout = stdout
+        self.capture_output = capture_output
         self.user = user
         self.group = group
         self.umask = umask
@@ -485,7 +619,7 @@ class PacketProcessRun:
         conn.write_u32(Packets.process_run)
         conn.write_str_list(self.command)
         conn.write_opt_bytes(self.stdin)
-        conn.write_opt_bytes(self.stdout)
+        conn.write_bool(self.capture_output)
         conn.write_opt_str(self.user)
         conn.write_opt_str(self.group)
         conn.write_opt_str(self.umask)
@@ -501,7 +635,64 @@ class PacketProcessRun:
         conn
             The connection
         """
-        # TODO
+        # By default we will run commands as the current user.
+        uid, gid = (None, None)
+        umask_oct = 0o077
+
+        if self.umask is not None:
+            try:
+                umask_oct = resolve_umask(self.umask)
+            except ValueError as e:
+                PacketInvalidField("umask", str(e)).write(conn)
+                return
+
+        if self.user is not None:
+            try:
+                (uid, gid) = resolve_user(self.user)
+            except ValueError as e:
+                PacketInvalidField("user", str(e)).write(conn)
+                return
+
+        if self.group is not None:
+            try:
+                gid = resolve_group(self.group)
+            except ValueError as e:
+                PacketInvalidField("group", str(e)).write(conn)
+                return
+
+        if self.cwd is not None:
+            if not os.path.isdir(self.cwd):
+                PacketInvalidField("cwd", "Requested working directory does not exist").write(conn)
+                return
+
+        def child_preexec():
+            """
+            Sets umask and becomes the correct user.
+            """
+            os.umask(umask_oct)
+            if gid is not None:
+                os.setresgid(gid, gid, gid)
+            if uid is not None:
+                os.setresuid(uid, uid, uid)
+            if self.cwd is not None:
+                os.chdir(self.cwd)
+
+        # TODO timeout
+        # TODO env
+        # Execute command with desired parameters
+        try:
+            result = subprocess.run(self.command,
+                input=self.stdin,
+                capture_output=self.capture_output,
+                cwd=self.cwd,
+                preexec_fn=child_preexec,
+                check=False)
+        except subprocess.SubprocessError as e:
+            PacketProcessPreexecError().write(conn)
+            return
+
+        # Send response for command result
+        PacketProcessCompleted(result.stdout, result.stderr, result.returncode).write(conn)
 
     @staticmethod
     def read(conn: Connection):
@@ -516,7 +707,7 @@ class PacketProcessRun:
         return PacketProcessRun(
             command=conn.read_str_list(),
             stdin=conn.read_opt_bytes(),
-            stdout=conn.read_opt_bytes(),
+            capture_output=conn.read_bool(),
             user=conn.read_opt_str(),
             group=conn.read_opt_str(),
             umask=conn.read_opt_str(),
@@ -528,8 +719,8 @@ class PacketProcessCompleted:
     """
 
     def __init__(self,
-                 stdout: bytes,
-                 stderr: bytes,
+                 stdout: Optional[bytes],
+                 stderr: Optional[bytes],
                  returncode: int):
         self.stdout = stdout
         self.stderr = stderr
@@ -557,8 +748,8 @@ class PacketProcessCompleted:
             The connection
         """
         conn.write_u32(Packets.process_completed)
-        conn.write_bytes(self.stdout)
-        conn.write_bytes(self.stderr)
+        conn.write_opt_bytes(self.stdout)
+        conn.write_opt_bytes(self.stderr)
         conn.write_i32(self.returncode)
         conn.flush()
 
@@ -573,16 +764,60 @@ class PacketProcessCompleted:
             The connection
         """
         return PacketProcessCompleted(
-            stdout=conn.read_bytes(),
-            stderr=conn.read_bytes(),
+            stdout=conn.read_opt_bytes(),
+            stderr=conn.read_opt_bytes(),
             returncode=conn.read_i32())
 
-packet_deserializers = {
+class PacketProcessPreexecError:
+    """
+    This packet is used to indicate an error in the preexec_fn when running the process.
+    """
+
+    def handle(self, conn: Connection):
+        """
+        Handles this packet.
+
+        Parameters
+        ----------
+        conn
+            The connection
+        """
+        _ = (self, conn)
+        raise RuntimeError("This packet should never be sent by the client!")
+
+    def write(self, conn: Connection):
+        """
+        Serializes the whole packet and writes it to the given connection.
+
+        Parameters
+        ----------
+        conn
+            The connection
+        """
+        conn.write_u32(Packets.process_preexec_error)
+        conn.flush()
+
+    @staticmethod
+    def read(conn: Connection):
+        """
+        Deserializes a packet of this type from the given connection.
+
+        Parameters
+        ----------
+        conn
+            The connection
+        """
+        _ = (conn)
+        return PacketProcessPreexecError()
+
+packet_deserializers: dict[int, Callable[[Connection], Any]] = {
     Packets.ack: PacketAck.read,
     Packets.check_alive: PacketCheckAlive.read,
     Packets.exit: PacketExit.read,
+    Packets.invalid_field: PacketInvalidField.read,
     Packets.process_run: PacketProcessRun.read,
     Packets.process_completed: PacketProcessCompleted.read,
+    Packets.process_preexec_error: PacketProcessPreexecError.read,
 }
 
 def receive_packet(conn: Connection) -> Any:

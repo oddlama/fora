@@ -11,10 +11,10 @@ class CompletedRemoteCommand:
     """
     The return value of run(), representing a finished remote process.
     """
-    def __init__(self, stdout: str, stderr: str, returncode: int):
-        self.stdout: str = stdout
-        self.stderr: str = stderr
-        self.returncode: int = returncode
+    def __init__(self, stdout: Optional[bytes], stderr: Optional[bytes], returncode: int):
+        self.stdout = stdout
+        self.stderr = stderr
+        self.returncode = returncode
 
 class Connector:
     """
@@ -52,7 +52,14 @@ class Connector:
         """
         raise NotImplementedError("Must be overwritten by subclass.")
 
-    def run(self, command, user, umask, checked=False, capture_output=False, input=None) -> CompletedRemoteCommand:
+    def run(self, command: list[str],
+            input: bytes,
+            capture_output: bool,
+            check: bool,
+            user: Optional[str],
+            group: Optional[str],
+            umask: Optional[str],
+            cwd: Optional[str]) -> CompletedRemoteCommand:
         """
         Runs the given command on the remote, returning a CompletedRemoteCommand
         containing the returned information (if any) and the status code.
