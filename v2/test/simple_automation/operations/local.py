@@ -2,38 +2,37 @@ import inspect
 import os
 import sys
 
-import simple_automation
+import simple_automation.loader
 
 def task(name):
     pass
 
-def _error_recursive_script_loop(script):
-    print(f"Detected recursive call to script {script}. Use recursive=True to allow this.")
-    print("Script stack:")
-    # TODO we can actually find out the exact invocation line using a stacktrace.
-    for meta in simple_automation.script_stack:
-        # TODO proper color switch and logic
-        if os.path.samefile(script, meta.loaded_from):
-            print(f"  [1;31m→ {meta.loaded_from}[m ({meta.name})")
-        else:
-            print(f"    {meta.loaded_from} ({meta.name})")
-    print(f"  → {script} (this call)")
-    print(inspect.getouterframes(inspect.currentframe())[2])
+def _print_script_trace(currentframe=None):
+    """
+    Prints a script trace similar to a python backtrace.
 
-    try:
-        raise RuntimeError(f"Invalid recursive call to script {script}")
-    except RuntimeError:
-        ei = sys.exc_info()
-        raise ei[1].with_traceback(None)
+    Parameters
+    ----------
+    currentframe
+        An additional FrameInfo object for a future script invocation,
+        which isn't yet part of the stack.
+    """
+    print("Script stack (most recent call last):")
+    def print_frame(f):
+        print(f"  File \"{f.filename}\", line {f.lineno}, in {f.frame.f_code.co_name}", file=sys.stderr)
+        for context in f.code_context:
+            print(f"    {context.strip()}", file=sys.stderr)
+
+    for _, frame in simple_automation.loader.script_stack:
+        print_frame(frame)
+    if currentframe is not None:
+        print_frame(currentframe)
 
 def script(name, script, recursive=False):
+    outer_frame = inspect.getouterframes(inspect.currentframe())[1]
     if not recursive:
-        for meta in simple_automation.script_stack:
+        for meta, _ in simple_automation.loader.script_stack:
             if os.path.samefile(script, meta.loaded_from):
-                # TODO how to signal error properly
-                # we need to close connections, we need proper output
-                # we dont want a simple die.
-                # maybe allow REPL to be started?
-                _error_recursive_script_loop(script)
-                return
+                _print_script_trace(outer_frame)
+                raise RuntimeError(f"Invalid recursive call to script '{script}'. Use recursive=True to allow this.")
     # TODO

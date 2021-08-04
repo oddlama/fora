@@ -4,6 +4,7 @@ the CLI interface and coordination of submodule loading.
 """
 
 import argparse
+import inspect
 import sys
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
@@ -49,7 +50,7 @@ def main_run(args: argparse.Namespace):
         host = simple_automation.hosts[h]
         with Connection(host):
             with simple_automation.current_host(host):
-                run_script(args.script)
+                run_script(args.script, inspect.getouterframes(inspect.currentframe())[0])
 
 class ArgumentParserError(Exception):
     """

@@ -3,6 +3,7 @@ Provides the submodule loading functions.
 """
 
 import glob
+import inspect
 import os
 import sys
 from itertools import combinations
@@ -12,6 +13,11 @@ import simple_automation
 from simple_automation.types import GroupType, HostType, InventoryType, ScriptType
 from simple_automation.utils import die_error, print_error, load_py_module, rank_sort, CycleError
 from simple_automation.connectors.connector import Connector
+
+script_stack: list[tuple[ScriptType, inspect.FrameInfo]] = []
+"""
+A stack of all currently executed scripts ((name, file), frame).
+"""
 
 class DefaultGroup:
     """
@@ -409,7 +415,7 @@ def load_site(inventories: list[str]):
     # Load all hosts defined in the inventory
     simple_automation.hosts = load_hosts()
 
-def run_script(script: str):
+def run_script(script: str, frame: inspect.FrameInfo):
     """
     Loads and implicitly runs the given script by creating a new instance.
 
@@ -417,12 +423,16 @@ def run_script(script: str):
     ----------
     script : str
         The path to the script that should be instanciated
+    frame
+        The FrameInfo object as given by inspect.getouterframes(inspect.currentframe())[?]
+        where the script call originates from. Used to keep track of the script invocation stack,
+        which helps with debugging (e.g. cyclic script calls).
     """
 
     name = os.path.splitext(os.path.basename(script))[0]
     meta = ScriptType(name, script)
 
-    simple_automation.script_stack.append(meta)
+    script_stack.append((meta, frame))
     with simple_automation.set_this(meta):
         load_py_module(script)
-    simple_automation.script_stack.pop()
+    script_stack.pop()

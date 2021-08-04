@@ -63,11 +63,6 @@ host: Optional[HostType] = None
 The currently active host. Only set when a script is currently being executed on a host.
 """
 
-script_stack: list[ScriptType] = []
-"""
-A stack of all currently executed scripts (name, file).
-"""
-
 
 _jinja2_env = NotYetLoaded()
 """
