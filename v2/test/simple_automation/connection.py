@@ -4,21 +4,24 @@ Stores state along with the connection.
 """
 
 from typing import Optional
+
 from simple_automation.connectors.connector import Connector, CompletedRemoteCommand
+from simple_automation.types import HostType
 
 class Connection:
     """
     The connection class represents a connection to a host.
     It consists of a connector, which is actually responsible for
-    providing remote access, and some internal state, which is used
-    to determine what user code is run as by default, or related settings.
+    providing remote access, and some state, which determines defaults
+    for the commands executed on the remote system.
     """
-    def __init__(self, host):
+    def __init__(self, host: HostType):
         self.host = host
+        if self.host.connector is None:
+            raise ValueError("host.connector must be set")
         self.connector: Connector = self.host.connector(host.url, host)
 
-        # TODO connection = connector + state
-        self.umask: str = '0755'
+        self.umask: str = '077'
         self.user: str = 'root'
         self.group: str = 'root'
 

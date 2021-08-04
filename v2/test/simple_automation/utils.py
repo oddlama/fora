@@ -151,6 +151,8 @@ def print_exception_hook(exc_type, exc_info, tb):
     """
 
     first_dynamic_tb = None
+    # Iterate over all frames in the traceback and
+    # find the first dynamically loaded module in the traceback
     while tb:
         frame = tb.tb_frame
         if "__name__" in frame.f_locals and frame.f_locals['__name__'] in dynamically_loaded_modules:
@@ -158,6 +160,8 @@ def print_exception_hook(exc_type, exc_info, tb):
             break
         tb = tb.tb_next
 
+    # Print the exception as usual begining from the first dynamic module,
+    # if one is involved.
     traceback.print_exception(exc_type, exc_info, first_dynamic_tb or tb)
 
 def install_exception_hook():

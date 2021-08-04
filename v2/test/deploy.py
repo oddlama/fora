@@ -5,7 +5,7 @@ print(f"[+] Run script {__file__} on host {host.name}")
 local.script(name="Run script",
              script="deploy.py")
 
-with host.defaults():
+with this.defaults():
     pass
 
 if "desktops" in host.groups:

@@ -301,7 +301,7 @@ def resolve_connector(host: HostType):
         # The connector was explicitly given
         pass
     else:
-        die_error(f"Invalid connector was specified", loc=host.loaded_from)
+        die_error("Invalid connector was specified", loc=host.loaded_from)
 
 def load_host(name: str, module_file: str) -> HostType:
     """

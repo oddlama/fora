@@ -29,8 +29,9 @@ def _print_script_trace(currentframe=None):
         print_frame(currentframe)
 
 def script(name, script, recursive=False):
-    outer_frame = inspect.getouterframes(inspect.currentframe())[1]
+    # Check if the invocation is recursive
     if not recursive:
+        outer_frame = inspect.getouterframes(inspect.currentframe())[1]
         for meta, _ in simple_automation.loader.script_stack:
             if os.path.samefile(script, meta.loaded_from):
                 _print_script_trace(outer_frame)

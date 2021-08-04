@@ -18,6 +18,9 @@ from typing import cast, Any, TypeVar, Callable, Optional
 
 T = TypeVar('T')
 
+# TODO timeout
+# TODO env
+
 def resolve_umask(umask: str) -> int:
     """
     Resolves an octal string umask to a numeric umask.
@@ -677,8 +680,6 @@ class PacketProcessRun:
             if self.cwd is not None:
                 os.chdir(self.cwd)
 
-        # TODO timeout
-        # TODO env
         # Execute command with desired parameters
         try:
             result = subprocess.run(self.command,
