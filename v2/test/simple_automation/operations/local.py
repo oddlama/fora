@@ -1,4 +1,6 @@
+import inspect
 import os
+import sys
 
 import simple_automation
 
@@ -16,6 +18,13 @@ def _error_recursive_script_loop(script):
         else:
             print(f"    {meta.loaded_from} ({meta.name})")
     print(f"  → {script} (this call)")
+    print(inspect.getouterframes(inspect.currentframe())[2])
+
+    try:
+        raise RuntimeError(f"Invalid recursive call to script {script}")
+    except RuntimeError:
+        ei = sys.exc_info()
+        raise ei[1].with_traceback(None)
 
 def script(name, script, recursive=False):
     if not recursive:
@@ -27,3 +36,4 @@ def script(name, script, recursive=False):
                 # maybe allow REPL to be started?
                 _error_recursive_script_loop(script)
                 return
+    # TODO

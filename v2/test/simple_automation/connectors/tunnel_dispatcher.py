@@ -35,8 +35,8 @@ def resolve_umask(umask: str) -> int:
     """
     try:
         return int(umask, 8)
-    except ValueError as _:
-        raise ValueError(f"Invalid umask '{umask}': Must be in octal format.")
+    except ValueError:
+        raise ValueError(f"Invalid umask '{umask}': Must be in octal format.") # pylint: disable=raise-missing-from
 
 def resolve_user(user: str) -> tuple[int, int]:
     """
@@ -60,10 +60,10 @@ def resolve_user(user: str) -> tuple[int, int]:
         try:
             uid = int(user)
             pw = getpwuid(uid)
-        except KeyError as _:
-            raise ValueError(f"The user with the uid '{uid}' does not exist.")
-        except ValueError as _:
-            raise ValueError(f"The user with the name '{user}' does not exist.")
+        except KeyError:
+            raise ValueError(f"The user with the uid '{uid}' does not exist.") # pylint: disable=raise-missing-from
+        except ValueError:
+            raise ValueError(f"The user with the name '{user}' does not exist.") # pylint: disable=raise-missing-from
 
     return (pw.pw_uid, pw.pw_gid)
 
@@ -89,10 +89,10 @@ def resolve_group(group: str) -> int:
         try:
             gid = int(group)
             gr = getgrgid(gid)
-        except KeyError as _:
-            raise ValueError(f"The group with the gid '{gid}' does not exist.")
-        except ValueError as _:
-            raise ValueError(f"The group with the name '{group}' does not exist.")
+        except KeyError:
+            raise ValueError(f"The group with the gid '{gid}' does not exist.") # pylint: disable=raise-missing-from
+        except ValueError:
+            raise ValueError(f"The group with the name '{group}' does not exist.") # pylint: disable=raise-missing-from
 
     return gr.gr_gid
 
@@ -794,6 +794,7 @@ class PacketProcessPreexecError:
         conn
             The connection
         """
+        _ = (self)
         conn.write_u32(Packets.process_preexec_error)
         conn.flush()
 
@@ -821,6 +822,19 @@ packet_deserializers: dict[int, Callable[[Connection], Any]] = {
 }
 
 def receive_packet(conn: Connection) -> Any:
+    """
+    Receives the next packet from the given connection.
+
+    Parameters
+    ----------
+    conn
+        The connection
+
+    Returns
+    -------
+    Any
+        The received packet
+    """
     try:
         packet_id = conn.read_u32()
         if packet_id not in packet_deserializers:
@@ -828,7 +842,7 @@ def receive_packet(conn: Connection) -> Any:
 
         return packet_deserializers[packet_id](conn)
     except struct.error as e:
-        raise IOError(f"Unexpected EOF in data stream: {str(e)}")
+        raise IOError("Unexpected EOF in data stream") from e
 
 def main():
     """

@@ -10,7 +10,7 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined
 import simple_automation
 from simple_automation.connection import Connection
 from simple_automation.loader import load_site, run_script
-from simple_automation.utils import die_error
+from simple_automation.utils import die_error, install_exception_hook
 from simple_automation.version import __version__
 
 def init_runtime():
@@ -98,6 +98,12 @@ def main():
         args: argparse.Namespace = parser.parse_args()
     except ArgumentParserError as e:
         die_error(str(e))
+
+    # Install exception hook to modify traceback, if debug isn't set.
+    # Exceptions raised from a dynamically loaded module will then
+    # be displayed a lot cleaner.
+    if not args.debug:
+        install_exception_hook()
 
     if 'func' not in args:
         # Fallback to --help.

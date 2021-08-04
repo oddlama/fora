@@ -3,7 +3,8 @@ Provides a class to manage a remote connection via the host's connector.
 Stores state along with the connection.
 """
 
-from simple_automation.connectors.connector import Connector
+from typing import Optional
+from simple_automation.connectors.connector import Connector, CompletedRemoteCommand
 
 class Connection:
     """
@@ -31,5 +32,12 @@ class Connection:
         self.host.connection = None
         self.connector.close()
 
-    def run(self, command, checked=False, input=None, user=None, umask=None):
+    def run(self, command: list[str],
+            input: Optional[bytes] = None, # pylint: disable=redefined-builtin
+            capture_output: bool = True,
+            check: bool = False,
+            user: Optional[str] = None,
+            group: Optional[str] = None,
+            umask: Optional[str] = None,
+            cwd: Optional[str] = None) -> CompletedRemoteCommand:
         pass

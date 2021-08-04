@@ -18,6 +18,9 @@ class ConnectionLogger:
     def failed(self, msg):
         print(f"[[32m>[m] Connection to {self.host.name} failed: {msg}")
 
+    def error(self, msg):
+        print(f"[[32m>[m] Connection error on {self.host.name}: {msg}")
+
 class Logger:
     def __init__(self):
         self.connections = {}

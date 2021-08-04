@@ -4,6 +4,7 @@ Provides utility functions.
 
 import os
 import sys
+import traceback
 import uuid
 from typing import TypeVar, Callable, Iterable
 
@@ -11,6 +12,11 @@ import importlib.machinery
 import importlib.util
 
 T = TypeVar('T')
+
+# A set of all modules names that are dynamically loaded modules.
+# These are guaranteed to be unique across all possible modules,
+# as a random uuid will be generated at load-time for each module.
+dynamically_loaded_modules: set[str] = set()
 
 def print_warning(msg: str):
     """
@@ -53,7 +59,9 @@ def load_py_module(file: str, print_on_error=True):
     Calling this function twice for the same file will yield distinct instances.
     """
     module_id = str(uuid.uuid4()).replace('-', '_')
-    loader = importlib.machinery.SourceFileLoader(f"{os.path.splitext(os.path.basename(file))[0]}__dynamic__{module_id}", file)
+    module_name = f"{os.path.splitext(os.path.basename(file))[0]}__dynamic__{module_id}"
+    dynamically_loaded_modules.add(module_name)
+    loader = importlib.machinery.SourceFileLoader(module_name, file)
     spec = importlib.util.spec_from_loader(loader.name, loader)
     if spec is None:
         raise ValueError(f"Failed to load module from file '{file}'")
@@ -62,7 +70,7 @@ def load_py_module(file: str, print_on_error=True):
         loader.exec_module(mod)
     except Exception as e:
         if print_on_error:
-            print_error(f"An exception occurred while loading module '{file}'!")
+            print_error(f"An exception occurred while loading/executing module '{file}'!")
         raise e
     return mod
 
@@ -135,3 +143,28 @@ def rank_sort(vertices: Iterable[T], preds_of: Callable[[T], Iterable[T]], child
             needs_rank_list.extend([(c, n) for c in childs_of(n)])
 
     return ranks
+
+def print_exception_hook(exc_type, exc_info, tb):
+    """
+    An exception hook that modifies tracebacks raised from dynamically
+    loaded modules so they are printed in a cleaner way.
+    """
+
+    first_dynamic_tb = None
+    while tb:
+        frame = tb.tb_frame
+        if "__name__" in frame.f_locals and frame.f_locals['__name__'] in dynamically_loaded_modules:
+            first_dynamic_tb = tb
+            break
+        tb = tb.tb_next
+
+    traceback.print_exception(exc_type, exc_info, first_dynamic_tb or tb)
+
+def install_exception_hook():
+    """
+    Installs a new global exception handler, that will modify the
+    traceback of exceptions raised from dynamically loaded modules
+    so that they are printed in a cleaner way.
+    """
+
+    sys.excepthook = print_exception_hook

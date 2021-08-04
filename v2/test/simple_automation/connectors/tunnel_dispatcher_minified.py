@@ -12,7 +12,7 @@ T=TypeVar('T')
 def resolve_umask(umask:str)->int:
  try:
   return int(umask,8)
- except ValueError as _:
+ except ValueError:
   raise ValueError(f"Invalid umask '{umask}': Must be in octal format.")
 def resolve_user(user:str)->tuple[int,int]:
  try:
@@ -21,9 +21,9 @@ def resolve_user(user:str)->tuple[int,int]:
   try:
    uid=int(user)
    pw=getpwuid(uid)
-  except KeyError as _:
+  except KeyError:
    raise ValueError(f"The user with the uid '{uid}' does not exist.")
-  except ValueError as _:
+  except ValueError:
    raise ValueError(f"The user with the name '{user}' does not exist.")
  return(pw.pw_uid,pw.pw_gid)
 def resolve_group(group:str)->int:
@@ -33,9 +33,9 @@ def resolve_group(group:str)->int:
   try:
    gid=int(group)
    gr=getgrgid(gid)
-  except KeyError as _:
+  except KeyError:
    raise ValueError(f"The group with the gid '{gid}' does not exist.")
-  except ValueError as _:
+  except ValueError:
    raise ValueError(f"The group with the name '{group}' does not exist.")
  return gr.gr_gid
 class Connection:
@@ -239,6 +239,7 @@ class PacketProcessPreexecError:
   _=(self,conn)
   raise RuntimeError("This packet should never be sent by the client!")
  def write(self,conn:Connection):
+  _=(self)
   conn.write_u32(Packets.process_preexec_error)
   conn.flush()
  @staticmethod
@@ -253,7 +254,7 @@ def receive_packet(conn:Connection)->Any:
    raise IOError(f"Received invalid packet id '{packet_id}'")
   return packet_deserializers[packet_id](conn)
  except struct.error as e:
-  raise IOError(f"Unexpected EOF in data stream: {str(e)}")
+  raise IOError("Unexpected EOF in data stream")from e
 def main():
  conn=Connection(sys.stdin.buffer,sys.stdout.buffer)
  while not conn.should_close:
