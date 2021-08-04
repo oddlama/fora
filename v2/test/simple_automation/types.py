@@ -455,6 +455,22 @@ class ScriptType(MockupType):
         The original file path of the instanciated module.
         """
 
+    def defaults(self,
+                 user: str = None,
+                 group: str = None,
+                 umask: str = None,
+                 cwd: str = None):
+        """
+        """
+        # TODO one defaults stack per task and per script.
+        # there should be a global method to resolve variables against
+        # defaults like
+        #   user, group, umask, cwd = resolve_defaults(user, group, umask, cwd)
+        # this automatically uses the current script (simple_automation.this)
+        # to determine the defaults. This function should return a separate defaultscontext
+        # as taskmeta needs it too. It should automatically store the correct info and update a variable
+        # in script.this like "defaults" so that bobs your uncle.
+
 def _get_variables(cls, module: ModuleType) -> set[str]:
     """
     Returns the list of all user-defined attributes for the given module.
