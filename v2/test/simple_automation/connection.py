@@ -21,10 +21,6 @@ class Connection:
             raise ValueError("host.connector must be set")
         self.connector: Connector = self.host.connector(host.url, host)
 
-        self.umask: str = '077'
-        self.user: str = 'root'
-        self.group: str = 'root'
-
     def __enter__(self):
         # Open the connection
         self.connector.open()
@@ -44,3 +40,6 @@ class Connection:
             umask: Optional[str] = None,
             cwd: Optional[str] = None) -> CompletedRemoteCommand:
         pass
+
+def open_connection(host: HostType):
+    return Connection(host)

@@ -14,10 +14,25 @@ from typing import Union, Callable, Optional, Any, TYPE_CHECKING
 # Cyclic import is correct at this point, as this module will not access anything from simple_automation
 # when it is being loaded, but only when certain functions are used.
 import simple_automation
+from simple_automation.remote_defaults import RemoteDefaults
 
 if TYPE_CHECKING:
     from simple_automation.connection import Connection
     from simple_automation.connectors.connector import Connector
+
+class RemoteDefaultsContext:
+    """
+    A context manager to overlay remote defaults on a stack of defaults.
+    """
+    def __init__(self, obj: Union[ScriptType, TaskType], new_defaults: RemoteDefaults):
+        self.obj = obj
+        self.new_defaults = new_defaults
+
+    def __enter__(self):
+        self.obj._defaults_stack.append(self.new_defaults)
+
+    def __exit__(self, type_t, value, traceback):
+        self.obj._defaults_stack.pop()
 
 class MockupType(ModuleType):
     """
@@ -352,7 +367,7 @@ class HostType(MockupType):
                 return True
 
         # TODO task variables lookup here
-        # if simple_automation.task is not None:
+        # if simple_automation.this is a task:
         #    if hasattr(simple_automation.task, attr):
         #        return True
 
@@ -455,13 +470,47 @@ class ScriptType(MockupType):
         The original file path of the instanciated module.
         """
 
+        self._defaults_stack: list[str] = [RemoteDefaults()]
+        """
+        The stack remote execution defaults. The stack can only be changed by using
+        the context manager returned in :meth:`self.defaults() <simple_automation.types.ScriptType.defaults>`.
+        """
+
     def defaults(self,
-                 user: str = None,
-                 group: str = None,
-                 umask: str = None,
-                 cwd: str = None):
+                 as_user: Optional[str] = None,
+                 as_group: Optional[str] = None,
+                 owner: Optional[str] = None,
+                 group: Optional[str] = None,
+                 file_mode: Optional[str] = None,
+                 dir_mode: Optional[str] = None,
+                 umask: Optional[str] = None,
+                 cwd: Optional[str] = None):
         """
+        Returns a context manager to incrementally change the remote execution defaults.
+
+        .. code-block:: python
+
+            from simple_automation import this
+            with this.defaults(owner="root", file_mode="644", dir_mode="755"):
         """
+        if simple_automation.this is not self:
+            raise RuntimeError("Cannot set defaults on a script when it isn't the currently active script.")
+
+        new_defaults = RemoteDefaults(
+                 as_user=as_user,
+                 as_group=as_group,
+                 owner=owner,
+                 group=group,
+                 file_mode=file_mode,
+                 dir_mode=dir_mode,
+                 umask=umask,
+                 cwd=cwd)
+        new_defaults.overlay(self.current_defaults())
+
+        simple_automation.host.connection.
+
+        # TODO verify
+        return RemoteDefaultsContext(self, new_defaults)
         # TODO one defaults stack per task and per script.
         # there should be a global method to resolve variables against
         # defaults like
@@ -470,6 +519,16 @@ class ScriptType(MockupType):
         # to determine the defaults. This function should return a separate defaultscontext
         # as taskmeta needs it too. It should automatically store the correct info and update a variable
         # in script.this like "defaults" so that bobs your uncle.
+
+    def current_defaults(self) -> RemoteDefaults:
+        """
+        Returns the currently active defaults.
+
+        Returns
+        -------
+            The currently active remote defaults.
+        """
+        return self._defaults_stack[-1]
 
 def _get_variables(cls, module: ModuleType) -> set[str]:
     """
