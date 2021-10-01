@@ -110,4 +110,5 @@ def main():
         # Fallback to --help.
         parser.print_help()
     else:
+        simple_automation.args = args
         args.func(args)

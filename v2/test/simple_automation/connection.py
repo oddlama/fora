@@ -6,7 +6,7 @@ Stores state along with the connection.
 from typing import Optional
 
 import simple_automation
-from simple_automation.connectors.connector import Connector, CompletedRemoteCommand
+from simple_automation.connectors.connector import Connector, CompletedRemoteCommand, StatResult
 from simple_automation.remote_settings import RemoteSettings
 from simple_automation.types import HostType, ScriptType, TaskType
 
@@ -62,9 +62,6 @@ class Connection:
             umask=umask,
             cwd=cwd)
 
-    def verify_defaults(self, defaults: RemoteSettings):
-        pass
-
     def resolve_defaults(self, settings: RemoteSettings) -> RemoteSettings:
         """
         Resolves (and verifies) the given settings against the current defaults,
@@ -104,22 +101,21 @@ class Connection:
         check_mask(settings.file_mode, "file_mode")
         check_mask(settings.dir_mode, "dir_mode")
         check_mask(settings.umask, "umask")
-        settings.cwd = self.resolve_dir(settings.cwd)
+        if not self.stat(settings.cwd):
+            raise ValueError(f"The selected working directory '{cwd}' doesn't exist!")
 
         return settings
 
     def resolve_user(self, user: str) -> str:
-        return ""
+        return self.connector.resolve_user(user)
 
     def resolve_group(self, group: str) -> str:
-        return ""
+        return self.connector.resolve_group(group)
 
-    def resolve_dir(self, path: str) -> str:
-        return ""
-
-    def stat(self, path: str):
-        # TODO
-        pass
+    def stat(self, path: str, follow_links: bool = True) -> Optional[StatResult]:
+        return self.connector.stat(
+            path=path,
+            follow_links=follow_links)
 
 def open_connection(host: HostType) -> Connection:
     """

@@ -29,7 +29,7 @@ class RemoteDefaultsContext:
         self.new_defaults = new_defaults
 
     def __enter__(self):
-        simple_automation.host.connection.verify_defaults(self.new_defaults)
+        self.new_defaults = simple_automation.host.connection.resolve_defaults(self.new_defaults)
         self.obj._defaults_stack.append(self.new_defaults)
 
     def __exit__(self, type_t, value, traceback):

@@ -13,8 +13,8 @@ import simple_automation.connectors.tunnel_dispatcher_minified
 
 from simple_automation import logger
 from simple_automation.log import ConnectionLogger
-from simple_automation.connectors.connector import Connector, connector, CompletedRemoteCommand
-from simple_automation.connectors.tunnel_dispatcher import Connection as SshConnection, PacketExit, PacketCheckAlive, PacketAck, PacketProcessRun, PacketProcessCompleted, PacketInvalidField, receive_packet
+from simple_automation.connectors.connector import Connector, connector, CompletedRemoteCommand, StatResult
+from simple_automation.connectors.tunnel_dispatcher import Connection as SshConnection, PacketExit, PacketCheckAlive, PacketAck, PacketProcessRun, PacketProcessCompleted, PacketInvalidField, PacketStat, PacketStatResult, PacketResolveUser, PacketResolveGroup, PacketResolveResult, receive_packet
 from simple_automation.types import HostType
 
 @connector
@@ -53,7 +53,10 @@ class SshConnector(Connector):
                 raise RuntimeError("Invalid response from remote dispatcher. This is a bug.")
         except IOError as e:
             self.log.failed("Dispatcher handshake failed")
-            raise IOError("Failed to establish connection to remote host.") from e
+            if simple_automation.args.debug:
+                raise IOError("Failed to establish connection to remote host.") from e
+            else:
+                exit(1)
 
         self.log.established()
 
@@ -115,6 +118,80 @@ class SshConnector(Connector):
                                                 cmd=command)
 
         return result
+
+    def stat(self, path: str, follow_links: bool) -> Optional[StatResult]:
+        try:
+            # Construct and send packet with process information
+            PacketStat(
+                path=path,
+                follow_links=follow_links).write(self.conn)
+
+            # Wait for result packet
+            packet = receive_packet(self.conn)
+        except IOError as e:
+            self.log.error("Unexpected EOF")
+            raise IOError("Remote host disconnected unexpectedly.") from e
+
+        # Check type of incoming packet to handle errors
+        if isinstance(packet, PacketInvalidField):
+            return None
+
+        if not isinstance(packet, PacketStatResult):
+            self.log.error(f"Invalid response '{type(packet)}'")
+            raise RuntimeError(f"Invalid response '{type(packet)}' from remote dispatcher. This is a bug.")
+
+        return StatResult(
+            type=ftype,
+            mode=stat.S_IMODE(s.st_mode),
+            uid=s.st_uid,
+            gid=s.st_gid,
+            size=s.size,
+            mtime=s.st_mtime,
+            ctime=s.st_ctime)
+
+    def resolve_user(self, user: str) -> str:
+        try:
+            # Construct and send packet with process information
+            packet_resolve = PacketResolveUser(user=user)
+            packet_resolve.write(self.conn)
+
+            # Wait for result packet
+            packet = receive_packet(self.conn)
+        except IOError as e:
+            self.log.error("Unexpected EOF")
+            raise IOError("Remote host disconnected unexpectedly.") from e
+
+        # Check type of incoming packet to handle errors differently
+        if isinstance(packet, PacketInvalidField):
+            raise ValueError(f"User '{user}' doesn't exist")
+
+        if not isinstance(packet, PacketResolveResult):
+            self.log.error(f"Invalid response '{type(packet)}'")
+            raise RuntimeError(f"Invalid response '{type(packet)}' from remote dispatcher. This is a bug.")
+
+        return packet.value
+
+    def resolve_group(self, group: str) -> str:
+        try:
+            # Construct and send packet with process information
+            packet_resolve = PacketResolveGroup(group=group)
+            packet_resolve.write(self.conn)
+
+            # Wait for result packet
+            packet = receive_packet(self.conn)
+        except IOError as e:
+            self.log.error("Unexpected EOF")
+            raise IOError("Remote host disconnected unexpectedly.") from e
+
+        # Check type of incoming packet to handle errors differently
+        if isinstance(packet, PacketInvalidField):
+            raise ValueError(f"Group '{group}' doesn't exist")
+
+        if not isinstance(packet, PacketResolveResult):
+            self.log.error(f"Invalid response '{type(packet)}'")
+            raise RuntimeError(f"Invalid response '{type(packet)}' from remote dispatcher. This is a bug.")
+
+        return packet.value
 
     def _ssh_command(self, remote_command_escaped: str) -> list[str]:
         """

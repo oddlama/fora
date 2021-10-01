@@ -2,6 +2,8 @@
 This is the main module of simple_automation.
 """
 
+import argparse
+
 from typing import Optional, Union, Any, cast
 from .types import InventoryType, GroupType, HostType, ScriptType, TaskType
 from .log import Logger
@@ -13,14 +15,21 @@ class NotYetLoaded:
     using a part of simple_automation that hasn't been initialized yet.
     """
 
-logger = Logger()
+args: argparse.Namespace = cast(argparse.Namespace, NotYetLoaded())
 """
 The global logger. Should be used for all user-facing information logging to ensure
 that this information is displayed in a proper format and according to the user's
 verbosity preferences.
 """
 
-inventory = cast(InventoryType, NotYetLoaded())
+logger: Logger = Logger()
+"""
+The global logger. Should be used for all user-facing information logging to ensure
+that this information is displayed in a proper format and according to the user's
+verbosity preferences.
+"""
+
+inventory: InventoryType = cast(InventoryType, NotYetLoaded())
 """
 The inventory module we are operating on.
 This is loaded from the inventory definition file (inventory.py).

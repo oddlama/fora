@@ -2,6 +2,7 @@
 Provides a class that represents execution defaults for a remote host.
 """
 
+from __future__ import annotations
 from typing import Optional
 
 class RemoteSettings:

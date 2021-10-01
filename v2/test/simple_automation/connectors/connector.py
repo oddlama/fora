@@ -16,6 +16,26 @@ class CompletedRemoteCommand:
         self.stderr = stderr
         self.returncode = returncode
 
+class StatResult:
+    """
+    The return value of stat(), representing information about a remote file.
+    """
+    def __init__(self,
+                 type: str,
+                 mode: int,
+                 uid: int,
+                 gid: int,
+                 size: int,
+                 mtime: int,
+                 ctime: int):
+        self.type = type
+        self.mode = mode
+        self.uid = uid
+        self.gid = gid
+        self.size = size
+        self.mtime = mtime
+        self.ctime = ctime
+
 class Connector:
     """
     The base class for all connectors.

@@ -1,4 +1,5 @@
 - declarative.
+- minify the dispatcher before packaging in setup.py
 
 
 TODO remove all type hints from docstrings when they

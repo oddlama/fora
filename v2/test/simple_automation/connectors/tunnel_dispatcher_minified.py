@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import os
+import stat
 import struct
 import subprocess
 import sys
@@ -105,6 +106,11 @@ class Packets(IntEnum):
  process_run=4
  process_completed=5
  process_preexec_error=6
+ stat=7
+ stat_result=8
+ resolve_user=9
+ resolve_group=10
+ resolve_result=11
 class PacketAck:
  def write(self,conn:Connection):
   _=(self)
@@ -246,7 +252,110 @@ class PacketProcessPreexecError:
  def read(conn:Connection):
   _=(conn)
   return PacketProcessPreexecError()
-packet_deserializers:dict[int,Callable[[Connection],Any]]={Packets.ack:PacketAck.read,Packets.check_alive:PacketCheckAlive.read,Packets.exit:PacketExit.read,Packets.invalid_field:PacketInvalidField.read,Packets.process_run:PacketProcessRun.read,Packets.process_completed:PacketProcessCompleted.read,Packets.process_preexec_error:PacketProcessPreexecError.read,}
+class PacketStat:
+ def __init__(self,path:str,follow_links:bool=True):
+  self.path=path
+  self.follow_links=follow_links
+ def handle(self,conn:Connection):
+  try:
+   s=os.stat(self.path,follow_symlinks=self.follow_links)
+  except OSError:
+   PacketInvalidField("path","Path doesn't exist").write(conn)
+   return
+  ftype="dir" if stat.S_ISDIR(s.st_mode) else "chr" if stat.S_ISCHR(s.st_mode) else "blk" if stat.S_ISBLK(s.st_mode) else "file" if stat.S_ISREG(s.st_mode) else "fifo" if stat.S_ISFIFO(s.st_mode)else "link" if stat.S_ISLNK(s.st_mode) else "sock" if stat.S_ISSOCK(s.st_mode)else "other"
+  PacketStatResult(type=ftype,mode=stat.S_IMODE(s.st_mode),uid=s.st_uid,gid=s.st_gid,size=s.size,mtime=s.st_mtime,ctime=s.st_ctime).write(conn)
+ def write(self,conn:Connection):
+  _=(self)
+  conn.write_u32(Packets.stat)
+  conn.write_str(self.path)
+  conn.write_bool(self.follow_links)
+  conn.flush()
+ @staticmethod
+ def read(conn:Connection):
+  return PacketStat(path=conn.read_str(),follow_links=conn.read_bool())
+class PacketStatResult:
+ def __init__(self,type:str,mode:int,uid:int,gid:int,size:int,mtime:int,ctime:int):
+  self.type=type
+  self.mode=mode
+  self.uid=uid
+  self.gid=gid
+  self.size=size
+  self.mtime=mtime
+  self.ctime=ctime
+ def handle(self,conn:Connection):
+  _=(self,conn)
+  raise RuntimeError("This packet should never be sent by the client!")
+ def write(self,conn:Connection):
+  conn.write_u32(Packets.stat_result)
+  conn.write_str(self.type)
+  conn.write_u64(self.mode)
+  conn.write_i32(self.uid)
+  conn.write_i32(self.gid)
+  conn.write_u64(self.size)
+  conn.write_u64(self.mtime)
+  conn.write_u64(self.ctime)
+  conn.flush()
+ @staticmethod
+ def read(conn:Connection):
+  return PacketStatResult(type=conn.read_str(),mode=conn.read_u64(),uid=conn.read_i32(),gid=conn.read_i32(),size=conn.read_u64(),mtime=conn.read_u64(),ctime=conn.read_u64())
+class PacketResolveUser:
+ def __init__(self,user:str):
+  self.user=user
+ def handle(self,conn:Connection):
+  try:
+   pw=getpwnam(self.user)
+  except KeyError:
+   try:
+    uid=int(self.user)
+    pw=getpwuid(uid)
+   except(KeyError,ValueError):
+    PacketInvalidField("user","The user does not exist").write(conn)
+    return
+  PacketResolveResult(value=pw.pw_name).write(conn)
+ def write(self,conn:Connection):
+  _=(self)
+  conn.write_u32(Packets.resolve_user)
+  conn.write_str(self.user)
+  conn.flush()
+ @staticmethod
+ def read(conn:Connection):
+  return PacketResolveUser(user=conn.read_str())
+class PacketResolveGroup:
+ def __init__(self,group:str):
+  self.group=group
+ def handle(self,conn:Connection):
+  try:
+   gr=getgrnam(self.group)
+  except KeyError:
+   try:
+    gid=int(self.group)
+    gr=getgrgid(gid)
+   except(KeyError,ValueError):
+    PacketInvalidField("group","The group does not exist").write(conn)
+    return
+  PacketResolveResult(value=gr.gr_name).write(conn)
+ def write(self,conn:Connection):
+  _=(self)
+  conn.write_u32(Packets.resolve_group)
+  conn.write_str(self.group)
+  conn.flush()
+ @staticmethod
+ def read(conn:Connection):
+  return PacketResolveGroup(group=conn.read_str())
+class PacketResolveResult:
+ def __init__(self,value:Optional[str]):
+  self.value=value
+ def handle(self,conn:Connection):
+  _=(self,conn)
+  raise RuntimeError("This packet should never be sent by the client!")
+ def write(self,conn:Connection):
+  conn.write_u32(Packets.resolve_result)
+  conn.write_opt_str(self.value)
+  conn.flush()
+ @staticmethod
+ def read(conn:Connection):
+  return PacketResolveResult(value=conn.read_opt_str())
+packet_deserializers:dict[int,Callable[[Connection],Any]]={Packets.ack:PacketAck.read,Packets.check_alive:PacketCheckAlive.read,Packets.exit:PacketExit.read,Packets.invalid_field:PacketInvalidField.read,Packets.process_run:PacketProcessRun.read,Packets.process_completed:PacketProcessCompleted.read,Packets.process_preexec_error:PacketProcessPreexecError.read,Packets.stat:PacketStat.read,Packets.stat_result:PacketStatResult.read,Packets.resolve_user:PacketResolveUser.read,Packets.resolve_group:PacketResolveGroup.read,Packets.resolve_result:PacketResolveResult.read,}
 def receive_packet(conn:Connection)->Any:
  try:
   packet_id=conn.read_u32()
