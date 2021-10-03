@@ -21,11 +21,24 @@ T = TypeVar('T')
 
 is_server = False
 debug = False
+try:
+    import simple_automation
+except ModuleNotFoundError:
+    pass
 
 # TODO timeout
 # TODO env
 
+def is_debug():
+    if is_server:
+        return debug
+    else:
+        return simple_automation.args.debug
+
 def log(msg: str):
+    if not is_debug():
+        return
+
     # TODO color should be configurable
     prefix = "[ [1;33mREMOTE[m  ] " if is_server else "[ [1;32mLOCAL[m   ] "
     print(f"{prefix}{msg}", file=sys.stderr, flush=True)

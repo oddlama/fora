@@ -12,7 +12,18 @@ from typing import cast,Any,TypeVar,Callable,Optional
 T=TypeVar('T')
 is_server=False
 debug=False
+try:
+ import simple_automation
+except ModuleNotFoundError:
+ pass
+def is_debug():
+ if is_server:
+  return debug
+ else:
+  return simple_automation.args.debug
 def log(msg:str):
+ if not is_debug():
+  return
  prefix="[ [1;33mREMOTE[m  ] " if is_server else "[ [1;32mLOCAL[m   ] "
  print(f"{prefix}{msg}",file=sys.stderr,flush=True)
 def resolve_umask(umask:str)->int:
@@ -346,18 +357,18 @@ class PacketResolveGroup:
  def read(conn:Connection):
   return PacketResolveGroup(group=conn.read_str())
 class PacketResolveResult:
- def __init__(self,value:Optional[str]):
+ def __init__(self,value:str):
   self.value=value
  def handle(self,conn:Connection):
   _=(self,conn)
   raise RuntimeError("This packet should never be sent by the client!")
  def write(self,conn:Connection):
   conn.write_u32(Packets.resolve_result)
-  conn.write_opt_str(self.value)
+  conn.write_str(self.value)
   conn.flush()
  @staticmethod
  def read(conn:Connection):
-  return PacketResolveResult(value=conn.read_opt_str())
+  return PacketResolveResult(value=conn.read_str())
 packet_deserializers:dict[int,Callable[[Connection],Any]]={Packets.ack:PacketAck.read,Packets.check_alive:PacketCheckAlive.read,Packets.exit:PacketExit.read,Packets.invalid_field:PacketInvalidField.read,Packets.process_run:PacketProcessRun.read,Packets.process_completed:PacketProcessCompleted.read,Packets.process_preexec_error:PacketProcessPreexecError.read,Packets.stat:PacketStat.read,Packets.stat_result:PacketStatResult.read,Packets.resolve_user:PacketResolveUser.read,Packets.resolve_group:PacketResolveGroup.read,Packets.resolve_result:PacketResolveResult.read,}
 def receive_packet(conn:Connection)->Any:
  try:
