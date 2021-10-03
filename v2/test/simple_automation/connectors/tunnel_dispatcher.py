@@ -19,8 +19,16 @@ from typing import cast, Any, TypeVar, Callable, Optional
 
 T = TypeVar('T')
 
+is_server = False
+debug = False
+
 # TODO timeout
 # TODO env
+
+def log(msg: str):
+    # TODO color should be configurable
+    prefix = "[ [1;33mREMOTE[m  ] " if is_server else "[ [1;32mLOCAL[m   ] "
+    print(f"{prefix}{msg}", file=sys.stderr, flush=True)
 
 def resolve_umask(umask: str) -> int:
     """
@@ -281,6 +289,7 @@ class Connection:
         v
             The object to serialize
         """
+        self.write_u64(len(v))
         self.write(v, len(v))
 
     def write_str(self, v: str):
@@ -858,9 +867,9 @@ class PacketStat:
             mode=stat.S_IMODE(s.st_mode),
             uid=s.st_uid,
             gid=s.st_gid,
-            size=s.size,
-            mtime=s.st_mtime,
-            ctime=s.st_ctime).write(conn)
+            size=s.st_size,
+            mtime=s.st_mtime_ns,
+            ctime=s.st_ctime_ns).write(conn)
 
     def write(self, conn: Connection):
         """
@@ -871,7 +880,6 @@ class PacketStat:
         conn
             The connection
         """
-        _ = (self)
         conn.write_u32(Packets.stat)
         conn.write_str(self.path)
         conn.write_bool(self.follow_links)
@@ -1002,7 +1010,6 @@ class PacketResolveUser:
         conn
             The connection
         """
-        _ = (self)
         conn.write_u32(Packets.resolve_user)
         conn.write_str(self.user)
         conn.flush()
@@ -1060,7 +1067,6 @@ class PacketResolveGroup:
         conn
             The connection
         """
-        _ = (self)
         conn.write_u32(Packets.resolve_group)
         conn.write_str(self.group)
         conn.flush()
@@ -1084,7 +1090,7 @@ class PacketResolveResult:
     """
 
     def __init__(self,
-                 value: Optional[str]):
+                 value: str):
         self.value = value
 
     def handle(self, conn: Connection):
@@ -1109,7 +1115,7 @@ class PacketResolveResult:
             The connection
         """
         conn.write_u32(Packets.resolve_result)
-        conn.write_opt_str(self.value)
+        conn.write_str(self.value)
         conn.flush()
 
     @staticmethod
@@ -1123,7 +1129,7 @@ class PacketResolveResult:
             The connection
         """
         return PacketResolveResult(
-            value=conn.read_opt_str())
+            value=conn.read_str())
 
 packet_deserializers: dict[int, Callable[[Connection], Any]] = {
     Packets.ack: PacketAck.read,
@@ -1159,6 +1165,12 @@ def receive_packet(conn: Connection) -> Any:
         if packet_id not in packet_deserializers:
             raise IOError(f"Received invalid packet id '{packet_id}'")
 
+        try:
+            packet_name = Packets(packet_id).name
+        except KeyError:
+            packet_name = f"unkown packet with id {packet_id}"
+
+        log(f"got packet header for: {packet_name}")
         return packet_deserializers[packet_id](conn)
     except struct.error as e:
         raise IOError("Unexpected EOF in data stream") from e
@@ -1168,14 +1180,21 @@ def main():
     Handles all incoming packets in a loop until an invalid packet or a
     PacketExit is received.
     """
+    global debug
+    global is_server
+    debug = len(sys.argv) > 1 and sys.argv[1] == "--debug"
+    is_server = __name__ = "__main__"
+
     conn = Connection(sys.stdin.buffer, sys.stdout.buffer)
 
     while not conn.should_close:
         try:
+            log("waiting for packet")
             packet = receive_packet(conn)
         except IOError as e:
             print(f"{str(e)}. Aborting.", file=sys.stderr, flush=True)
             sys.exit(3)
+        log(f"received packet {type(packet).__name__}")
         packet.handle(conn)
 
 if __name__ == '__main__':

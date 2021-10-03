@@ -101,15 +101,23 @@ class Connection:
         check_mask(settings.file_mode, "file_mode")
         check_mask(settings.dir_mode, "dir_mode")
         check_mask(settings.umask, "umask")
-        if not self.stat(settings.cwd):
-            raise ValueError(f"The selected working directory '{cwd}' doesn't exist!")
+        if settings.cwd:
+            s = self.stat(settings.cwd)
+            if not s:
+                raise ValueError(f"The selected working directory '{settings.cwd}' doesn't exist!")
+            if s.type != "dir":
+                raise ValueError(f"The selected working directory '{settings.cwd}' is not a directory!")
 
         return settings
 
-    def resolve_user(self, user: str) -> str:
+    def resolve_user(self, user: Optional[str]) -> Optional[str]:
+        if user is None:
+            return None
         return self.connector.resolve_user(user)
 
-    def resolve_group(self, group: str) -> str:
+    def resolve_group(self, group: Optional[str]) -> Optional[str]:
+        if group is None:
+            return None
         return self.connector.resolve_group(group)
 
     def stat(self, path: str, follow_links: bool = True) -> Optional[StatResult]:

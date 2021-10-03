@@ -10,6 +10,11 @@ from grp import getgrnam,getgrgid
 from struct import pack,unpack
 from typing import cast,Any,TypeVar,Callable,Optional
 T=TypeVar('T')
+is_server=False
+debug=False
+def log(msg:str):
+ prefix="[ [1;33mREMOTE[m  ] " if is_server else "[ [1;32mLOCAL[m   ] "
+ print(f"{prefix}{msg}",file=sys.stderr,flush=True)
 def resolve_umask(umask:str)->int:
  try:
   return int(umask,8)
@@ -73,6 +78,7 @@ class Connection:
  def write(self,data:bytes,count:int):
   self.buffer_out.write(data[:count])
  def write_bytes(self,v:bytes):
+  self.write_u64(len(v))
   self.write(v,len(v))
  def write_str(self,v:str):
   self.write_bytes(v.encode('utf-8'))
@@ -263,9 +269,8 @@ class PacketStat:
    PacketInvalidField("path","Path doesn't exist").write(conn)
    return
   ftype="dir" if stat.S_ISDIR(s.st_mode) else "chr" if stat.S_ISCHR(s.st_mode) else "blk" if stat.S_ISBLK(s.st_mode) else "file" if stat.S_ISREG(s.st_mode) else "fifo" if stat.S_ISFIFO(s.st_mode)else "link" if stat.S_ISLNK(s.st_mode) else "sock" if stat.S_ISSOCK(s.st_mode)else "other"
-  PacketStatResult(type=ftype,mode=stat.S_IMODE(s.st_mode),uid=s.st_uid,gid=s.st_gid,size=s.size,mtime=s.st_mtime,ctime=s.st_ctime).write(conn)
+  PacketStatResult(type=ftype,mode=stat.S_IMODE(s.st_mode),uid=s.st_uid,gid=s.st_gid,size=s.st_size,mtime=s.st_mtime_ns,ctime=s.st_ctime_ns).write(conn)
  def write(self,conn:Connection):
-  _=(self)
   conn.write_u32(Packets.stat)
   conn.write_str(self.path)
   conn.write_bool(self.follow_links)
@@ -313,7 +318,6 @@ class PacketResolveUser:
     return
   PacketResolveResult(value=pw.pw_name).write(conn)
  def write(self,conn:Connection):
-  _=(self)
   conn.write_u32(Packets.resolve_user)
   conn.write_str(self.user)
   conn.flush()
@@ -335,7 +339,6 @@ class PacketResolveGroup:
     return
   PacketResolveResult(value=gr.gr_name).write(conn)
  def write(self,conn:Connection):
-  _=(self)
   conn.write_u32(Packets.resolve_group)
   conn.write_str(self.group)
   conn.flush()
@@ -361,17 +364,28 @@ def receive_packet(conn:Connection)->Any:
   packet_id=conn.read_u32()
   if packet_id not in packet_deserializers:
    raise IOError(f"Received invalid packet id '{packet_id}'")
+  try:
+   packet_name=Packets(packet_id).name
+  except KeyError:
+   packet_name=f"unkown packet with id {packet_id}"
+  log(f"got packet header for: {packet_name}")
   return packet_deserializers[packet_id](conn)
  except struct.error as e:
   raise IOError("Unexpected EOF in data stream")from e
 def main():
+ global debug
+ global is_server
+ debug=len(sys.argv)>1 and sys.argv[1]=="--debug"
+ is_server=__name__="__main__"
  conn=Connection(sys.stdin.buffer,sys.stdout.buffer)
  while not conn.should_close:
   try:
+   log("waiting for packet")
    packet=receive_packet(conn)
   except IOError as e:
    print(f"{str(e)}. Aborting.",file=sys.stderr,flush=True)
    sys.exit(3)
+  log(f"received packet {type(packet).__name__}")
   packet.handle(conn)
 if __name__=='__main__':
  main()

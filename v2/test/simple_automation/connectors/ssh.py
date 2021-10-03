@@ -119,7 +119,7 @@ class SshConnector(Connector):
 
         return result
 
-    def stat(self, path: str, follow_links: bool) -> Optional[StatResult]:
+    def stat(self, path: str, follow_links: bool = True) -> Optional[StatResult]:
         try:
             # Construct and send packet with process information
             PacketStat(
@@ -141,13 +141,13 @@ class SshConnector(Connector):
             raise RuntimeError(f"Invalid response '{type(packet)}' from remote dispatcher. This is a bug.")
 
         return StatResult(
-            type=ftype,
-            mode=stat.S_IMODE(s.st_mode),
-            uid=s.st_uid,
-            gid=s.st_gid,
-            size=s.size,
-            mtime=s.st_mtime,
-            ctime=s.st_ctime)
+            type=packet.type,
+            mode=packet.mode,
+            uid=packet.uid,
+            gid=packet.gid,
+            size=packet.size,
+            mtime=packet.mtime,
+            ctime=packet.ctime)
 
     def resolve_user(self, user: str) -> str:
         try:

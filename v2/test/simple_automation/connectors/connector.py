@@ -117,6 +117,15 @@ class Connector:
         """
         raise NotImplementedError("Must be overwritten by subclass.")
 
+    def resolve_user(self, user: str) -> str:
+        raise NotImplementedError("Must be overwritten by subclass.")
+
+    def resolve_group(self, group: str) -> str:
+        raise NotImplementedError("Must be overwritten by subclass.")
+
+    def stat(self, path: str, follow_links: bool = True) -> Optional[StatResult]:
+        raise NotImplementedError("Must be overwritten by subclass.")
+
 def connector(cls):
     """
     The @connector class decorator used to register the connector
