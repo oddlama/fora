@@ -43,25 +43,6 @@ class Connection:
         self.host.connection = None
         self.connector.close()
 
-    def run(self,
-            command: list[str],
-            input: Optional[bytes] = None, # pylint: disable=redefined-builtin
-            capture_output: bool = True,
-            check: bool = False,
-            user: Optional[str] = None,
-            group: Optional[str] = None,
-            umask: Optional[str] = None,
-            cwd: Optional[str] = None) -> CompletedRemoteCommand:
-        return self.connector.run(
-            command=command,
-            input=input,
-            capture_output=capture_output,
-            check=check,
-            user=user,
-            group=group,
-            umask=umask,
-            cwd=cwd)
-
     def resolve_defaults(self, settings: RemoteSettings) -> RemoteSettings:
         """
         Resolves (and verifies) the given settings against the current defaults,
@@ -78,7 +59,7 @@ class Connection:
         RemoteSettings
             The resolved settings
         """
-        if not (isinstance(simple_automation.this, ScriptType) or isinstance(simple_automation.this, TaskType)):
+        if not isinstance(simple_automation.this, (ScriptType, TaskType)):
             raise RuntimeError("Cannot resolve defaults, when neither a script nor a task is currently running.")
 
         # Overlay settings on top of defaults and base defaults
@@ -92,7 +73,7 @@ class Connection:
             try:
                 int(mask, 8)
             except ValueError:
-                raise ValueError(f"Error while resolving settings: {name} is '{mask}' but must be octal!")
+                raise ValueError(f"Error while resolving settings: {name} is '{mask}' but must be octal!") # pylint: disable=raise-missing-from
 
         settings.as_user = self.resolve_user(settings.as_user)
         settings.as_group = self.resolve_group(settings.as_group)
@@ -110,17 +91,44 @@ class Connection:
 
         return settings
 
+    def run(self,
+            command: list[str],
+            input: Optional[bytes] = None, # pylint: disable=redefined-builtin
+            capture_output: bool = True,
+            check: bool = False,
+            user: Optional[str] = None,
+            group: Optional[str] = None,
+            umask: Optional[str] = None,
+            cwd: Optional[str] = None) -> CompletedRemoteCommand:
+        """
+        See :func:`simple_automation.connectors.connector.run`.
+        """
+        return self.connector.run(
+            command=command,
+            input=input,
+            capture_output=capture_output,
+            check=check,
+            user=user,
+            group=group,
+            umask=umask,
+            cwd=cwd)
+
     def resolve_user(self, user: Optional[str]) -> Optional[str]:
-        if user is None:
-            return None
+        """
+        See :func:`simple_automation.connectors.connector.resolve_user`.
+        """
         return self.connector.resolve_user(user)
 
     def resolve_group(self, group: Optional[str]) -> Optional[str]:
-        if group is None:
-            return None
+        """
+        See :func:`simple_automation.connectors.connector.resolve_group`.
+        """
         return self.connector.resolve_group(group)
 
     def stat(self, path: str, follow_links: bool = True) -> Optional[StatResult]:
+        """
+        See :func:`simple_automation.connectors.connector.stat`.
+        """
         return self.connector.stat(
             path=path,
             follow_links=follow_links)

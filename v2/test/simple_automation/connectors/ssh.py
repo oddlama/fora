@@ -53,11 +53,15 @@ class SshConnector(Connector):
             if packet is not None and not isinstance(packet, PacketAck):
                 raise RuntimeError("Invalid response from remote dispatcher. This is a bug.")
         except IOError as e:
-            self.log.failed("Dispatcher handshake failed")
-            if simple_automation.args.debug:
-                raise IOError("Failed to establish connection to remote host.") from e
+            returncode = self.process.poll()
+            if returncode is None:
+                self.log.failed("Dispatcher handshake failed")
+                if simple_automation.args.debug:
+                    raise IOError("Failed to establish connection to remote host.") from e
+                raise e
             else:
-                exit(1)
+                self.log.failed(f"Dispatcher handshake failed: ssh exited with code {returncode}")
+                return False
 
         self.log.established()
 
@@ -73,14 +77,18 @@ class SshConnector(Connector):
         self.process.stdout.close()
         self.log.closed()
 
-    def run(self, command: list[str],
-            input: Optional[bytes], # pylint: disable=redefined-builtin
-            capture_output: bool,
-            check: bool,
-            user: Optional[str],
-            group: Optional[str],
-            umask: Optional[str],
-            cwd: Optional[str]) -> CompletedRemoteCommand:
+    def run(self,
+            command: list[str],
+            input: Optional[bytes] = None, # pylint: disable=redefined-builtin
+            capture_output: bool = True,
+            check: bool = False,
+            user: Optional[str] = None,
+            group: Optional[str] = None,
+            umask: Optional[str] = None,
+            cwd: Optional[str] = None) -> CompletedRemoteCommand:
+        """
+        See :func:`simple_automation.connectors.connector.run`.
+        """
         try:
             # Construct and send packet with process information
             packet_run = PacketProcessRun(
@@ -121,6 +129,9 @@ class SshConnector(Connector):
         return result
 
     def stat(self, path: str, follow_links: bool = True) -> Optional[StatResult]:
+        """
+        See :func:`simple_automation.connectors.connector.stat`.
+        """
         try:
             # Construct and send packet with process information
             PacketStat(
@@ -150,7 +161,13 @@ class SshConnector(Connector):
             mtime=packet.mtime,
             ctime=packet.ctime)
 
-    def resolve_user(self, user: str) -> str:
+    def resolve_user(self, user: Optional[str]) -> Optional[str]:
+        """
+        See :func:`simple_automation.connectors.connector.resolve_group`.
+        """
+        if user is None:
+            return None
+
         try:
             # Construct and send packet with process information
             packet_resolve = PacketResolveUser(user=user)
@@ -172,7 +189,13 @@ class SshConnector(Connector):
 
         return packet.value
 
-    def resolve_group(self, group: str) -> str:
+    def resolve_group(self, group: Optional[str]) -> Optional[str]:
+        """
+        See :func:`simple_automation.connectors.connector.resolve_group`.
+        """
+        if group is None:
+            return None
+
         try:
             # Construct and send packet with process information
             packet_resolve = PacketResolveGroup(group=group)

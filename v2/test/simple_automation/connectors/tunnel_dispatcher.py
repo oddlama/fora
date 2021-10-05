@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# pylint: disable=too-many-lines
 
 """
 Provides a stdin/stdout based protocol to safely dispatch commands and return their
@@ -30,12 +31,21 @@ except ModuleNotFoundError:
 # TODO env
 
 def is_debug():
-    if is_server:
-        return debug
-    else:
-        return simple_automation.args.debug
+    """
+    Returns True if debugging output should be genereated.
+    """
+    return debug if is_server else simple_automation.args.debug
 
 def log(msg: str):
+    """
+    Logs the given message to stderr, appending a prefix to indicate whether this
+    is running on a remote (server) or locally (client).
+
+    Parameters
+    ----------
+    msg
+        The message to log.
+    """
     if not is_debug():
         return
 
@@ -918,7 +928,7 @@ class PacketStatResult:
     """
 
     def __init__(self,
-                 type: str,
+                 type: str, # pylint: disable=redefined-builtin
                  mode: int,
                  uid: int,
                  gid: int,
@@ -1193,10 +1203,11 @@ def main():
     Handles all incoming packets in a loop until an invalid packet or a
     PacketExit is received.
     """
+    # pylint: disable=global-statement
     global debug
     global is_server
     debug = len(sys.argv) > 1 and sys.argv[1] == "--debug"
-    is_server = __name__ = "__main__"
+    is_server = __name__ == "__main__"
 
     conn = Connection(sys.stdin.buffer, sys.stdout.buffer)
 

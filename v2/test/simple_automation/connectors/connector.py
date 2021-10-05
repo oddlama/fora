@@ -21,7 +21,7 @@ class StatResult:
     The return value of stat(), representing information about a remote file.
     """
     def __init__(self,
-                 type: str,
+                 type: str, # pylint: disable=redefined-builtin
                  mode: int,
                  uid: int,
                  gid: int,
@@ -72,14 +72,15 @@ class Connector:
         """
         raise NotImplementedError("Must be overwritten by subclass.")
 
-    def run(self, command: list[str],
-            input: Optional[bytes], # pylint: disable=redefined-builtin
-            capture_output: bool,
-            check: bool,
-            user: Optional[str],
-            group: Optional[str],
-            umask: Optional[str],
-            cwd: Optional[str]) -> CompletedRemoteCommand:
+    def run(self,
+            command: list[str],
+            input: Optional[bytes] = None, # pylint: disable=redefined-builtin
+            capture_output: bool = True,
+            check: bool = False,
+            user: Optional[str] = None,
+            group: Optional[str] = None,
+            umask: Optional[str] = None,
+            cwd: Optional[str] = None) -> CompletedRemoteCommand:
         """
         Runs the given command on the remote, returning a CompletedRemoteCommand
         containing the returned information (if any) and the status code.
@@ -117,13 +118,63 @@ class Connector:
         """
         raise NotImplementedError("Must be overwritten by subclass.")
 
-    def resolve_user(self, user: str) -> str:
+    def resolve_user(self, user: Optional[str]) -> Optional[str]:
+        """
+        Resolves the given user (if not None) on the remote, returning
+        the canonicalized username.
+
+        Raises a ValueError if the user doesn't exist.
+
+        Parameters
+        ----------
+        user
+            The username or uid that should be resolved.
+
+        Returns
+        -------
+        Optional[str]
+            The resolved username or None if the input was None.
+        """
         raise NotImplementedError("Must be overwritten by subclass.")
 
-    def resolve_group(self, group: str) -> str:
+    def resolve_group(self, group: Optional[str]) -> Optional[str]:
+        """
+        Resolves the given group (if not None) on the remote, returning
+        the canonicalized groupname.
+
+        Raises a ValueError if the group doesn't exist.
+
+        Parameters
+        ----------
+        group
+            The groupname or gid that should be resolved.
+
+        Returns
+        -------
+        Optional[str]
+            The resolved groupname or None if the input was None.
+        """
         raise NotImplementedError("Must be overwritten by subclass.")
 
     def stat(self, path: str, follow_links: bool = True) -> Optional[StatResult]:
+        """
+        Runs stat() on the given path on the remote. Follows links if follow_links
+        is true.
+
+        Returns None if the remote couldn't stat the given path.
+
+        Parameters
+        ----------
+        path
+            The path to stat.
+        follow_links
+            Whether to follow symbolic links instead of running stat on the link.
+
+        Returns
+        -------
+        Optional[StatResult]
+            The resolved groupname or None if the input was None.
+        """
         raise NotImplementedError("Must be overwritten by subclass.")
 
 def connector(cls):

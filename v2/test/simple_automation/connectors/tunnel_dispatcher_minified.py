@@ -17,10 +17,7 @@ try:
 except ModuleNotFoundError:
  pass
 def is_debug():
- if is_server:
-  return debug
- else:
-  return simple_automation.args.debug
+ return debug if is_server else simple_automation.args.debug
 def log(msg:str):
  if not is_debug():
   return

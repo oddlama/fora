@@ -5,7 +5,6 @@ the CLI interface and coordination of submodule loading.
 
 import argparse
 import inspect
-import sys
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 import simple_automation
@@ -48,6 +47,9 @@ def main_run(args: argparse.Namespace):
     # Instanciate (run) the given script for each selected host
     for h in host_names:
         host = simple_automation.hosts[h]
+
+        # TODO catch connection error, bot on connect and while processing,
+        # then continue with other hosts or quit?
         with open_connection(host):
             with simple_automation.current_host(host):
                 run_script(args.script, inspect.getouterframes(inspect.currentframe())[0])
