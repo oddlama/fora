@@ -31,7 +31,8 @@ class DefaultHost:
     """
 
     def __init__(self, name):
-        self.url = name
+        from simple_automation import this
+        this.url = name
 
 def load_inventory(file: str) -> InventoryType:
     """
@@ -320,7 +321,7 @@ def load_host(name: str, module_file: str) -> HostType:
         The host module
     """
     module_file_exists = os.path.exists(module_file)
-    meta = HostType(name, module_file if module_file_exists else "__internal__")
+    meta = HostType(name, module_file if module_file_exists else "__cmdline__")
     meta.add_group("all")
 
     with simple_automation.set_this(meta):

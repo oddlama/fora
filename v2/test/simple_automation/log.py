@@ -29,3 +29,6 @@ class Logger:
         cl = ConnectionLogger(host, connector)
         self.connections[host] = cl
         return cl
+
+    def skip_host(self, host, msg):
+        print(f"[ SKIP ] Skipping host {host.name}: {msg}")

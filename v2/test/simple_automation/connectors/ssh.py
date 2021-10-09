@@ -13,7 +13,7 @@ import simple_automation.connectors.tunnel_dispatcher_minified
 
 from simple_automation import logger
 from simple_automation.log import ConnectionLogger
-from simple_automation.connectors.connector import Connector, connector, CompletedRemoteCommand, StatResult
+from simple_automation.connectors.connector import Connector, connector, ConnectionEstablishError, CompletedRemoteCommand, StatResult
 from simple_automation.connectors.tunnel_dispatcher import Connection as SshConnection, PacketExit, PacketCheckAlive, PacketAck, PacketProcessRun, PacketProcessCompleted, PacketInvalidField, PacketStat, PacketStatResult, PacketResolveUser, PacketResolveGroup, PacketResolveResult, receive_packet
 from simple_automation.types import HostType
 
@@ -59,9 +59,9 @@ class SshConnector(Connector):
                 if simple_automation.args.debug:
                     raise IOError("Failed to establish connection to remote host.") from e
                 raise e
-            else:
-                self.log.failed(f"Dispatcher handshake failed: ssh exited with code {returncode}")
-                return False
+
+            self.log.failed(f"Dispatcher handshake failed: ssh exited with code {returncode}")
+            raise ConnectionEstablishError()
 
         self.log.established()
 
