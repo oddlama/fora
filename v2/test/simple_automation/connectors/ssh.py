@@ -61,7 +61,7 @@ class SshConnector(Connector):
                 raise e
 
             self.log.failed(f"Dispatcher handshake failed: ssh exited with code {returncode}")
-            raise ConnectionEstablishError()
+            raise ConnectionEstablishError() from e
 
         self.log.established()
 

@@ -4,22 +4,22 @@ class ConnectionLogger:
         self.connector = connector
 
     def init(self):
-        print(f"[[32m>[m] Establishing connection to {self.host.name} via {self.connector.schema}")
+        print(f"[ CONN ] Establishing connection to {self.host.name} via {self.connector.schema}")
 
     def established(self):
-        print(f"[[32m>[m] Connection to {self.host.name} established")
+        print(f"[ CONN ] Connection to {self.host.name} established")
 
     def requested_close(self):
-        print(f"[[32m>[m] Requesting to close connection to {self.host.name}")
+        print(f"[ CONN ] Requesting to close connection to {self.host.name}")
 
     def closed(self):
-        print(f"[[32m>[m] Connection to {self.host.name} closed")
+        print(f"[ CONN ] Connection to {self.host.name} closed")
 
     def failed(self, msg):
-        print(f"[[32m>[m] Connection to {self.host.name} failed: {msg}")
+        print(f"[ CONN ] Connection to {self.host.name} failed: {msg}")
 
     def error(self, msg):
-        print(f"[[32m>[m] Connection error on {self.host.name}: {msg}")
+        print(f"[ CONN ] Connection error on {self.host.name}: {msg}")
 
 class Logger:
     def __init__(self):
@@ -30,5 +30,11 @@ class Logger:
         self.connections[host] = cl
         return cl
 
+    def error(self, msg):
+        print(f"[ ERROR ] {msg}")
+
     def skip_host(self, host, msg):
         print(f"[ SKIP ] Skipping host {host.name}: {msg}")
+
+    def run_script(self, name, script):
+        print(f"[ RUN ] {script}: {name}")

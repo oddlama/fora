@@ -31,7 +31,7 @@ class DefaultHost:
     """
 
     def __init__(self, name):
-        from simple_automation import this
+        from simple_automation import this # pylint: disable=import-outside-toplevel
         this.url = name
 
 def load_inventory(file: str) -> InventoryType:
@@ -435,5 +435,6 @@ def run_script(script: str, frame: inspect.FrameInfo):
 
     script_stack.append((meta, frame))
     with simple_automation.set_this(meta):
-        load_py_module(script)
+        with meta.defaults():
+            load_py_module(script)
     script_stack.pop()
