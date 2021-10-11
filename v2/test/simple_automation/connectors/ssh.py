@@ -36,17 +36,19 @@ class SshConnector(Connector):
         self.log: ConnectionLogger = logger.new_connection(host, self)
         self.process: subprocess.Popen
         self.conn: SshConnection
+        self.is_open: bool = False
 
     def open(self):
         self.log.init()
         with open(simple_automation.connectors.tunnel_dispatcher_minified.__file__, 'rb') as f:
             tunnel_dispatcher_gz_b64 = base64.b64encode(zlib.compress(f.read(), 9)).decode('ascii')
 
-        # Start the remote dispatcher by uploading it inline as base64.
+        # Start the remote dispatcher by uploading it inline as base64
         param_debug = "--debug" if simple_automation.args.debug else ""
         command = self._ssh_command(f"env python3 -c \"$(echo '{tunnel_dispatcher_gz_b64}' | base64 -d | openssl zlib -d)\" {param_debug}")
         self.process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=sys.stderr)
         self.conn = SshConnection(self.process.stdout, self.process.stdin)
+
         try:
             PacketCheckAlive().write(self.conn)
             packet = receive_packet(self.conn)
@@ -63,6 +65,7 @@ class SshConnector(Connector):
             self.log.failed(f"Dispatcher handshake failed: ssh exited with code {returncode}")
             raise ConnectionEstablishError() from e
 
+        self.is_open = True
         self.log.established()
 
         # TODO assert Popen proccess is killed atexit
@@ -70,12 +73,13 @@ class SshConnector(Connector):
         # TODO check that we are root.
 
     def close(self):
-        PacketExit().write(self.conn)
-        self.log.requested_close()
-        self.process.stdin.close()
-        self.process.wait()
-        self.process.stdout.close()
-        self.log.closed()
+        if self.is_open:
+            PacketExit().write(self.conn)
+            self.log.requested_close()
+            self.process.stdin.close()
+            self.process.wait()
+            self.process.stdout.close()
+            self.log.closed()
 
     def run(self,
             command: list[str],
@@ -86,9 +90,6 @@ class SshConnector(Connector):
             group: Optional[str] = None,
             umask: Optional[str] = None,
             cwd: Optional[str] = None) -> CompletedRemoteCommand:
-        """
-        See :func:`simple_automation.connectors.connector.run`.
-        """
         try:
             # Construct and send packet with process information
             packet_run = PacketProcessRun(
@@ -129,9 +130,6 @@ class SshConnector(Connector):
         return result
 
     def stat(self, path: str, follow_links: bool = True) -> Optional[StatResult]:
-        """
-        See :func:`simple_automation.connectors.connector.stat`.
-        """
         try:
             # Construct and send packet with process information
             PacketStat(
@@ -162,9 +160,6 @@ class SshConnector(Connector):
             ctime=packet.ctime)
 
     def resolve_user(self, user: Optional[str]) -> Optional[str]:
-        """
-        See :func:`simple_automation.connectors.connector.resolve_group`.
-        """
         if user is None:
             return None
 
@@ -190,9 +185,6 @@ class SshConnector(Connector):
         return packet.value
 
     def resolve_group(self, group: Optional[str]) -> Optional[str]:
-        """
-        See :func:`simple_automation.connectors.connector.resolve_group`.
-        """
         if group is None:
             return None
 

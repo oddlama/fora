@@ -11,8 +11,6 @@ from typing import TypeVar, Callable, Iterable
 import importlib.machinery
 import importlib.util
 
-import simple_automation
-
 T = TypeVar('T')
 
 # A set of all modules names that are dynamically loaded modules.
@@ -55,7 +53,7 @@ class CycleError(ValueError):
         super().__init__(msg)
         self.cycle = cycle
 
-def load_py_module(file: str, print_on_error=True):
+def load_py_module(file: str):
     """
     Loads a module from the given filename and assigns a unique module name to it.
     Calling this function twice for the same file will yield distinct instances.
@@ -69,13 +67,7 @@ def load_py_module(file: str, print_on_error=True):
         raise ValueError(f"Failed to load module from file '{file}'")
     mod = importlib.util.module_from_spec(spec)
 
-    #try:
     loader.exec_module(mod)
-    #except Exception as e:
-    #    if print_on_error:
-    #        simple_automation.logger.error(f"An exception occurred while loading/executing module '{file}'!")
-    #    raise e
-
     return mod
 
 def rank_sort(vertices: Iterable[T], preds_of: Callable[[T], Iterable[T]], childs_of: Callable[[T], Iterable[T]]) -> dict[T, int]:
