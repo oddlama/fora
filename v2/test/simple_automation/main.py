@@ -6,7 +6,6 @@ the CLI interface and coordination of submodule loading.
 import argparse
 import inspect
 import sys
-import traceback
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 import simple_automation
@@ -51,14 +50,14 @@ def main_run(args: argparse.Namespace):
         host = simple_automation.hosts[h]
 
         try:
+            print(f"╼════════╡ {host.name} ╞════════╾")
             with open_connection(host):
                 with simple_automation.current_host(host):
                     run_script(args.script, inspect.getouterframes(inspect.currentframe())[0])
         except AbortExecutionSignal:
             # TODO --> Abort because of errors, unless --continue, --ignore-errors or smth
             print("EXEC ABORT REQUESTED, pls log beforehand, TODO check if we should continue on other hosts")
-            exit(1)
-
+            sys.exit(1)
 
 class ArgumentParserError(Exception):
     """
@@ -91,8 +90,8 @@ def main():
     # Run script options
     parser.add_argument('-H', '--hosts', dest='hosts', default=None, type=str,
             help="Specifies a comma separated list of hosts to run on. By default all hosts are selected. Duplicates will be ignored.")
-    parser.add_argument('-p', '--pretend', '--dry', '--dry-run', dest='pretend', action='store_true',
-            help="Print what would be done instead of performing any actions. Probing commands will still be executed to determine the current state of a system.")
+    parser.add_argument('--dry', '--dry-run', '--pretend', dest='dry', action='store_true',
+            help="Print what would be done instead of performing any actions. Probing commands will still be executed to determine the current state of the systems.")
     parser.add_argument('-v', '--verbose', dest='verbose', action='count', default=0,
             help="Increase output verbosity. Can be given multiple times. Typically, everything will be printed with -vvv.")
     parser.add_argument('--debug', dest='debug', action='store_true',

@@ -58,12 +58,9 @@ class SshConnector(Connector):
         except IOError as e:
             returncode = self.process.poll()
             if returncode is None:
-                self.log.failed("Dispatcher handshake failed")
-                if simple_automation.args.debug:
-                    raise IOError("Failed to establish connection to remote host.") from e
-                raise e
-
-            self.log.failed(f"Dispatcher handshake failed: ssh exited with code {returncode}")
+                self.log.failed(f"Dispatcher handshake failed: {str(e)}")
+            else:
+                self.log.failed(f"Dispatcher handshake failed: ssh exited with code {returncode}")
             raise AbortExecutionSignal() from e
 
         self.is_open = True
@@ -106,8 +103,8 @@ class SshConnector(Connector):
             # Wait for result packet
             packet = receive_packet(self.conn)
         except IOError as e:
-            self.log.error("Unexpected EOF")
-            raise IOError("Remote host disconnected unexpectedly.") from e
+            self.log.error(f"Remote host disconnected unexpectedly: {str(e)}")
+            raise AbortExecutionSignal() from e
 
         # Check type of incoming packet to handle errors differently
         if isinstance(packet, PacketInvalidField):
@@ -130,7 +127,7 @@ class SshConnector(Connector):
 
         return result
 
-    def stat(self, path: str, follow_links: bool = True) -> Optional[StatResult]:
+    def stat(self, path: str, follow_links: bool = False) -> Optional[StatResult]:
         try:
             # Construct and send packet with process information
             PacketStat(
@@ -140,8 +137,8 @@ class SshConnector(Connector):
             # Wait for result packet
             packet = receive_packet(self.conn)
         except IOError as e:
-            self.log.error("Unexpected EOF")
-            raise IOError("Remote host disconnected unexpectedly.") from e
+            self.log.error(f"Remote host disconnected unexpectedly: {str(e)}")
+            raise AbortExecutionSignal() from e
 
         # Check type of incoming packet to handle errors
         if isinstance(packet, PacketInvalidField):
@@ -154,8 +151,8 @@ class SshConnector(Connector):
         return StatResult(
             type=packet.type,
             mode=packet.mode,
-            uid=packet.uid,
-            gid=packet.gid,
+            owner=packet.owner,
+            group=packet.group,
             size=packet.size,
             mtime=packet.mtime,
             ctime=packet.ctime)
@@ -172,8 +169,8 @@ class SshConnector(Connector):
             # Wait for result packet
             packet = receive_packet(self.conn)
         except IOError as e:
-            self.log.error("Unexpected EOF")
-            raise IOError("Remote host disconnected unexpectedly.") from e
+            self.log.error(f"Remote host disconnected unexpectedly: {str(e)}")
+            raise AbortExecutionSignal() from e
 
         # Check type of incoming packet to handle errors differently
         if isinstance(packet, PacketInvalidField):
@@ -197,8 +194,8 @@ class SshConnector(Connector):
             # Wait for result packet
             packet = receive_packet(self.conn)
         except IOError as e:
-            self.log.error("Unexpected EOF")
-            raise IOError("Remote host disconnected unexpectedly.") from e
+            self.log.error(f"Remote host disconnected unexpectedly: {str(e)}")
+            raise AbortExecutionSignal() from e
 
         # Check type of incoming packet to handle errors differently
         if isinstance(packet, PacketInvalidField):

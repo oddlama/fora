@@ -4,7 +4,7 @@ Defines the connector interface.
 
 from __future__ import annotations
 
-from typing import Callable, Optional
+from typing import Callable, Optional, Union
 from simple_automation.types import HostType
 
 class CompletedRemoteCommand:
@@ -19,19 +19,20 @@ class CompletedRemoteCommand:
 class StatResult:
     """
     The return value of stat(), representing information about a remote file.
+    The type will be one of [ "dir", "chr", "blk", "file", "fifo", "link", "sock", "other" ]
     """
     def __init__(self,
                  type: str, # pylint: disable=redefined-builtin
-                 mode: int,
-                 uid: int,
-                 gid: int,
+                 mode: Union[int, str],
+                 owner: str,
+                 group: str,
                  size: int,
                  mtime: int,
                  ctime: int):
         self.type = type
-        self.mode = mode
-        self.uid = uid
-        self.gid = gid
+        self.mode: str = mode if isinstance(mode, str) else oct(mode)[2:]
+        self.owner = owner
+        self.group = group
         self.size = size
         self.mtime = mtime
         self.ctime = ctime
@@ -156,7 +157,7 @@ class Connector:
         """
         raise NotImplementedError("Must be overwritten by subclass.")
 
-    def stat(self, path: str, follow_links: bool = True) -> Optional[StatResult]:
+    def stat(self, path: str, follow_links: bool = False) -> Optional[StatResult]:
         """
         Runs stat() on the given path on the remote. Follows links if follow_links
         is true.

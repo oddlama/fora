@@ -267,7 +267,7 @@ class PacketProcessPreexecError:
   _=(conn)
   return PacketProcessPreexecError()
 class PacketStat:
- def __init__(self,path:str,follow_links:bool=True):
+ def __init__(self,path:str,follow_links:bool=False):
   self.path=path
   self.follow_links=follow_links
  def handle(self,conn:Connection):
@@ -277,7 +277,15 @@ class PacketStat:
    PacketInvalidField("path","Path doesn't exist").write(conn)
    return
   ftype="dir" if stat.S_ISDIR(s.st_mode) else "chr" if stat.S_ISCHR(s.st_mode) else "blk" if stat.S_ISBLK(s.st_mode) else "file" if stat.S_ISREG(s.st_mode) else "fifo" if stat.S_ISFIFO(s.st_mode)else "link" if stat.S_ISLNK(s.st_mode) else "sock" if stat.S_ISSOCK(s.st_mode)else "other"
-  PacketStatResult(type=ftype,mode=stat.S_IMODE(s.st_mode),uid=s.st_uid,gid=s.st_gid,size=s.st_size,mtime=s.st_mtime_ns,ctime=s.st_ctime_ns).write(conn)
+  try:
+   owner=getpwuid(s.st_uid).pw_name
+  except KeyError:
+   owner=str(s.st_uid)
+  try:
+   group=getgrgid(s.st_gid).gr_name
+  except KeyError:
+   group=str(s.st_gid)
+  PacketStatResult(type=ftype,mode=stat.S_IMODE(s.st_mode),owner=owner,group=group,size=s.st_size,mtime=s.st_mtime_ns,ctime=s.st_ctime_ns).write(conn)
  def write(self,conn:Connection):
   conn.write_u32(Packets.stat)
   conn.write_str(self.path)
@@ -287,11 +295,11 @@ class PacketStat:
  def read(conn:Connection):
   return PacketStat(path=conn.read_str(),follow_links=conn.read_bool())
 class PacketStatResult:
- def __init__(self,type:str,mode:int,uid:int,gid:int,size:int,mtime:int,ctime:int):
+ def __init__(self,type:str,mode:int,owner:str,group:str,size:int,mtime:int,ctime:int):
   self.type=type
   self.mode=mode
-  self.uid=uid
-  self.gid=gid
+  self.owner=owner
+  self.group=group
   self.size=size
   self.mtime=mtime
   self.ctime=ctime
@@ -302,15 +310,15 @@ class PacketStatResult:
   conn.write_u32(Packets.stat_result)
   conn.write_str(self.type)
   conn.write_u64(self.mode)
-  conn.write_i32(self.uid)
-  conn.write_i32(self.gid)
+  conn.write_str(self.owner)
+  conn.write_str(self.group)
   conn.write_u64(self.size)
   conn.write_u64(self.mtime)
   conn.write_u64(self.ctime)
   conn.flush()
  @staticmethod
  def read(conn:Connection):
-  return PacketStatResult(type=conn.read_str(),mode=conn.read_u64(),uid=conn.read_i32(),gid=conn.read_i32(),size=conn.read_u64(),mtime=conn.read_u64(),ctime=conn.read_u64())
+  return PacketStatResult(type=conn.read_str(),mode=conn.read_u64(),owner=conn.read_str(),group=conn.read_str(),size=conn.read_u64(),mtime=conn.read_u64(),ctime=conn.read_u64())
 class PacketResolveUser:
  def __init__(self,user:str):
   self.user=user
@@ -384,7 +392,7 @@ def main():
  global debug
  global is_server
  debug=len(sys.argv)>1 and sys.argv[1]=="--debug"
- is_server=__name__="__main__"
+ is_server=__name__=="__main__"
  conn=Connection(sys.stdin.buffer,sys.stdout.buffer)
  while not conn.should_close:
   try:

@@ -855,7 +855,7 @@ class PacketStat:
     This packet is used to retrieve information about a file or directory.
     """
 
-    def __init__(self, path: str, follow_links: bool = True):
+    def __init__(self, path: str, follow_links: bool = False):
         self.path = path
         self.follow_links = follow_links
 
@@ -884,12 +884,22 @@ class PacketStat:
                 "sock" if stat.S_ISSOCK(s.st_mode) else \
                 "other"
 
+        try:
+            owner = getpwuid(s.st_uid).pw_name
+        except KeyError:
+            owner = str(s.st_uid)
+
+        try:
+            group = getgrgid(s.st_gid).gr_name
+        except KeyError:
+            group = str(s.st_gid)
+
         # Send response
         PacketStatResult(
             type=ftype,
             mode=stat.S_IMODE(s.st_mode),
-            uid=s.st_uid,
-            gid=s.st_gid,
+            owner=owner,
+            group=group,
             size=s.st_size,
             mtime=s.st_mtime_ns,
             ctime=s.st_ctime_ns).write(conn)
@@ -930,15 +940,15 @@ class PacketStatResult:
     def __init__(self,
                  type: str, # pylint: disable=redefined-builtin
                  mode: int,
-                 uid: int,
-                 gid: int,
+                 owner: str,
+                 group: str,
                  size: int,
                  mtime: int,
                  ctime: int):
         self.type = type
         self.mode = mode
-        self.uid = uid
-        self.gid = gid
+        self.owner = owner
+        self.group = group
         self.size = size
         self.mtime = mtime
         self.ctime = ctime
@@ -967,8 +977,8 @@ class PacketStatResult:
         conn.write_u32(Packets.stat_result)
         conn.write_str(self.type)
         conn.write_u64(self.mode)
-        conn.write_i32(self.uid)
-        conn.write_i32(self.gid)
+        conn.write_str(self.owner)
+        conn.write_str(self.group)
         conn.write_u64(self.size)
         conn.write_u64(self.mtime)
         conn.write_u64(self.ctime)
@@ -987,8 +997,8 @@ class PacketStatResult:
         return PacketStatResult(
             type=conn.read_str(),
             mode=conn.read_u64(),
-            uid=conn.read_i32(),
-            gid=conn.read_i32(),
+            owner=conn.read_str(),
+            group=conn.read_str(),
             size=conn.read_u64(),
             mtime=conn.read_u64(),
             ctime=conn.read_u64())

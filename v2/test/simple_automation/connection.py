@@ -18,15 +18,6 @@ class Connection:
     for the commands executed on the remote system.
     """
 
-    base_settings = RemoteSettings(
-        file_mode="600",
-        dir_mode="700",
-        umask="077",
-        cwd="/tmp")
-    """
-    The base remote settings that are used, if no other preferences are given.
-    """
-
     def __init__(self, host: HostType):
         self.host = host
         if self.host.connector is None:
@@ -62,9 +53,8 @@ class Connection:
         if not isinstance(simple_automation.this, (ScriptType, TaskType)):
             raise RuntimeError("Cannot resolve defaults, when neither a script nor a task is currently running.")
 
-        # Overlay settings on top of defaults and base defaults
+        # Overlay settings on top of defaults
         settings = simple_automation.this.current_defaults().overlay(settings)
-        settings = Connection.base_settings.overlay(settings)
 
         # A function to check whether a mask is octal
         def check_mask(mask: Optional[str], name: str):
@@ -103,15 +93,16 @@ class Connection:
         """
         See :func:`simple_automation.connectors.connector.run`.
         """
+        defaults = simple_automation.this.current_defaults()
         return self.connector.run(
             command=command,
             input=input,
             capture_output=capture_output,
             check=check,
-            user=user,
-            group=group,
-            umask=umask,
-            cwd=cwd)
+            user=user if user is not None else defaults.as_user,
+            group=group if group is not None else defaults.as_group,
+            umask=umask if umask is not None else defaults.umask,
+            cwd=cwd if cwd is not None else defaults.cwd)
 
     def resolve_user(self, user: Optional[str]) -> Optional[str]:
         """
@@ -125,7 +116,7 @@ class Connection:
         """
         return self.connector.resolve_group(group)
 
-    def stat(self, path: str, follow_links: bool = True) -> Optional[StatResult]:
+    def stat(self, path: str, follow_links: bool = False) -> Optional[StatResult]:
         """
         See :func:`simple_automation.connectors.connector.stat`.
         """

@@ -31,6 +31,7 @@ class RemoteDefaultsContext:
     def __enter__(self):
         self.new_defaults = simple_automation.host.connection.resolve_defaults(self.new_defaults)
         self.obj._defaults_stack.append(self.new_defaults)
+        return RemoteSettings.base_settings.overlay(self.new_defaults)
 
     def __exit__(self, type_t, value, traceback):
         self.obj._defaults_stack.pop()
@@ -445,7 +446,7 @@ class TaskType(MockupType):
                  file_mode: Optional[str] = None,
                  dir_mode: Optional[str] = None,
                  umask: Optional[str] = None,
-                 cwd: Optional[str] = None):
+                 cwd: Optional[str] = None) -> RemoteDefaultsContext:
         """
         Returns a context manager to incrementally change the remote execution defaults.
 
@@ -463,23 +464,23 @@ class TaskType(MockupType):
                  as_group=as_group,
                  owner=owner,
                  group=group,
-                 file_mode=file_mode,
-                 dir_mode=dir_mode,
-                 umask=umask,
+                 file_mode=None if file_mode is None else oct(int(file_mode, 8))[2:],
+                 dir_mode=None if dir_mode is None else oct(int(dir_mode, 8))[2:],
+                 umask=None if umask is None else oct(int(umask, 8))[2:],
                  cwd=cwd)
-        new_defaults = self.current_defaults().overlay(new_defaults)
+        new_defaults = self._defaults_stack[-1].overlay(new_defaults)
         return RemoteDefaultsContext(self, new_defaults)
 
     def current_defaults(self) -> RemoteSettings:
         """
-        Returns the currently active defaults.
+        Returns the fully resolved currently active defaults.
 
         Returns
         -------
         RemoteSettings
             The currently active remote defaults.
         """
-        return self._defaults_stack[-1]
+        return RemoteSettings.base_settings.overlay(self._defaults_stack[-1])
 
     @staticmethod
     def get_variables(task: TaskType) -> set[str]:
@@ -535,7 +536,7 @@ class ScriptType(MockupType):
                  file_mode: Optional[str] = None,
                  dir_mode: Optional[str] = None,
                  umask: Optional[str] = None,
-                 cwd: Optional[str] = None):
+                 cwd: Optional[str] = None) -> RemoteDefaultsContext:
         """
         Returns a context manager to incrementally change the remote execution defaults.
 
@@ -553,23 +554,23 @@ class ScriptType(MockupType):
                  as_group=as_group,
                  owner=owner,
                  group=group,
-                 file_mode=file_mode,
-                 dir_mode=dir_mode,
-                 umask=umask,
+                 file_mode=None if file_mode is None else oct(int(file_mode, 8))[2:],
+                 dir_mode=None if dir_mode is None else oct(int(dir_mode, 8))[2:],
+                 umask=None if umask is None else oct(int(umask, 8))[2:],
                  cwd=cwd)
-        new_defaults = self.current_defaults().overlay(new_defaults)
+        new_defaults = self._defaults_stack[-1].overlay(new_defaults)
         return RemoteDefaultsContext(self, new_defaults)
 
     def current_defaults(self) -> RemoteSettings:
         """
-        Returns the currently active defaults.
+        Returns the fully resolved currently active defaults.
 
         Returns
         -------
         RemoteSettings
             The currently active remote defaults.
         """
-        return self._defaults_stack[-1]
+        return RemoteSettings.base_settings.overlay(self._defaults_stack[-1])
 
 def _get_variables(cls, module: ModuleType) -> set[str]:
     """

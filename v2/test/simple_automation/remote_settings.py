@@ -11,6 +11,12 @@ class RemoteSettings:
     the remote host. This includes things such as the owner and group of newly
     created files, or the user as which commands are run.
     """
+
+    base_settings: RemoteSettings
+    """
+    The base remote settings that are used, if no other preferences are given.
+    """
+
     def __init__(self,
                  as_user: Optional[str] = None,
                  as_group: Optional[str] = None,
@@ -66,3 +72,13 @@ class RemoteSettings:
         members = [x for x in members if x is not None]
         member_str = ','.join([f"{n}={v}" for (n,v) in members])
         return f"RemoteSettings{{{member_str}}}"
+
+RemoteSettings.base_settings = RemoteSettings(
+    as_user=None,
+    as_group=None,
+    owner="root",
+    group="root",
+    file_mode="600",
+    dir_mode="700",
+    umask="077",
+    cwd="/tmp")
