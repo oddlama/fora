@@ -7,11 +7,6 @@ from __future__ import annotations
 from typing import Callable, Optional
 from simple_automation.types import HostType
 
-class ConnectionEstablishError(Exception):
-    """
-    Error class for errors when establishing a connection.
-    """
-
 class CompletedRemoteCommand:
     """
     The return value of run(), representing a finished remote process.

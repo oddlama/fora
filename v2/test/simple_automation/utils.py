@@ -18,6 +18,13 @@ T = TypeVar('T')
 # as a random uuid will be generated at load-time for each module.
 dynamically_loaded_modules: set[str] = set()
 
+class AbortExecutionSignal(Exception):
+    """
+    An exception used to indicate an error condition that requires the execution to
+    be stopped for the current host. The exception stack will not be printed and should
+    be logged before raising this exception.
+    """
+
 def print_warning(msg: str):
     """
     Prints a message with a colored 'warning: ' prefix.

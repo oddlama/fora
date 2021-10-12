@@ -5,13 +5,14 @@ the CLI interface and coordination of submodule loading.
 
 import argparse
 import inspect
+import sys
+import traceback
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 import simple_automation
-from simple_automation.connectors.connector import ConnectionEstablishError
 from simple_automation.connection import open_connection
 from simple_automation.loader import load_site, run_script
-from simple_automation.utils import die_error, install_exception_hook
+from simple_automation.utils import AbortExecutionSignal, die_error, install_exception_hook
 from simple_automation.version import __version__
 
 def init_runtime():
@@ -44,19 +45,20 @@ def main_run(args: argparse.Namespace):
         host_names.append(h)
     host_names = sorted(host_names)
 
-    # TODO multiprocessing?
+    # TODO: multiprocessing?
     # Instanciate (run) the given script for each selected host
     for h in host_names:
         host = simple_automation.hosts[h]
 
-        # TODO catch connection error, bot on connect and while processing,
-        # then continue with other hosts or quit?
         try:
             with open_connection(host):
                 with simple_automation.current_host(host):
                     run_script(args.script, inspect.getouterframes(inspect.currentframe())[0])
-        except ConnectionEstablishError:
-            simple_automation.logger.skip_host(host, "Connection could not be established")
+        except AbortExecutionSignal:
+            # TODO --> Abort because of errors, unless --continue, --ignore-errors or smth
+            print("EXEC ABORT REQUESTED, pls log beforehand, TODO check if we should continue on other hosts")
+            exit(1)
+
 
 class ArgumentParserError(Exception):
     """

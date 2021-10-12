@@ -438,3 +438,27 @@ def run_script(script: str, frame: inspect.FrameInfo):
         with meta.defaults():
             load_py_module(script)
     script_stack.pop()
+
+def script_trace(currentframe=None):
+    """
+    Creates a script trace similar to a python backtrace.
+
+    Parameters
+    ----------
+    currentframe
+        An additional FrameInfo object for a future script invocation,
+        which isn't yet part of the stack.
+    """
+    def format_frame(f):
+        frame = f"  File \"{f.filename}\", line {f.lineno}, in {f.frame.f_code.co_name}\n"
+        for context in f.code_context:
+            frame += f"    {context.strip()}\n"
+        return frame
+
+    ret = "Script stack (most recent call last):\n"
+    for _, frame in script_stack:
+        ret += format_frame(frame)
+    if currentframe is not None:
+        ret += format_frame(currentframe)
+
+    return ret[:-1] # Strip last newline
