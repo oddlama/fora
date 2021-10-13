@@ -3,7 +3,7 @@ Provides a class to manage a remote connection via the host's connector.
 Stores state along with the connection.
 """
 
-from typing import Optional
+from typing import cast, Union, Optional
 
 import simple_automation
 from simple_automation.connectors.connector import Connector, CompletedRemoteCommand, StatResult
@@ -93,7 +93,7 @@ class Connection:
         """
         See :func:`simple_automation.connectors.connector.run`.
         """
-        defaults = simple_automation.this.current_defaults()
+        defaults = cast(Union[ScriptType, TaskType], simple_automation.this).current_defaults()
         return self.connector.run(
             command=command,
             input=input,

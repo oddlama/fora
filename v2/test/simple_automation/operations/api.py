@@ -41,7 +41,7 @@ class Operation:
         self.name = name
         self.initial_state_dict: Optional[dict[str, Any]] = None
         self.final_state_dict: Optional[dict[str, Any]] = None
-        print(f"{self.op_name=} {self.name=}")
+        simple_automation.log.print_transaction_early(self)
 
     def connection(self) -> Connection:
         """
@@ -69,8 +69,6 @@ class Operation:
         if self.initial_state_dict is not None:
             raise OperationError("An operation's 'initial_state' can only be set once.")
         self.initial_state_dict = dict(kwargs)
-
-        print(f"initial {self.op_name=} {self.name=} {self.initial_state_dict}")
 
     def final_state(self, **kwargs):
         """
@@ -120,12 +118,13 @@ class Operation:
         OperationResult
             The OperationResult for this failed operation.
         """
-        # TODO print
-        return OperationResult(success=False,
+        result = OperationResult(success=False,
                 changed=False,
                 initial=self.initial_state_dict or {},
                 final={},
                 failure_message=msg)
+        simple_automation.log.print_transaction(self, result)
+        return result
 
     def success(self) -> OperationResult:
         """
@@ -138,11 +137,12 @@ class Operation:
         """
         if self.initial_state_dict is None or self.final_state_dict is None:
             raise OperationError("Both initial and final state must have been set before 'success()' may be called.")
-        # TODO print
-        return OperationResult(success=True,
+        result = OperationResult(success=True,
                 changed=self.initial_state_dict != self.final_state_dict,
                 initial=self.initial_state_dict,
                 final=self.final_state_dict)
+        simple_automation.log.print_transaction(self, result)
+        return result
 
 def operation(op_name):
     """
@@ -156,10 +156,7 @@ def operation(op_name):
                 ret = function(*args, **kwargs, op=op)
             except Exception as e:
                 # TODO log traceback, return failed
-                print(e)
                 ret = op.failure(str(e))
-                import traceback
-                traceback.print_exc()
                 raise AbortExecutionSignal() from e
 
             return ret

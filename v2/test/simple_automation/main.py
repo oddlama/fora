@@ -54,9 +54,10 @@ def main_run(args: argparse.Namespace):
             with open_connection(host):
                 with simple_automation.current_host(host):
                     run_script(args.script, inspect.getouterframes(inspect.currentframe())[0])
-        except AbortExecutionSignal:
+        except AbortExecutionSignal as e:
             # TODO --> Abort because of errors, unless --continue, --ignore-errors or smth
             print("EXEC ABORT REQUESTED, pls log beforehand, TODO check if we should continue on other hosts")
+            simple_automation.utils.print_exception(*sys.exc_info())
             sys.exit(1)
 
 class ArgumentParserError(Exception):

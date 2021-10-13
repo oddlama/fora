@@ -2,6 +2,7 @@
 Provides utility functions.
 """
 
+import inspect
 import os
 import sys
 import traceback
@@ -10,6 +11,8 @@ from typing import TypeVar, Callable, Iterable
 
 import importlib.machinery
 import importlib.util
+
+from simple_automation.types import ScriptType
 
 T = TypeVar('T')
 
@@ -147,31 +150,62 @@ def rank_sort(vertices: Iterable[T], preds_of: Callable[[T], Iterable[T]], child
 
     return ranks
 
-def print_exception_hook(exc_type, exc_info, tb):
+def script_trace(script_stack: list[tuple[ScriptType, inspect.FrameInfo]],
+                 include_root: bool = False):
     """
-    An exception hook that modifies tracebacks raised from dynamically
-    loaded modules so they are printed in a cleaner way.
+    Creates a script trace similar to a python backtrace.
+
+    Parameters
+    ----------
+    script_stack
+        The script stack to print
+    include_root
+        Whether or not to include the root frame in the script trace.
+    """
+    def format_frame(f):
+        frame = f"  File \"{f.filename}\", line {f.lineno}, in {f.frame.f_code.co_name}\n"
+        for context in f.code_context:
+            frame += f"    {context.strip()}\n"
+        return frame
+
+    ret = "Script stack (most recent call last):\n"
+    for _, frame in script_stack if include_root else script_stack[1:]:
+        ret += format_frame(frame)
+
+    return ret[:-1] # Strip last newline
+
+def print_exception(exc_type, exc_info, tb):
+    """
+    A function that hook that prints an exception traceback beginning from the
+    last dynamically loaded module, but including a script stack so the error
+    location is more easily understood and printed in a cleaner way.
     """
 
-    first_dynamic_tb = None
+    last_dynamic_tb = None
     # Iterate over all frames in the traceback and
-    # find the first dynamically loaded module in the traceback
+    # find the last dynamically loaded module in the traceback
     while tb:
         frame = tb.tb_frame
         if "__name__" in frame.f_locals and frame.f_locals['__name__'] in dynamically_loaded_modules:
-            first_dynamic_tb = tb
-            break
+            last_dynamic_tb = tb
         tb = tb.tb_next
 
-    # Print the exception as usual begining from the first dynamic module,
+    # Print the script stack if at least one user script is involved,
+    # which means we need to have at least two entries as the root context
+    # is also involved.
+    script_stack = getattr(exc_info, 'script_stack', None)
+    if script_stack is not None and len(script_stack) > 1:
+        print(script_trace(script_stack), file=sys.stderr)
+
+    # Print the exception as usual begining from the last dynamic module,
     # if one is involved.
-    traceback.print_exception(exc_type, exc_info, first_dynamic_tb or tb)
+    traceback.print_exception(exc_type, exc_info, last_dynamic_tb or tb)
 
 def install_exception_hook():
     """
     Installs a new global exception handler, that will modify the
     traceback of exceptions raised from dynamically loaded modules
-    so that they are printed in a cleaner way.
+    so that they are printed in a cleaner and more meaningful way (for the user).
     """
 
-    sys.excepthook = print_exception_hook
+    sys.excepthook = print_exception
