@@ -9,6 +9,7 @@ import sys
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 import simple_automation
+from simple_automation import logger
 from simple_automation.connection import open_connection
 from simple_automation.loader import load_site, run_script
 from simple_automation.utils import AbortExecutionSignal, die_error, install_exception_hook
@@ -50,10 +51,12 @@ def main_run(args: argparse.Namespace):
         host = simple_automation.hosts[h]
 
         try:
-            print(f"╼════════╡ {host.name} ╞════════╾")
+            print(f"[1;34mhost[m {host.name}")
             with open_connection(host):
                 with simple_automation.current_host(host):
-                    run_script(args.script, inspect.getouterframes(inspect.currentframe())[0])
+                    logger.run_script(args.script)
+                    with logger.indent():
+                        run_script(args.script, inspect.getouterframes(inspect.currentframe())[0])
         except AbortExecutionSignal as e:
             # TODO --> Abort because of errors, unless --continue, --ignore-errors or smth
             print("EXEC ABORT REQUESTED, pls log beforehand, TODO check if we should continue on other hosts")

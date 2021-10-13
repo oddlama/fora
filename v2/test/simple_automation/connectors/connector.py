@@ -77,7 +77,7 @@ class Connector:
             command: list[str],
             input: Optional[bytes] = None, # pylint: disable=redefined-builtin
             capture_output: bool = True,
-            check: bool = False,
+            check: bool = True,
             user: Optional[str] = None,
             group: Optional[str] = None,
             umask: Optional[str] = None,

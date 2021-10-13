@@ -36,6 +36,7 @@ def directory(op: Operation,
         The directory group. Uses the remote execution defaults if None.
     """
     check_absolute_path(path)
+    op.desc(path)
 
     with op.defaults(dir_mode=mode, owner=owner, group=group) as attr:
         op.final_state(exists=True, mode=attr.dir_mode, owner=attr.owner, group=attr.group)
@@ -64,19 +65,19 @@ def directory(op: Operation,
         if not simple_automation.args.dry:
             # Replace existing path if desired
             if delete_existing and stat is not None and stat.type != "dir":
-                op.connection().run(["rm", "-rf", path], check=True)
+                op.connection().run(["rm", "-rf", path])
 
             # Create directory if it doesn't exist
             if op.changed("exists"):
-                op.connection().run(["mkdir", path], check=True)
+                op.connection().run(["mkdir", path])
 
             # Set correct mode, if needed
             if op.changed("mode"):
-                op.connection().run(["chmod", attr.dir_mode, path], check=True)
+                op.connection().run(["chmod", attr.dir_mode, path])
 
             # Set correct owner and group, if needed
             if op.changed("owner") or op.changed("group"):
-                op.connection().run(["chown", f"{attr.owner}:{attr.group}", path], check=True)
+                op.connection().run(["chown", f"{attr.owner}:{attr.group}", path])
 
             # TODO: diff imporant things
             #if simple_automation.args.diff:

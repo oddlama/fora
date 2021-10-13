@@ -229,7 +229,7 @@ class PacketProcessRun:
    if self.cwd is not None:
     os.chdir(self.cwd)
   try:
-   result=subprocess.run(self.command,input=self.stdin,capture_output=self.capture_output,cwd=self.cwd,preexec_fn=child_preexec,check=False)
+   result=subprocess.run(self.command,input=self.stdin,capture_output=self.capture_output,cwd=self.cwd,preexec_fn=child_preexec,check=True)
   except subprocess.SubprocessError as e:
    PacketProcessPreexecError().write(conn)
    return

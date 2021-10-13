@@ -725,7 +725,7 @@ class PacketProcessRun:
                 capture_output=self.capture_output,
                 cwd=self.cwd,
                 preexec_fn=child_preexec,
-                check=False)
+                check=True)
         except subprocess.SubprocessError as e:
             PacketProcessPreexecError().write(conn)
             return

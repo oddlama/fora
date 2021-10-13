@@ -5,6 +5,7 @@ Provides necessary components to define operations.
 from typing import cast, Union, Any, Optional
 
 import simple_automation
+from simple_automation import logger
 from simple_automation.connection import Connection
 from simple_automation.types import RemoteDefaultsContext, HostType, ScriptType, TaskType
 from simple_automation.utils import AbortExecutionSignal
@@ -39,9 +40,14 @@ class Operation:
     def __init__(self, op_name: str, name: str):
         self.op_name = op_name
         self.name = name
+        self.desc: str
         self.initial_state_dict: Optional[dict[str, Any]] = None
         self.final_state_dict: Optional[dict[str, Any]] = None
-        simple_automation.log.print_transaction_early(self)
+        logger.print(f"[37m# {self.name}[m")
+
+    def desc(self, description: str):
+        self.desc = description
+        logger.print_transaction_early(self)
 
     def connection(self) -> Connection:
         """
@@ -123,7 +129,7 @@ class Operation:
                 initial=self.initial_state_dict or {},
                 final={},
                 failure_message=msg)
-        simple_automation.log.print_transaction(self, result)
+        logger.print_transaction(self, result)
         return result
 
     def success(self) -> OperationResult:
@@ -141,7 +147,7 @@ class Operation:
                 changed=self.initial_state_dict != self.final_state_dict,
                 initial=self.initial_state_dict,
                 final=self.final_state_dict)
-        simple_automation.log.print_transaction(self, result)
+        logger.print_transaction(self, result)
         return result
 
 def operation(op_name):
@@ -151,11 +157,11 @@ def operation(op_name):
     def operation_wrapper(function):
         def wrapper(*args, **kwargs):
             op = Operation(op_name=op_name, name=kwargs.pop("name", None))
-            check = kwargs.pop("check", False)
+            check = kwargs.pop("check", True)
+
             try:
                 ret = function(*args, **kwargs, op=op)
             except Exception as e:
-                # TODO log traceback, return failed
                 ret = op.failure(str(e))
                 raise AbortExecutionSignal() from e
 
