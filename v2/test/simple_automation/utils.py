@@ -181,6 +181,7 @@ def print_exception(exc_type, exc_info, tb):
     location is more easily understood and printed in a cleaner way.
     """
 
+    original_tb = tb
     last_dynamic_tb = None
     # Iterate over all frames in the traceback and
     # find the last dynamically loaded module in the traceback
@@ -199,7 +200,7 @@ def print_exception(exc_type, exc_info, tb):
 
     # Print the exception as usual begining from the last dynamic module,
     # if one is involved.
-    traceback.print_exception(exc_type, exc_info, last_dynamic_tb or tb)
+    traceback.print_exception(exc_type, exc_info, last_dynamic_tb or original_tb)
 
 def install_exception_hook():
     """
