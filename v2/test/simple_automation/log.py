@@ -17,22 +17,28 @@ class ConnectionLogger:
         self.connector = connector
 
     def init(self):
-        print(f"[ CONN ] Establishing connection to {self.host.name} via {self.connector.schema}")
+        #print(f"[ CONN ] Establishing connection to {self.host.name} via {self.connector.schema}")
+        print(f"[1;34m{self.connector.schema}[m [1;33mconnecting[m")
 
     def established(self):
-        print(f"[ CONN ] Connection to {self.host.name} established")
+        #print(f"[ CONN ] Connection to {self.host.name} established")
+        print(f"[1;34m{self.connector.schema}[m [1;32mconnected[m")
 
     def requested_close(self):
-        print(f"[ CONN ] Requesting to close connection to {self.host.name}")
+        pass
+        #print(f"[ CONN ] Requesting to close connection to {self.host.name}")
 
     def closed(self):
-        print(f"[ CONN ] Connection to {self.host.name} closed")
+        pass
+        #print(f"[ CONN ] Connection to {self.host.name} closed")
 
     def failed(self, msg):
-        print(f"[ CONN ] Connection to {self.host.name} failed: {msg}")
+        pass
+        #print(f"[ CONN ] Connection to {self.host.name} failed: {msg}")
 
     def error(self, msg):
-        print(f"[ CONN ] Connection error on {self.host.name}: {msg}")
+        pass
+        #print(f"[ CONN ] Connection error on {self.host.name}: {msg}")
 
 def align_ellipsis(s, width):
     """
@@ -67,7 +73,6 @@ class Logger:
     def indent_prefix(self):
         ret = ""
         for i in range(self.indentation_level):
-            #ret += "[37m│[m "
             ret += "  "
         return ret
 
@@ -111,6 +116,21 @@ class Logger:
         """
         Prints the transaction summary
         """
+        # TODO make inventory.py able to set verbose=3 without needing to do -v everytime
+        # TODO format proposal:
+        # normal:
+        #   dir /tmp/very/special/dir (This is some directory that needs creation)
+        # -v:
+        #   dir /tmp/very/special/dir (This is some directory that needs creation)
+        #   └ exists: False → True, mode: 755
+        #   dir /tmp/very/special/dir (This is some directory that needs creation)
+        #   └ exists: True, mode: 755
+        # -vv:
+        #   dir /tmp/very/special/dir (This is some directory that needs creation)
+        #   ├ exists: False → True
+        #   └ mode: mode: 755
+        #   dir /tmp/very/special/dir (This is some directory that needs creation)
+        #   └ fail: error message
         verbose = True # TODO
         if result.success:
             if result.changed:
@@ -140,6 +160,7 @@ class Logger:
 
                 if initial_v == final_v:
                     if verbose >= 1:
+                        # TODO = instead of : for better readability
                         entry_str = f"[37m{str_k}: {str_initial_v}[m"
                         state_infos.append(entry_str)
                 else:

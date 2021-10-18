@@ -97,9 +97,9 @@ def main():
     parser.add_argument('--dry', '--dry-run', '--pretend', dest='dry', action='store_true',
             help="Print what would be done instead of performing any actions. Probing commands will still be executed to determine the current state of the systems.")
     parser.add_argument('-v', '--verbose', dest='verbose', action='count', default=0,
-            help="Increase output verbosity. Can be given multiple times. Typically, everything will be printed with -vvv.")
+            help="Increase output verbosity. Can be given multiple times. ")
     parser.add_argument('--debug', dest='debug', action='store_true',
-            help="Enable debugging output.")
+            help="Enable debugging output. Forces verbosity to max value.")
     parser.add_argument('inventory', type=str, nargs='+',
             help="The inventories on which the script should be run on. A inventory is either a full inventory module file (determined by the presenence of a .py extension, e.g. inventory.py), or a single-host defined in any syntax that is accepted by ssh (e.g. root@localhost or ssh://[user]@host)")
     parser.add_argument('script', type=str,
@@ -110,6 +110,11 @@ def main():
         args: argparse.Namespace = parser.parse_args()
     except ArgumentParserError as e:
         die_error(str(e))
+
+    # Force max verbosity with --debug
+    # TODO define max verbosity = 2 or 3?
+    if args.debug:
+        args.verbose = 99
 
     # Install exception hook to modify traceback, if debug isn't set.
     # Exceptions raised from a dynamically loaded module will then

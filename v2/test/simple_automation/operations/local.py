@@ -13,7 +13,7 @@ from simple_automation.utils import AbortExecutionSignal
 def task(name: str):
     pass
 
-# TODO checked or check or ignore_errors
+# TODO check= or ignore_errors=
 def script(name: str,
            script: str, # pylint: disable=redefined-outer-name
            recursive: bool = False):
