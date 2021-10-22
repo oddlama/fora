@@ -5,7 +5,7 @@ This is the main module of simple_automation.
 import argparse
 
 from typing import Optional, Union, Any, cast
-from .types import InventoryType, GroupType, HostType, ScriptType, TaskType
+from .types import InventoryType, GroupType, HostType, ScriptType
 from .log import Logger
 
 
@@ -57,10 +57,10 @@ A dict containing all host definitions, mapped by host_id.
 """
 
 
-this: Optional[Union[GroupType, HostType, ScriptType, TaskType]] = None
+this: Optional[Union[GroupType, HostType, ScriptType]] = None
 """
 This variable holds all meta information available to a module when itself is being loaded.
-The module can be a host, group or task module, and will hold an instance of the mockup type as defined in :module:`simple_automation.types`.
+The module can be a host, group or script module, and will hold an instance of the mockup type as defined in :module:`simple_automation.types`.
 For more information on how to use the specific meta type objects, refer to the documentation of the respective class.
 
 This variable must not be used anywhere else but inside the primary definition of one of the
@@ -102,7 +102,7 @@ def current_host(active_host: HostType):
     """
     return SetVariableContextManager(__import__(__name__), 'host', active_host)
 
-def set_this(value: Optional[Union[GroupType, HostType, ScriptType, TaskType]]):
+def set_this(value: Optional[Union[GroupType, HostType, ScriptType]]):
     """
     A context manager to temporarily set :attr:`simple_automation.this` to the given value.
     """

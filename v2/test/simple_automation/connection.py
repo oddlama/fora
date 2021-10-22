@@ -3,12 +3,12 @@ Provides a class to manage a remote connection via the host's connector.
 Stores state along with the connection.
 """
 
-from typing import cast, Union, Optional
+from typing import cast, Optional
 
 import simple_automation
 from simple_automation.connectors.connector import Connector, CompletedRemoteCommand, StatResult
 from simple_automation.remote_settings import RemoteSettings
-from simple_automation.types import HostType, ScriptType, TaskType
+from simple_automation.types import HostType, ScriptType
 
 class Connection:
     """
@@ -50,8 +50,8 @@ class Connection:
         RemoteSettings
             The resolved settings
         """
-        if not isinstance(simple_automation.this, (ScriptType, TaskType)):
-            raise RuntimeError("Cannot resolve defaults, when neither a script nor a task is currently running.")
+        if not isinstance(simple_automation.this, ScriptType):
+            raise RuntimeError("Cannot resolve defaults, when no script is currently running.")
 
         # Overlay settings on top of defaults
         settings = simple_automation.this.current_defaults().overlay(settings)
@@ -93,7 +93,7 @@ class Connection:
         """
         See :func:`simple_automation.connectors.connector.run`.
         """
-        defaults = cast(Union[ScriptType, TaskType], simple_automation.this).current_defaults()
+        defaults = cast(ScriptType, simple_automation.this).current_defaults()
         return self.connector.run(
             command=command,
             input=input,

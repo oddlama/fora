@@ -99,7 +99,7 @@ class Logger:
         #name_align_at = 30 * (1 + (len(transaction.desc) // 30))
         #desc = f"{transaction.desc:<{name_align_at}}"
         title = transaction.op_name
-        desc = transaction.desc
+        desc = transaction.description
         print(f"{self.indent_prefix()}{title_color}{title}[m {desc} ", end="", flush=True)
 
     def print_transaction_early(self, transaction):

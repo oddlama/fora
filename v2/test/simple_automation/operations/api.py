@@ -2,12 +2,12 @@
 Provides necessary components to define operations.
 """
 
-from typing import cast, Union, Any, Optional
+from typing import cast, Any, Optional
 
 import simple_automation
 from simple_automation import logger
 from simple_automation.connection import Connection
-from simple_automation.types import RemoteDefaultsContext, HostType, ScriptType, TaskType
+from simple_automation.types import RemoteDefaultsContext, HostType, ScriptType
 from simple_automation.utils import AbortExecutionSignal
 
 class OperationError(Exception):
@@ -40,13 +40,13 @@ class Operation:
     def __init__(self, op_name: str, name: str):
         self.op_name = op_name
         self.name = name
-        self.desc: str
+        self.description: str
         self.initial_state_dict: Optional[dict[str, Any]] = None
         self.final_state_dict: Optional[dict[str, Any]] = None
         logger.print(f"[37m# {self.name}[m")
 
     def desc(self, description: str):
-        self.desc = description
+        self.description = description
         logger.print_transaction_early(self)
 
     def connection(self) -> Connection:
@@ -63,10 +63,10 @@ class Operation:
 
     def defaults(self, *args, **kwargs) -> RemoteDefaultsContext:
         """
-        Sets defaults on the current script or task. See :meth:`simple_automation.types.ScriptType.defaults`.
+        Sets defaults on the current script. See :meth:`simple_automation.types.ScriptType.defaults`.
         """
         _ = (self)
-        return cast(Union[ScriptType, TaskType], simple_automation.this).defaults(*args, **kwargs)
+        return cast(ScriptType, simple_automation.this).defaults(*args, **kwargs)
 
     def initial_state(self, **kwargs):
         """

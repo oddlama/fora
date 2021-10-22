@@ -24,7 +24,7 @@ class RemoteDefaultsContext:
     """
     A context manager to overlay remote defaults on a stack of defaults.
     """
-    def __init__(self, obj: Union[ScriptType, TaskType], new_defaults: RemoteSettings):
+    def __init__(self, obj: ScriptType, new_defaults: RemoteSettings):
         self.obj = obj
         self.new_defaults = new_defaults
 
@@ -279,7 +279,7 @@ class HostType(MockupType):
           1. Host variables
           2. Group variables (respecting topological order), the global "all" group
              implicitly will be the last in the chain
-          3. Task variables
+          3. Script variables
           4. raises AttributeError
 
         If the attribute start with an underscore, the lookup will always be from the host object
@@ -332,7 +332,7 @@ class HostType(MockupType):
           1. Host variables
           2. Group variables (respecting topological order), the global "all" group
              implicitly will be the last in the chain
-          3. Task variables
+          3. Script variables
           4. False
 
         If the attribute start with an underscore, the lookup will always be from the host object
@@ -404,101 +404,6 @@ class InventoryType(MockupType):
         The list of hosts that belong to this inventory and have to be loaded.
         """
 
-class TaskType(MockupType):
-    """
-    A mockup type for task modules. This is not the actual type of an instanciated
-    module, but will reflect some of it's properties better than ModuleType.
-
-    This class also represents all meta information available to a task module when itself
-    is being loaded. It allows a module to access and modify its associated meta-information.
-
-    When writing a task module, you can simply import :attr:`simple_automation.this`,
-    which exposes an API to access/modify this information.
-    """
-
-    reserved_vars: set[str] = set(["name", "loaded_from"])
-    """
-    A list of variable names that are reserved and must not be set by the module.
-    """
-
-    def __init__(self, host_id: str, loaded_from: str):
-        self.name: str = host_id
-        """
-        The name of the task. Must not be changed.
-        """
-
-        self.loaded_from: str = loaded_from
-        """
-        The original file path of the instanciated module.
-        """
-
-        self._defaults_stack: list[RemoteSettings] = [RemoteSettings()]
-        """
-        The stack of remote execution defaults. The stack must only be changed by using
-        the context manager returned in :meth:`self.defaults() <simple_automation.types.ScriptType.defaults>`.
-        """
-
-    def defaults(self,
-                 as_user: Optional[str] = None,
-                 as_group: Optional[str] = None,
-                 owner: Optional[str] = None,
-                 group: Optional[str] = None,
-                 file_mode: Optional[str] = None,
-                 dir_mode: Optional[str] = None,
-                 umask: Optional[str] = None,
-                 cwd: Optional[str] = None) -> RemoteDefaultsContext:
-        """
-        Returns a context manager to incrementally change the remote execution defaults.
-
-        .. code-block:: python
-
-            from simple_automation import this
-            with this.defaults(owner="root", file_mode="644", dir_mode="755"):
-                # ...
-        """
-        if simple_automation.this is not self:
-            raise RuntimeError("Cannot set defaults on a script when it isn't the currently active script.")
-
-        new_defaults = RemoteSettings(
-                 as_user=as_user,
-                 as_group=as_group,
-                 owner=owner,
-                 group=group,
-                 file_mode=None if file_mode is None else oct(int(file_mode, 8))[2:],
-                 dir_mode=None if dir_mode is None else oct(int(dir_mode, 8))[2:],
-                 umask=None if umask is None else oct(int(umask, 8))[2:],
-                 cwd=cwd)
-        new_defaults = self._defaults_stack[-1].overlay(new_defaults)
-        return RemoteDefaultsContext(self, new_defaults)
-
-    def current_defaults(self) -> RemoteSettings:
-        """
-        Returns the fully resolved currently active defaults.
-
-        Returns
-        -------
-        RemoteSettings
-            The currently active remote defaults.
-        """
-        return RemoteSettings.base_settings.overlay(self._defaults_stack[-1])
-
-    @staticmethod
-    def get_variables(task: TaskType) -> set[str]:
-        """
-        Returns the list of all user-defined attributes for a task.
-
-        Parameters
-        ----------
-        task : TaskType
-            The task module
-
-        Returns
-        -------
-        set[str]
-            The user-defined attributes for the given task
-        """
-        return _get_variables(TaskType, task)
-
 class ScriptType(MockupType):
     """
     A mockup type for script modules. This is not the actual type of an instanciated
@@ -509,6 +414,11 @@ class ScriptType(MockupType):
 
     When writing a script module, you can simply import :attr:`simple_automation.this`,
     which exposes an API to access/modify this information.
+    """
+
+    reserved_vars: set[str] = set(["name", "loaded_from"])
+    """
+    A list of variable names that are reserved and must not be set by the module.
     """
 
     def __init__(self, host_id: str, loaded_from: str):
@@ -571,6 +481,23 @@ class ScriptType(MockupType):
             The currently active remote defaults.
         """
         return RemoteSettings.base_settings.overlay(self._defaults_stack[-1])
+
+    @staticmethod
+    def get_variables(script: ScriptType) -> set[str]:
+        """
+        Returns the list of all user-defined attributes for a script.
+
+        Parameters
+        ----------
+        script : ScriptType
+            The script module
+
+        Returns
+        -------
+        set[str]
+            The user-defined attributes for the given script
+        """
+        return _get_variables(ScriptType, script)
 
 def _get_variables(cls, module: ModuleType) -> set[str]:
     """
