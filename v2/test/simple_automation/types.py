@@ -20,6 +20,16 @@ if TYPE_CHECKING:
     from simple_automation.connection import Connection
     from simple_automation.connectors.connector import Connector
 
+def transfer(function):
+    """
+    A decorator for implementations of MockupType. This will cause
+    the decorated function to be transferred to the loaded dynamic module,
+    after variables have been transferred, but before the dynamic module is executed.
+    """
+    function._transfer = True
+    print(function)
+    return function
+
 class RemoteDefaultsContext:
     """
     A context manager to overlay remote defaults on a stack of defaults.
@@ -38,7 +48,8 @@ class RemoteDefaultsContext:
 
 class MockupType(ModuleType):
     """
-    A base class for all module mockup types.
+    A base class for all module mockup types, which allow a
+    transfer of variables to a real dynamically loaded module.
     """
 
     reserved_vars: set[str] = set()
@@ -51,11 +62,21 @@ class MockupType(ModuleType):
 
     def transfer(self, module: ModuleType):
         """
-        Transfers all reserved variables from this object to the given module.
+        Transfers all reserved variables from this object to the given module,
+        as well as any functions tagged with @transfer.
         """
         for var in self.reserved_vars:
             if hasattr(self, var):
                 setattr(module, var, getattr(self, var))
+
+        import functools
+
+        # Transfer functions tagged with @transfer
+        for attr in [attr for attr in dir(type(self)) if
+                callable(getattr(self, attr)) and
+                hasattr(getattr(self, attr), '_transfer') and
+                getattr(getattr(self, attr), '_transfer') == True]:
+            setattr(module, attr, functools.partial(getattr(self, attr), module))
 
 class GroupType(MockupType):
     """
@@ -107,6 +128,7 @@ class GroupType(MockupType):
         This group will be loaded after this set of other groups.
         """
 
+    @transfer
     def before(self, group: str):
         """
         Adds a reverse-dependency on the given group.
@@ -123,6 +145,7 @@ class GroupType(MockupType):
 
         self.groups_before.add(group)
 
+    @transfer
     def before_all(self, groups: list[str]):
         """
         Adds a reverse-dependency on all given groups.
@@ -135,6 +158,7 @@ class GroupType(MockupType):
         for g in groups:
             self.before(g)
 
+    @transfer
     def after(self, group: str):
         """
         Adds a dependency on the given group.
@@ -151,6 +175,7 @@ class GroupType(MockupType):
 
         self.groups_after.add(group)
 
+    @transfer
     def after_all(self, groups: list[str]):
         """
         Adds a dependency on all given groups.
@@ -247,6 +272,7 @@ class HostType(MockupType):
         The connection to this host, if it is opened.
         """
 
+    @transfer
     def add_group(self, group: str):
         """
         Adds a this host to the specified group.
@@ -260,6 +286,7 @@ class HostType(MockupType):
             raise ValueError(f"Referenced invalid group '{group}'!")
         self.groups.add(group)
 
+    @transfer
     def add_groups(self, groups: list[str]):
         """
         Adds a this host to the specified list of groups.
@@ -317,10 +344,11 @@ class HostType(MockupType):
             if hasattr(group, attr):
                 return getattr(group, attr)
 
-        # TODO task variables lookup here
-        # if simple_automation.task is not None:
-        #    if hasattr(simple_automation.task, attr):
-        #        return getattr(simple_automation.task, attr)
+        # Look up variable on current script
+        if isinstance(simple_automation.this, ScriptType):
+            print(simple_automation.this)
+            if hasattr(simple_automation.this, attr):
+                return getattr(simple_automation.this, attr)
 
         raise AttributeError(attr)
 
@@ -368,10 +396,10 @@ class HostType(MockupType):
             if hasattr(group, attr):
                 return True
 
-        # TODO task variables lookup here
-        # if simple_automation.this is a task:
-        #    if hasattr(simple_automation.task, attr):
-        #        return True
+        # Look up variable on current script
+        if isinstance(simple_automation.this, ScriptType):
+            if hasattr(simple_automation.this, attr):
+                return True
 
         return False
 
@@ -438,6 +466,7 @@ class ScriptType(MockupType):
         the context manager returned in :meth:`self.defaults() <simple_automation.types.ScriptType.defaults>`.
         """
 
+    @transfer
     def defaults(self,
                  as_user: Optional[str] = None,
                  as_group: Optional[str] = None,
@@ -471,6 +500,7 @@ class ScriptType(MockupType):
         new_defaults = self._defaults_stack[-1].overlay(new_defaults)
         return RemoteDefaultsContext(self, new_defaults)
 
+    @transfer
     def current_defaults(self) -> RemoteSettings:
         """
         Returns the fully resolved currently active defaults.

@@ -402,8 +402,9 @@ def load_site(inventories: list[str]):
         # Load first inventory module file and append hosts from other inventory modules
         simple_automation.inventory = load_inventory(module_files[0])
         # Append hosts from other inventory modules
-        for inv in module_files:
+        for inv in module_files[1:]:
             simple_automation.inventory.hosts.extend(load_inventory(inv).hosts)
+            print(simple_automation.inventory.hosts)
 
     # Append single hosts
     for shost in single_hosts:
@@ -436,8 +437,14 @@ def run_script(script: str, frame: inspect.FrameInfo):
     script_stack.append((meta, frame))
     try:
         with simple_automation.set_this(meta):
+            # New script instance starts with fresh set of default values.
+            # Use defaults() here to resolve them at least once.
             with meta.defaults():
-                load_py_module(script)
+                def a(mod):
+                    # TODO evil
+                    meta.transfer(mod)
+                    simple_automation.this = mod
+                load_py_module(script, pre_exec=a)
     except Exception as e:
         # Save the current script_stack in any exception thrown from this context
         # for later use in any exception handler.

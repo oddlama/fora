@@ -7,7 +7,8 @@ import os
 import sys
 import traceback
 import uuid
-from typing import TypeVar, Callable, Iterable
+from types import ModuleType
+from typing import TypeVar, Callable, Iterable, Callable, Optional
 
 import importlib.machinery
 import importlib.util
@@ -63,7 +64,7 @@ class CycleError(ValueError):
         super().__init__(msg)
         self.cycle = cycle
 
-def load_py_module(file: str):
+def load_py_module(file: str, pre_exec: Optional[Callable[[], ModuleType]] = None) -> ModuleType:
     """
     Loads a module from the given filename and assigns a unique module name to it.
     Calling this function twice for the same file will yield distinct instances.
@@ -75,8 +76,15 @@ def load_py_module(file: str):
     spec = importlib.util.spec_from_loader(loader.name, loader)
     if spec is None:
         raise ValueError(f"Failed to load module from file '{file}'")
-    mod = importlib.util.module_from_spec(spec)
 
+    mod = importlib.util.module_from_spec(spec)
+    def aaaa():
+        print("x")
+    # TODO away
+    mod.aaaa = aaaa
+    # Run pre_exec callback after the module is loaded but before it is executed
+    if pre_exec is not None:
+        pre_exec(mod)
     loader.exec_module(mod)
     return mod
 
