@@ -64,7 +64,7 @@ class CycleError(ValueError):
         super().__init__(msg)
         self.cycle = cycle
 
-def load_py_module(file: str, pre_exec: Optional[Callable[[], ModuleType]] = None) -> ModuleType:
+def load_py_module(file: str, pre_exec: Optional[Callable[[ModuleType], None]] = None) -> ModuleType:
     """
     Loads a module from the given filename and assigns a unique module name to it.
     Calling this function twice for the same file will yield distinct instances.

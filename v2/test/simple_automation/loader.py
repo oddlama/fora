@@ -48,7 +48,7 @@ def load_inventory(file: str) -> InventoryType:
     InventoryType
         The loaded group module
     """
-    inventory = load_py_module(file)
+    inventory = cast(InventoryType, load_py_module(file))
     if not hasattr(inventory, 'hosts'):
         die_error("inventory must define a list of hosts!", loc="inventory.py")
 
@@ -80,7 +80,7 @@ def load_group(module_file: str) -> GroupType:
 
     # Instanciate module
     with simple_automation.set_this(meta):
-        ret = load_py_module(module_file, pre_exec=lambda module: setattr(meta, '_module', module))
+        ret = cast(GroupType, load_py_module(module_file, pre_exec=lambda module: setattr(meta, '_module', module)))
 
     for reserved in GroupType.reserved_vars:
         if hasattr(ret, reserved):
@@ -327,7 +327,7 @@ def load_host(name: str, module_file: str) -> HostType:
     with simple_automation.set_this(meta):
         # Instanciate module
         if module_file_exists:
-            ret = load_py_module(module_file, pre_exec=lambda module: setattr(meta, '_module', module))
+            ret = cast(HostType, load_py_module(module_file, pre_exec=lambda module: setattr(meta, '_module', module)))
         else:
             # Instanciate default module and set ssh_host to the name
             ret = cast(HostType, DefaultHost(name))

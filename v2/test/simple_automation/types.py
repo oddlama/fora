@@ -100,12 +100,17 @@ class GroupType(MockupType):
             this.after("server")
     """
 
-    reserved_vars: set[str] = set(["name", "loaded_from", "groups_before", "groups_after"])
+    reserved_vars: set[str] = set(["_module", "name", "loaded_from", "groups_before", "groups_after"])
     """
     A list of variable names that are reserved and must not be set by the module.
     """
 
     def __init__(self, name: str, loaded_from: str):
+        self._module: ModuleType
+        """
+        The associated dynamically loaded module (will be set before the dynamic module is executed).
+        """
+
         self.name: str = name
         """
         The name of the group. Must not be changed.
@@ -231,12 +236,17 @@ class HostType(MockupType):
             this.add_group("desktops")
     """
 
-    reserved_vars: set[str] = set(["name", "loaded_from", "groups", "url", "connector", "connection"])
+    reserved_vars: set[str] = set(["_module", "name", "loaded_from", "groups", "url", "connector", "connection"])
     """
     A list of variable names that are reserved and must not be set by the module.
     """
 
     def __init__(self, host_id: str, loaded_from: str):
+        self._module: ModuleType
+        """
+        The associated dynamically loaded module (will be set before the dynamic module is executed).
+        """
+
         self.name: str = host_id
         """
         The corresponding host name as defined in the inventory.
@@ -441,12 +451,17 @@ class ScriptType(MockupType):
     which exposes an API to access/modify this information.
     """
 
-    reserved_vars: set[str] = set(["name", "loaded_from"])
+    reserved_vars: set[str] = set(["_module", "name", "loaded_from"])
     """
     A list of variable names that are reserved and must not be set by the module.
     """
 
     def __init__(self, host_id: str, loaded_from: str):
+        self._module: ModuleType
+        """
+        The associated dynamically loaded module (will be set before the dynamic module is executed).
+        """
+
         self.name: str = host_id
         """
         The name of the script. Must not be changed.
