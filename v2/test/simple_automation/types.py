@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from types import ModuleType
 from typing import Union, Callable, Optional, Any, TYPE_CHECKING
+import functools
 
 # pylint: disable=cyclic-import
 # Cyclic import is correct at this point, as this module will not access anything from simple_automation
@@ -27,7 +28,6 @@ def transfer(function):
     after variables have been transferred, but before the dynamic module is executed.
     """
     function._transfer = True
-    print(function)
     return function
 
 class RemoteDefaultsContext:
@@ -68,8 +68,6 @@ class MockupType(ModuleType):
         for var in self.reserved_vars:
             if hasattr(self, var):
                 setattr(module, var, getattr(self, var))
-
-        import functools
 
         # Transfer functions tagged with @transfer
         for attr in [attr for attr in dir(type(self)) if
@@ -346,9 +344,8 @@ class HostType(MockupType):
 
         # Look up variable on current script
         if isinstance(simple_automation.this, ScriptType):
-            print(simple_automation.this)
-            if hasattr(simple_automation.this, attr):
-                return getattr(simple_automation.this, attr)
+            if hasattr(simple_automation.this._module, attr):
+                return getattr(simple_automation.this._module, attr)
 
         raise AttributeError(attr)
 
@@ -398,7 +395,7 @@ class HostType(MockupType):
 
         # Look up variable on current script
         if isinstance(simple_automation.this, ScriptType):
-            if hasattr(simple_automation.this, attr):
+            if hasattr(simple_automation.this._module, attr):
                 return True
 
         return False

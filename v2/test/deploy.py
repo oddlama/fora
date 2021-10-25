@@ -10,7 +10,7 @@ somedefault = 134
 local.script(name="Run script",
              script="deploy2.py")
 
-print(current_defaults())
+print(this.current_defaults())
 
 if "desktops" in host.groups:
     print("is desktop")
