@@ -8,7 +8,7 @@ import sys
 import traceback
 import uuid
 from types import ModuleType
-from typing import TypeVar, Callable, Iterable, Callable, Optional
+from typing import TypeVar, Callable, Iterable, Optional
 
 import importlib.machinery
 import importlib.util

@@ -18,11 +18,13 @@ class ConnectionLogger:
 
     def init(self):
         #print(f"[ CONN ] Establishing connection to {self.host.name} via {self.connector.schema}")
-        print(f"[1;34m{self.connector.schema}[m [1;33mconnecting[m")
+        #print(f"[1;34m{self.connector.schema}[m [1;33mconnecting[m")
+        print(f"[1;34m{self.connector.schema}[m connecting... ", end="", flush=True)
 
     def established(self):
         #print(f"[ CONN ] Connection to {self.host.name} established")
-        print(f"[1;34m{self.connector.schema}[m [1;32mconnected[m")
+        #print(f"[1;34m{self.connector.schema}[m [1;32mconnected[m")
+        print("[1;32mOK[m")
 
     def requested_close(self):
         pass

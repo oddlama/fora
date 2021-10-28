@@ -80,7 +80,7 @@ def load_group(module_file: str) -> GroupType:
 
     # Instanciate module
     with simple_automation.set_this(meta):
-        ret = cast(GroupType, load_py_module(module_file, pre_exec=lambda module: setattr(meta, '_module', module)))
+        ret = cast(GroupType, load_py_module(module_file, pre_exec=lambda module: setattr(meta, 'module', module)))
 
     for reserved in GroupType.reserved_vars:
         if hasattr(ret, reserved):
@@ -327,11 +327,11 @@ def load_host(name: str, module_file: str) -> HostType:
     with simple_automation.set_this(meta):
         # Instanciate module
         if module_file_exists:
-            ret = cast(HostType, load_py_module(module_file, pre_exec=lambda module: setattr(meta, '_module', module)))
+            ret = cast(HostType, load_py_module(module_file, pre_exec=lambda module: setattr(meta, 'module', module)))
         else:
             # Instanciate default module and set ssh_host to the name
             ret = cast(HostType, DefaultHost(name))
-            ret._module = meta
+            meta.module = ret
 
     # Check if the module did set any reserved variables
     for reserved in HostType.reserved_vars:
@@ -440,7 +440,7 @@ def run_script(script: str, frame: inspect.FrameInfo):
             # New script instance starts with fresh set of default values.
             # Use defaults() here to resolve them at least once.
             with meta.defaults():
-                load_py_module(script, pre_exec=lambda module: setattr(meta, '_module', module))
+                load_py_module(script, pre_exec=lambda module: setattr(meta, 'module', module))
     except Exception as e:
         # Save the current script_stack in any exception thrown from this context
         # for later use in any exception handler.

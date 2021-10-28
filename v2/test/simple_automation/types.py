@@ -27,7 +27,7 @@ def transfer(function):
     the decorated function to be transferred to the loaded dynamic module,
     after variables have been transferred, but before the dynamic module is executed.
     """
-    function._transfer = True
+    setattr(function, '_transfer', True)
     return function
 
 class RemoteDefaultsContext:
@@ -70,11 +70,10 @@ class MockupType(ModuleType):
                 setattr(module, var, getattr(self, var))
 
         # Transfer functions tagged with @transfer
-        for attr in [attr for attr in dir(type(self)) if
-                callable(getattr(self, attr)) and
-                hasattr(getattr(self, attr), '_transfer') and
-                getattr(getattr(self, attr), '_transfer') == True]:
-            setattr(module, attr, functools.partial(getattr(self, attr), module))
+        for attr in dir(type(self)):
+            a = getattr(self, attr)
+            if callable(a) and hasattr(a, '_transfer') and getattr(a, '_transfer') is True:
+                setattr(module, attr, functools.partial(getattr(self, attr), module))
 
 class GroupType(MockupType):
     """
@@ -100,13 +99,13 @@ class GroupType(MockupType):
             this.after("server")
     """
 
-    reserved_vars: set[str] = set(["_module", "name", "loaded_from", "groups_before", "groups_after"])
+    reserved_vars: set[str] = set(["module", "name", "loaded_from", "groups_before", "groups_after"])
     """
     A list of variable names that are reserved and must not be set by the module.
     """
 
     def __init__(self, name: str, loaded_from: str):
-        self._module: ModuleType
+        self.module: ModuleType
         """
         The associated dynamically loaded module (will be set before the dynamic module is executed).
         """
@@ -236,13 +235,13 @@ class HostType(MockupType):
             this.add_group("desktops")
     """
 
-    reserved_vars: set[str] = set(["_module", "name", "loaded_from", "groups", "url", "connector", "connection"])
+    reserved_vars: set[str] = set(["module", "name", "loaded_from", "groups", "url", "connector", "connection"])
     """
     A list of variable names that are reserved and must not be set by the module.
     """
 
     def __init__(self, host_id: str, loaded_from: str):
-        self._module: ModuleType
+        self.module: ModuleType
         """
         The associated dynamically loaded module (will be set before the dynamic module is executed).
         """
@@ -354,8 +353,8 @@ class HostType(MockupType):
 
         # Look up variable on current script
         if isinstance(simple_automation.this, ScriptType):
-            if hasattr(simple_automation.this._module, attr):
-                return getattr(simple_automation.this._module, attr)
+            if hasattr(simple_automation.this.module, attr):
+                return getattr(simple_automation.this.module, attr)
 
         raise AttributeError(attr)
 
@@ -405,7 +404,7 @@ class HostType(MockupType):
 
         # Look up variable on current script
         if isinstance(simple_automation.this, ScriptType):
-            if hasattr(simple_automation.this._module, attr):
+            if hasattr(simple_automation.this.module, attr):
                 return True
 
         return False
@@ -451,13 +450,13 @@ class ScriptType(MockupType):
     which exposes an API to access/modify this information.
     """
 
-    reserved_vars: set[str] = set(["_module", "name", "loaded_from"])
+    reserved_vars: set[str] = set(["module", "name", "loaded_from"])
     """
     A list of variable names that are reserved and must not be set by the module.
     """
 
     def __init__(self, host_id: str, loaded_from: str):
-        self._module: ModuleType
+        self.module: ModuleType
         """
         The associated dynamically loaded module (will be set before the dynamic module is executed).
         """
