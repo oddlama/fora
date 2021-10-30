@@ -4,12 +4,17 @@ import stat
 import struct
 import subprocess
 import sys
+import typing
 from enum import IntEnum
 from pwd import getpwnam,getpwuid
 from grp import getgrnam,getgrgid
 from struct import pack,unpack
-from typing import cast,Any,TypeVar,Callable,Optional
+from typing import cast,Any,TypeVar,Callable,Optional,Union,NamedTuple,NewType
 T=TypeVar('T')
+i32=NewType('i32',int)
+u32=NewType('u32',int)
+i64=NewType('i64',int)
+u64=NewType('u64',int)
 is_server=False
 debug=False
 try:
@@ -21,7 +26,7 @@ def is_debug():
 def log(msg:str):
  if not is_debug():
   return
- prefix="[ [1;33mREMOTE[m  ] " if is_server else "[ [1;32mLOCAL[m   ] "
+ prefix="  [1;33mREMOTE[m: " if is_server else "   [1;32mLOCAL[m: "
  print(f"{prefix}{msg}",file=sys.stderr,flush=True)
 def resolve_umask(umask:str)->int:
  try:
@@ -61,140 +66,128 @@ class Connection:
   self.buffer_out.flush()
  def read(self,count:int)->bytes:
   return self.buffer_in.read(count)
- def read_bytes(self)->bytes:
-  return self.read(self.read_u64())
- def read_str(self)->str:
-  return self.read_bytes().decode('utf-8')
- def read_str_list(self)->list[str]:
-  return list(self.read_str()for i in range(self.read_u64()))
- def _read_opt_generic(self,f:Callable[[],T])->Optional[T]:
-  return f()if self.read_bool()else None
- def read_opt_bytes(self)->Optional[bytes]:
-  return self._read_opt_generic(self.read_bytes)
- def read_opt_str(self)->Optional[str]:
-  return self._read_opt_generic(self.read_str)
- def read_bool(self)->bool:
-  return cast(bool,unpack(">?",self.read(1))[0])
- def read_i32(self)->int:
-  return cast(int,unpack(">i",self.read(4))[0])
- def read_u32(self)->int:
-  return cast(int,unpack(">I",self.read(4))[0])
- def read_i64(self)->int:
-  return cast(int,unpack(">q",self.read(8))[0])
- def read_u64(self)->int:
-  return cast(int,unpack(">Q",self.read(8))[0])
  def write(self,data:bytes,count:int):
   self.buffer_out.write(data[:count])
- def write_bytes(self,v:bytes):
-  self.write_u64(len(v))
-  self.write(v,len(v))
- def write_str(self,v:str):
-  self.write_bytes(v.encode('utf-8'))
- def write_str_list(self,v:list[str]):
-  self.write_u64(len(v))
-  for i in v:
-   self.write_str(i)
- def _write_opt_generic(self,v:Optional[T],f:Callable[[T],None]):
-  self.write_bool(v is not None)
+ def write_packet(self,packet:Any):
+  if not hasattr(packet,'_is_packet')or not bool(getattr(packet,'_is_packet')):
+   raise ValueError("Invalid argument: Must be a packet!")
+  packet._write(self)
+def is_optional(field):
+ return typing.get_origin(field)is Union and type(None)in typing.get_args(field)
+def is_list(field):
+ return typing.get_origin(field)is list
+_serializers:dict[Any,Callable[[Connection,Any],Any]]={}
+_serializers[bool]=lambda conn,v:conn.write(pack(">?",v),1)
+_serializers[i32] =lambda conn,v:conn.write(pack(">i",v),4)
+_serializers[u32] =lambda conn,v:conn.write(pack(">I",v),4)
+_serializers[i64] =lambda conn,v:conn.write(pack(">q",v),8)
+_serializers[u64] =lambda conn,v:conn.write(pack(">Q",v),8)
+_serializers[bytes]=lambda conn,v:(_serializers[u64](conn,len(v)),conn.write(v,len(v)))
+_serializers[str] =lambda conn,v:_serializers[bytes](conn,v.encode('utf-8'))
+def serialize(conn:Connection,vtype,v:Any):
+ if vtype in _serializers:
+  _serializers[vtype](conn,v)
+ elif is_optional(vtype):
+  real_type=typing.get_args(vtype)[0]
+  _serializers[bool](conn,v is not None)
   if v is not None:
-   f(v)
- def write_opt_bytes(self,v:Optional[bytes]):
-  self._write_opt_generic(v,self.write_bytes)
- def write_opt_str(self,v:Optional[str]):
-  self._write_opt_generic(v,self.write_str)
- def write_bool(self,v:bool):
-  self.write(pack(">?",v),1)
- def write_i32(self,v:int):
-  self.write(pack(">i",v),4)
- def write_u32(self,v:int):
-  self.write(pack(">I",v),4)
- def write_i64(self,v:int):
-  self.write(pack(">q",v),8)
- def write_u64(self,v:int):
-  self.write(pack(">Q",v),8)
-class Packets(IntEnum):
- ack=0
- check_alive=1
- exit=2
- invalid_field=3
- process_run=4
- process_completed=5
- process_preexec_error=6
- stat=7
- stat_result=8
- resolve_user=9
- resolve_group=10
- resolve_result=11
-class PacketAck:
+   serialize(conn,real_type,v)
+ elif is_list(vtype):
+  element_type=typing.get_args(vtype)[0]
+  _serializers[u64](conn,len(v))
+  for i in v:
+   serialize(conn,element_type,i)
+ else:
+  raise ValueError(f"Cannot serialize object of type {vtype}")
+_deserializers:dict[Any,Callable[[Connection],Any]]={}
+_deserializers[bool]=lambda conn:unpack(">?",conn.read(1))[0]
+_deserializers[i32] =lambda conn:unpack(">i",conn.read(4))[0]
+_deserializers[u32] =lambda conn:unpack(">I",conn.read(4))[0]
+_deserializers[i64] =lambda conn:unpack(">q",conn.read(8))[0]
+_deserializers[u64] =lambda conn:unpack(">Q",conn.read(8))[0]
+_deserializers[bytes]=lambda conn:conn.read(_deserializers[u64](conn))
+_deserializers[str] =lambda conn:_deserializers[bytes](conn).decode('utf-8')
+def deserialize(conn:Connection,vtype):
+ if vtype in _deserializers:
+  return _deserializers[vtype](conn)
+ elif is_optional(vtype):
+  real_type=typing.get_args(vtype)[0]
+  if not _deserializers[bool](conn):
+   return None
+  return deserialize(conn,real_type)
+ elif is_list(vtype):
+  element_type=typing.get_args(vtype)[0]
+  return list(deserialize(conn,element_type)for i in range(_deserializers[u64](conn)))
+ else:
+  raise ValueError(f"Cannot deserialize object of type {vtype}")
+class Packet:
  def write(self,conn:Connection):
-  _=(self)
-  conn.write_u32(Packets.ack)
-  conn.flush()
+  pass
  def handle(self,conn:Connection):
-  _=(self,conn)
- @staticmethod
- def read(conn:Connection):
-  _=(conn)
-  return PacketAck()
-class PacketCheckAlive:
- def write(self,conn:Connection):
-  _=(self)
-  conn.write_u32(Packets.check_alive)
-  conn.flush()
+  pass
+packets:list[Packet]=[]
+packet_deserializers:dict[int,Callable[[Connection],Any]]={}
+def _handle_response_packet():
+ raise RuntimeError("This packet is a server-side response packet and must never be sent by the client!")
+def _read_packet(cls,conn:Connection):
+ kwargs={}
+ for f in cls._fields:
+  ftype=cls.__annotations__[f]
+  kwargs[f]=deserialize(conn,ftype)
+ return cls(**kwargs)
+def _write_packet(cls,packet_id:u32,self,conn:Connection):
+ serialize(conn,u32,packet_id)
+ for f in cls._fields:
+  ftype=cls.__annotations__[f]
+  serialize(conn,ftype,getattr(self,f))
+ conn.flush()
+def packet(type):
+ if type not in['response','request']:
+  raise RuntimeError("Invalid @packet decoration: type must be either 'response' or 'request'.")
+ def wrapper(cls):
+  if not hasattr(cls,'_fields'):
+   raise RuntimeError("Invalid @packet decoration: Decorated class must inherit from NamedTuple.")
+  packet_id=len(packets)
+  cls._is_packet=True
+  cls._write=lambda self,conn:_write_packet(cls,packet_id,self,conn)
+  if type=='response':
+   cls.handle=_handle_response_packet
+  elif type=='request':
+   if not hasattr(cls,'handle')or not callable(getattr(cls,'handle')):
+    raise RuntimeError("Invalid @packet decoration: request packets must provide a handle method!")
+  packets.append(cls)
+  packet_deserializers[packet_id]=lambda conn:_read_packet(cls,conn)
+  return cls
+ return wrapper
+@packet(type='response')
+class PacketAck(NamedTuple):
+ pass 
+@packet(type='request')
+class PacketCheckAlive(NamedTuple):
  def handle(self,conn:Connection):
   _=(self)
-  PacketAck().write(conn)
- @staticmethod
- def read(conn:Connection):
-  _=(conn)
-  return PacketCheckAlive()
-class PacketExit:
- def write(self,conn:Connection):
-  _=(self)
-  conn.write_u32(Packets.exit)
-  conn.flush()
+  conn.write_packet(PacketAck())
+@packet(type='request')
+class PacketExit(NamedTuple):
  def handle(self,conn:Connection):
   _=(self)
   conn.should_close=True
- @staticmethod
- def read(conn:Connection):
-  _=(conn)
-  return PacketExit()
-class PacketInvalidField:
- def __init__(self,field:str,error_message:str):
-  self.field=field
-  self.error_message=error_message
- def write(self,conn:Connection):
-  _=(self)
-  conn.write_u32(Packets.invalid_field)
-  conn.write_str(self.field)
-  conn.write_str(self.error_message)
-  conn.flush()
+@packet(type='response')
+class PacketInvalidField(NamedTuple):
+ field:str
+ error_message:str
  def handle(self,conn:Connection):
   _=(conn)
   raise ValueError(f"Invalid value given for field '{self.field}': {self.error_message}")
- @staticmethod
- def read(conn:Connection):
-  return PacketInvalidField(field=conn.read_str(),error_message=conn.read_str())
-class PacketProcessRun:
- def __init__(self,command:list[str],stdin:Optional[bytes]=None,capture_output:bool=True,user:Optional[str]=None,group:Optional[str]=None,umask:Optional[str]=None,cwd:Optional[str]=None):
-  self.command=command
-  self.stdin=stdin
-  self.capture_output=capture_output
-  self.user=user
-  self.group=group
-  self.umask=umask
-  self.cwd=cwd
- def write(self,conn:Connection):
-  conn.write_u32(Packets.process_run)
-  conn.write_str_list(self.command)
-  conn.write_opt_bytes(self.stdin)
-  conn.write_bool(self.capture_output)
-  conn.write_opt_str(self.user)
-  conn.write_opt_str(self.group)
-  conn.write_opt_str(self.umask)
-  conn.write_opt_str(self.cwd)
-  conn.flush()
+@packet(type='request')
+class PacketProcessRun(NamedTuple):
+ command:list[str]
+ stdin:Optional[bytes]=None
+ capture_output:bool=True
+ user:Optional[str]=None
+ group:Optional[str]=None
+ umask:Optional[str]=None
+ cwd:Optional[str]=None
  def handle(self,conn:Connection):
   uid,gid=(None,None)
   umask_oct=0o077
@@ -202,23 +195,23 @@ class PacketProcessRun:
    try:
     umask_oct=resolve_umask(self.umask)
    except ValueError as e:
-    PacketInvalidField("umask",str(e)).write(conn)
+    conn.write_packet(PacketInvalidField("umask",str(e)))
     return
   if self.user is not None:
    try:
     (uid,gid)=resolve_user(self.user)
    except ValueError as e:
-    PacketInvalidField("user",str(e)).write(conn)
+    conn.write_packet(PacketInvalidField("user",str(e)))
     return
   if self.group is not None:
    try:
     gid=resolve_group(self.group)
    except ValueError as e:
-    PacketInvalidField("group",str(e)).write(conn)
+    conn.write_packet(PacketInvalidField("group",str(e)))
     return
   if self.cwd is not None:
    if not os.path.isdir(self.cwd):
-    PacketInvalidField("cwd","Requested working directory does not exist").write(conn)
+    conn.write_packet(PacketInvalidField("cwd","Requested working directory does not exist"))
     return
   def child_preexec():
    os.umask(umask_oct)
@@ -231,50 +224,26 @@ class PacketProcessRun:
   try:
    result=subprocess.run(self.command,input=self.stdin,capture_output=self.capture_output,cwd=self.cwd,preexec_fn=child_preexec,check=True)
   except subprocess.SubprocessError as e:
-   PacketProcessPreexecError().write(conn)
+   conn.write_packet(PacketProcessPreexecError())
    return
-  PacketProcessCompleted(result.stdout,result.stderr,result.returncode).write(conn)
- @staticmethod
- def read(conn:Connection):
-  return PacketProcessRun(command=conn.read_str_list(),stdin=conn.read_opt_bytes(),capture_output=conn.read_bool(),user=conn.read_opt_str(),group=conn.read_opt_str(),umask=conn.read_opt_str(),cwd=conn.read_opt_str())
-class PacketProcessCompleted:
- def __init__(self,stdout:Optional[bytes],stderr:Optional[bytes],returncode:int):
-  self.stdout=stdout
-  self.stderr=stderr
-  self.returncode=returncode
- def handle(self,conn:Connection):
-  _=(self,conn)
-  raise RuntimeError("This packet should never be sent by the client!")
- def write(self,conn:Connection):
-  conn.write_u32(Packets.process_completed)
-  conn.write_opt_bytes(self.stdout)
-  conn.write_opt_bytes(self.stderr)
-  conn.write_i32(self.returncode)
-  conn.flush()
- @staticmethod
- def read(conn:Connection):
-  return PacketProcessCompleted(stdout=conn.read_opt_bytes(),stderr=conn.read_opt_bytes(),returncode=conn.read_i32())
-class PacketProcessPreexecError:
- def handle(self,conn:Connection):
-  _=(self,conn)
-  raise RuntimeError("This packet should never be sent by the client!")
- def write(self,conn:Connection):
-  _=(self)
-  conn.write_u32(Packets.process_preexec_error)
-  conn.flush()
- @staticmethod
- def read(conn:Connection):
-  _=(conn)
-  return PacketProcessPreexecError()
-class PacketStat:
- def __init__(self,path:str,follow_links:bool=False):
-  self.path=path
-  self.follow_links=follow_links
+  conn.write_packet(PacketProcessCompleted(result.stdout,result.stderr,i32(result.returncode)))
+@packet(type='response')
+class PacketProcessCompleted(NamedTuple):
+ stdout:Optional[bytes]
+ stderr:Optional[bytes]
+ returncode:i32
+@packet(type='response')
+class PacketProcessPreexecError(NamedTuple):
+ pass 
+@packet(type='request')
+class PacketStat(NamedTuple):
+ path:str
+ follow_links:bool=False
  def handle(self,conn:Connection):
   try:
    s=os.stat(self.path,follow_symlinks=self.follow_links)
   except OSError:
-   PacketInvalidField("path","Path doesn't exist").write(conn)
+   conn.write_packet(PacketInvalidField("path","Path doesn't exist"))
    return
   ftype="dir" if stat.S_ISDIR(s.st_mode) else "chr" if stat.S_ISCHR(s.st_mode) else "blk" if stat.S_ISBLK(s.st_mode) else "file" if stat.S_ISREG(s.st_mode) else "fifo" if stat.S_ISFIFO(s.st_mode)else "link" if stat.S_ISLNK(s.st_mode) else "sock" if stat.S_ISSOCK(s.st_mode)else "other"
   try:
@@ -285,43 +254,19 @@ class PacketStat:
    group=getgrgid(s.st_gid).gr_name
   except KeyError:
    group=str(s.st_gid)
-  PacketStatResult(type=ftype,mode=stat.S_IMODE(s.st_mode),owner=owner,group=group,size=s.st_size,mtime=s.st_mtime_ns,ctime=s.st_ctime_ns).write(conn)
- def write(self,conn:Connection):
-  conn.write_u32(Packets.stat)
-  conn.write_str(self.path)
-  conn.write_bool(self.follow_links)
-  conn.flush()
- @staticmethod
- def read(conn:Connection):
-  return PacketStat(path=conn.read_str(),follow_links=conn.read_bool())
-class PacketStatResult:
- def __init__(self,type:str,mode:int,owner:str,group:str,size:int,mtime:int,ctime:int):
-  self.type=type
-  self.mode=mode
-  self.owner=owner
-  self.group=group
-  self.size=size
-  self.mtime=mtime
-  self.ctime=ctime
- def handle(self,conn:Connection):
-  _=(self,conn)
-  raise RuntimeError("This packet should never be sent by the client!")
- def write(self,conn:Connection):
-  conn.write_u32(Packets.stat_result)
-  conn.write_str(self.type)
-  conn.write_u64(self.mode)
-  conn.write_str(self.owner)
-  conn.write_str(self.group)
-  conn.write_u64(self.size)
-  conn.write_u64(self.mtime)
-  conn.write_u64(self.ctime)
-  conn.flush()
- @staticmethod
- def read(conn:Connection):
-  return PacketStatResult(type=conn.read_str(),mode=conn.read_u64(),owner=conn.read_str(),group=conn.read_str(),size=conn.read_u64(),mtime=conn.read_u64(),ctime=conn.read_u64())
-class PacketResolveUser:
- def __init__(self,user:str):
-  self.user=user
+  conn.write_packet(PacketStatResult(type=ftype,mode=u64(stat.S_IMODE(s.st_mode)),owner=owner,group=group,size=u64(s.st_size),mtime=u64(s.st_mtime_ns),ctime=u64(s.st_ctime_ns)))
+@packet(type='response')
+class PacketStatResult(NamedTuple):
+ type:str 
+ mode:u64
+ owner:str
+ group:str
+ size:u64
+ mtime:u64
+ ctime:u64
+@packet(type='request')
+class PacketResolveUser(NamedTuple):
+ user:str
  def handle(self,conn:Connection):
   try:
    pw=getpwnam(self.user)
@@ -330,19 +275,12 @@ class PacketResolveUser:
     uid=int(self.user)
     pw=getpwuid(uid)
    except(KeyError,ValueError):
-    PacketInvalidField("user","The user does not exist").write(conn)
+    conn.write_packet(PacketInvalidField("user","The user does not exist"))
     return
-  PacketResolveResult(value=pw.pw_name).write(conn)
- def write(self,conn:Connection):
-  conn.write_u32(Packets.resolve_user)
-  conn.write_str(self.user)
-  conn.flush()
- @staticmethod
- def read(conn:Connection):
-  return PacketResolveUser(user=conn.read_str())
-class PacketResolveGroup:
- def __init__(self,group:str):
-  self.group=group
+  conn.write_packet(PacketResolveResult(value=pw.pw_name))
+@packet(type='request')
+class PacketResolveGroup(NamedTuple):
+ group:str
  def handle(self,conn:Connection):
   try:
    gr=getgrnam(self.group)
@@ -351,39 +289,21 @@ class PacketResolveGroup:
     gid=int(self.group)
     gr=getgrgid(gid)
    except(KeyError,ValueError):
-    PacketInvalidField("group","The group does not exist").write(conn)
+    conn.write_packet(PacketInvalidField("group","The group does not exist"))
     return
-  PacketResolveResult(value=gr.gr_name).write(conn)
- def write(self,conn:Connection):
-  conn.write_u32(Packets.resolve_group)
-  conn.write_str(self.group)
-  conn.flush()
- @staticmethod
- def read(conn:Connection):
-  return PacketResolveGroup(group=conn.read_str())
-class PacketResolveResult:
- def __init__(self,value:str):
-  self.value=value
- def handle(self,conn:Connection):
-  _=(self,conn)
-  raise RuntimeError("This packet should never be sent by the client!")
- def write(self,conn:Connection):
-  conn.write_u32(Packets.resolve_result)
-  conn.write_str(self.value)
-  conn.flush()
- @staticmethod
- def read(conn:Connection):
-  return PacketResolveResult(value=conn.read_str())
-packet_deserializers:dict[int,Callable[[Connection],Any]]={Packets.ack:PacketAck.read,Packets.check_alive:PacketCheckAlive.read,Packets.exit:PacketExit.read,Packets.invalid_field:PacketInvalidField.read,Packets.process_run:PacketProcessRun.read,Packets.process_completed:PacketProcessCompleted.read,Packets.process_preexec_error:PacketProcessPreexecError.read,Packets.stat:PacketStat.read,Packets.stat_result:PacketStatResult.read,Packets.resolve_user:PacketResolveUser.read,Packets.resolve_group:PacketResolveGroup.read,Packets.resolve_result:PacketResolveResult.read,}
+  conn.write_packet(PacketResolveResult(value=gr.gr_name))
+@packet(type='response')
+class PacketResolveResult(NamedTuple):
+ value:str
 def receive_packet(conn:Connection)->Any:
  try:
-  packet_id=conn.read_u32()
+  packet_id=deserialize(conn,u32)
   if packet_id not in packet_deserializers:
    raise IOError(f"Received invalid packet id '{packet_id}'")
   try:
-   packet_name=Packets(packet_id).name
+   packet_name=packets[packet_id].__name__
   except KeyError:
-   packet_name=f"unkown packet with id {packet_id}"
+   packet_name=f"[unkown packet with id {packet_id}]"
   log(f"got packet header for: {packet_name}")
   return packet_deserializers[packet_id](conn)
  except struct.error as e:

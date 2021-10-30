@@ -11,14 +11,19 @@ import stat
 import struct
 import subprocess
 import sys
+import typing
 
 from enum import IntEnum
 from pwd import getpwnam, getpwuid
 from grp import getgrnam, getgrgid
 from struct import pack, unpack
-from typing import cast, Any, TypeVar, Callable, Optional
+from typing import cast, Any, TypeVar, Callable, Optional, Union, NamedTuple, NewType
 
 T = TypeVar('T')
+i32 = NewType('i32', int)
+u32 = NewType('u32', int)
+i64 = NewType('i64', int)
+u64 = NewType('u64', int)
 
 is_server = False
 debug = False
@@ -30,10 +35,11 @@ except ModuleNotFoundError:
 # TODO timeout
 # TODO env
 
+# Utility functions
+# ----------------------------------------------------------------
+
 def is_debug():
-    """
-    Returns True if debugging output should be genereated.
-    """
+    """Returns True if debugging output should be genereated."""
     return debug if is_server else simple_automation.args.debug
 
 def log(msg: str):
@@ -50,7 +56,7 @@ def log(msg: str):
         return
 
     # TODO color should be configurable
-    prefix = "[ [1;33mREMOTE[m  ] " if is_server else "[ [1;32mLOCAL[m   ] "
+    prefix = "  [1;33mREMOTE[m: " if is_server else "   [1;32mLOCAL[m: "
     print(f"{prefix}{msg}", file=sys.stderr, flush=True)
 
 def resolve_umask(umask: str) -> int:
@@ -131,11 +137,12 @@ def resolve_group(group: str) -> int:
 
     return gr.gr_gid
 
+# Connection wrapper
+# ----------------------------------------------------------------
+
 # pylint: disable=too-many-public-methods
 class Connection:
-    """
-    Represents a connection to this dispatcher via an input and output buffer.
-    """
+    """Represents a connection to this dispatcher via an input and output buffer."""
 
     def __init__(self, buffer_in, buffer_out):
         self.buffer_in = buffer_in
@@ -143,539 +150,193 @@ class Connection:
         self.should_close = False
 
     def flush(self):
-        """
-        Flushes the output buffer.
-        """
+        """Flushes the output buffer."""
         self.buffer_out.flush()
 
     def read(self, count: int) -> bytes:
-        """
-        Reads a given number of bytes from the input buffer.
-
-        Parameters
-        ----------
-        count: int
-            The number of bytes to read from the input buffer
-
-        Returns
-        -------
-        bytes
-            The bytes from the input buffer
-        """
+        """Reads exactly the given amount of bytes."""
         return self.buffer_in.read(count)
 
-    def read_bytes(self) -> bytes:
-        """
-        Deserializes a bytes object from the input buffer.
-
-        Returns
-        -------
-        bytes
-            The deserialized object
-        """
-        return self.read(self.read_u64())
-
-    def read_str(self) -> str:
-        """
-        Deserializes a str from the input buffer.
-
-        Returns
-        -------
-        str
-            The deserialized object
-        """
-        return self.read_bytes().decode('utf-8')
-
-    def read_str_list(self) -> list[str]:
-        """
-        Deserializes a list of str from the input buffer.
-
-        Returns
-        -------
-        list[str]
-            The deserialized object
-        """
-        return list(self.read_str() for i in range(self.read_u64()))
-
-    def _read_opt_generic(self, f: Callable[[], T]) -> Optional[T]:
-        """
-        Deserializes a generic optional object from the input buffer.
-
-        Parameters
-        ----------
-        f
-            The deserializing function for T
-
-        Returns
-        -------
-        Optional[T]
-            The deserialized object
-        """
-        return f() if self.read_bool() else None
-
-    def read_opt_bytes(self) -> Optional[bytes]:
-        """
-        Deserializes a optional bytes object from the input buffer.
-
-        Returns
-        -------
-        Optional[bytes]
-            The deserialized object
-        """
-        return self._read_opt_generic(self.read_bytes)
-
-    def read_opt_str(self) -> Optional[str]:
-        """
-        Deserializes a optional str from the input buffer.
-
-        Returns
-        -------
-        Optional[str]
-            The deserialized object
-        """
-        return self._read_opt_generic(self.read_str)
-
-    def read_bool(self) -> bool:
-        """
-        Deserializes a bool from the input buffer.
-
-        Returns
-        -------
-        bool
-            The deserialized object
-        """
-        return cast(bool, unpack(">?", self.read(1))[0])
-
-    def read_i32(self) -> int:
-        """
-        Deserializes a 32-bit signed integer from the input buffer.
-
-        Returns
-        -------
-        int
-            The deserialized object
-        """
-        return cast(int, unpack(">i", self.read(4))[0])
-
-    def read_u32(self) -> int:
-        """
-        Deserializes a 32-bit unsigned integer from the input buffer.
-
-        Returns
-        -------
-        int
-            The deserialized object
-        """
-        return cast(int, unpack(">I", self.read(4))[0])
-
-    def read_i64(self) -> int:
-        """
-        Deserializes a 64-bit signed integer from the input buffer.
-
-        Returns
-        -------
-        int
-            The deserialized object
-        """
-        return cast(int, unpack(">q", self.read(8))[0])
-
-    def read_u64(self) -> int:
-        """
-        Deserializes a 64-bit unsigned integer from the input buffer.
-
-        Returns
-        -------
-        int
-            The deserialized object
-        """
-        return cast(int, unpack(">Q", self.read(8))[0])
-
     def write(self, data: bytes, count: int):
-        """
-        Writes a given number of bytes to the output buffer.
-
-        Parameters
-        ----------
-        data
-            The data bytes
-        count
-            The number of bytes to write
-        """
+        """Writes exactly the given amount of bytes from data."""
         self.buffer_out.write(data[:count])
 
-    def write_bytes(self, v: bytes):
-        """
-        Serializes a bytes object to the output buffer.
+    def write_packet(self, packet: Any):
+        """Writes the given packet."""
+        if not hasattr(packet, '_is_packet') or not bool(getattr(packet, '_is_packet')):
+            raise ValueError("Invalid argument: Must be a packet!")
+        # We don't expose write directly, as the type checker currently is unable
+        # to determine whether this function exists, as it is added by the @packet decorator.
+        packet._write(self)
 
-        Parameters
-        ----------
-        v
-            The object to serialize
-        """
-        self.write_u64(len(v))
-        self.write(v, len(v))
+# Primary serialization and deserialization
+# ----------------------------------------------------------------
 
-    def write_str(self, v: str):
-        """
-        Serializes a str object to the output buffer.
+def is_optional(field):
+    """Returns True when the given type annotation is Optional[...]."""
+    return typing.get_origin(field) is Union and type(None) in typing.get_args(field)
 
-        Parameters
-        ----------
-        v
-            The object to serialize
-        """
-        self.write_bytes(v.encode('utf-8'))
+def is_list(field):
+    """Returns True when the given type annotation is list[...]."""
+    return typing.get_origin(field) is list
 
-    def write_str_list(self, v: list[str]):
-        """
-        Serializes a list of str to the output buffer.
+_serializers: dict[Any, Callable[[Connection, Any], Any]] = {}
+_serializers[bool]  = lambda conn, v: conn.write(pack(">?", v), 1)
+_serializers[i32]   = lambda conn, v: conn.write(pack(">i", v), 4)
+_serializers[u32]   = lambda conn, v: conn.write(pack(">I", v), 4)
+_serializers[i64]   = lambda conn, v: conn.write(pack(">q", v), 8)
+_serializers[u64]   = lambda conn, v: conn.write(pack(">Q", v), 8)
+_serializers[bytes] = lambda conn, v: (_serializers[u64](conn, len(v)), conn.write(v, len(v)))
+_serializers[str]   = lambda conn, v: _serializers[bytes](conn, v.encode('utf-8'))
 
-        Parameters
-        ----------
-        v
-            The object to serialize
-        """
-        self.write_u64(len(v))
-        for i in v:
-            self.write_str(i)
-
-    def _write_opt_generic(self, v: Optional[T], f: Callable[[T], None]):
-        """
-        Serializes a generic optional to the output buffer.
-
-        Parameters
-        ----------
-        v
-            The object to serialize
-        f
-            The serializer function for T
-        """
-        self.write_bool(v is not None)
+def serialize(conn: Connection, vtype, v: Any):
+    """Serializes v based on the underlying type 'vtype' and writes it to the given connection."""
+    if vtype in _serializers:
+        _serializers[vtype](conn, v)
+    elif is_optional(vtype):
+        real_type = typing.get_args(vtype)[0]
+        _serializers[bool](conn, v is not None)
         if v is not None:
-            f(v)
+            serialize(conn, real_type, v)
+    elif is_list(vtype):
+        element_type = typing.get_args(vtype)[0]
+        _serializers[u64](conn, len(v))
+        for i in v:
+            serialize(conn, element_type, i)
+    else:
+        raise ValueError(f"Cannot serialize object of type {vtype}")
 
-    def write_opt_bytes(self, v: Optional[bytes]):
-        """
-        Serializes an optional bytes object to the output buffer.
+_deserializers: dict[Any, Callable[[Connection], Any]] = {}
+_deserializers[bool]  = lambda conn: unpack(">?", conn.read(1))[0]
+_deserializers[i32]   = lambda conn: unpack(">i", conn.read(4))[0]
+_deserializers[u32]   = lambda conn: unpack(">I", conn.read(4))[0]
+_deserializers[i64]   = lambda conn: unpack(">q", conn.read(8))[0]
+_deserializers[u64]   = lambda conn: unpack(">Q", conn.read(8))[0]
+_deserializers[bytes] = lambda conn: conn.read(_deserializers[u64](conn))
+_deserializers[str]   = lambda conn: _deserializers[bytes](conn).decode('utf-8')
 
-        Parameters
-        ----------
-        v
-            The object to serialize
-        """
-        self._write_opt_generic(v, self.write_bytes)
+def deserialize(conn: Connection, vtype):
+    """Deserializes an object from the given connection based on the underlying type 'vtype' and returns it."""
+    if vtype in _deserializers:
+        return _deserializers[vtype](conn)
+    elif is_optional(vtype):
+        real_type = typing.get_args(vtype)[0]
+        if not _deserializers[bool](conn):
+            return None
+        return deserialize(conn, real_type)
+    elif is_list(vtype):
+        element_type = typing.get_args(vtype)[0]
+        return list(deserialize(conn, element_type) for i in range(_deserializers[u64](conn)))
+    else:
+        raise ValueError(f"Cannot deserialize object of type {vtype}")
 
-    def write_opt_str(self, v: Optional[str]):
-        """
-        Serializes an optional str to the output buffer.
+# Packet helpers
+# ----------------------------------------------------------------
 
-        Parameters
-        ----------
-        v
-            The object to serialize
-        """
-        self._write_opt_generic(v, self.write_str)
-
-    def write_bool(self, v: bool):
-        """
-        Serializes a bool to the output buffer.
-
-        Parameters
-        ----------
-        v
-            The object to serialize
-        """
-        self.write(pack(">?", v), 1)
-
-    def write_i32(self, v: int):
-        """
-        Serializes a 32-bit signed integer to the output buffer.
-
-        Parameters
-        ----------
-        v
-            The object to serialize
-        """
-        self.write(pack(">i", v), 4)
-
-    def write_u32(self, v: int):
-        """
-        Serializes a 32-bit unsigned integer to the output buffer.
-
-        Parameters
-        ----------
-        v
-            The object to serialize
-        """
-        self.write(pack(">I", v), 4)
-
-    def write_i64(self, v: int):
-        """
-        Serializes a 64-bit signed integer to the output buffer.
-
-        Parameters
-        ----------
-        v
-            The object to serialize
-        """
-        self.write(pack(">q", v), 8)
-
-    def write_u64(self, v: int):
-        """
-        Serializes a 64-bit unsigned integer to the output buffer.
-
-        Parameters
-        ----------
-        v
-            The object to serialize
-        """
-        self.write(pack(">Q", v), 8)
-
-class Packets(IntEnum):
-    """
-    An enumeration type assigning an id to each packet.
-    """
-    ack = 0
-    check_alive = 1
-    exit = 2
-    invalid_field = 3
-    process_run = 4
-    process_completed = 5
-    process_preexec_error = 6
-    stat = 7
-    stat_result = 8
-    resolve_user = 9
-    resolve_group = 10
-    resolve_result = 11
-
-class PacketAck:
-    """
-    This packet is used to acknowledge the previous packet. Only
-    sent on special occasions (e.g. PacketCheckAlive).
-    """
-
+class Packet:
+    """Dummy packet type for type checking."""
     def write(self, conn: Connection):
-        """
-        Serializes the whole packet and writes it to the given connection.
-
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        _ = (self)
-        conn.write_u32(Packets.ack)
-        conn.flush()
+        pass
 
     def handle(self, conn: Connection):
-        """
-        Handles this packet.
+        pass
 
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        _ = (self, conn)
+packets: list[Packet] = []
+packet_deserializers: dict[int, Callable[[Connection], Any]] = {}
 
-    @staticmethod
-    def read(conn: Connection):
-        """
-        Deserializes a packet of this type from the given connection.
+def _handle_response_packet():
+    raise RuntimeError("This packet is a server-side response packet and must never be sent by the client!")
 
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        _ = (conn)
-        return PacketAck()
+# Define generic read and write functions
+def _read_packet(cls, conn: Connection):
+    kwargs = {}
+    for f in cls._fields:
+        ftype = cls.__annotations__[f]
+        kwargs[f] = deserialize(conn, ftype)
+    return cls(**kwargs)
 
-class PacketCheckAlive:
-    """
-    This packet is used to check whether a connection is alive. The receiver must answer with
-    PacketAck immediately.
-    """
+def _write_packet(cls, packet_id: u32, self, conn: Connection):
+    serialize(conn, u32, packet_id)
+    for f in cls._fields:
+        ftype = cls.__annotations__[f]
+        serialize(conn, ftype, getattr(self, f))
+    conn.flush()
 
-    def write(self, conn: Connection):
-        """
-        Serializes the whole packet and writes it to the given connection.
+def packet(type): # pylint: disable=redefined-builtin
+    """Decorator for packet types. Registers the packet and generates read and write methods."""
+    if type not in ['response', 'request']:
+        raise RuntimeError("Invalid @packet decoration: type must be either 'response' or 'request'.")
 
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        _ = (self)
-        conn.write_u32(Packets.check_alive)
-        conn.flush()
+    def wrapper(cls):
+        # Assert cls is a NamedTuple
+        if not hasattr(cls, '_fields'):
+            raise RuntimeError("Invalid @packet decoration: Decorated class must inherit from NamedTuple.")
 
-    def handle(self, conn: Connection):
-        """
-        Handles this packet.
+        # Find next packet id
+        packet_id = len(packets)
 
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        _ = (self)
-        PacketAck().write(conn)
+        # Replace functions
+        cls._is_packet = True
+        cls._write = lambda self, conn: _write_packet(cls, packet_id, self, conn)
+        if type == 'response':
+            cls.handle = _handle_response_packet
+        elif type == 'request':
+            if not hasattr(cls, 'handle') or not callable(getattr(cls, 'handle')):
+                raise RuntimeError("Invalid @packet decoration: request packets must provide a handle method!")
 
-    @staticmethod
-    def read(conn: Connection):
-        """
-        Deserializes a packet of this type from the given connection.
+        # Register packet
+        packets.append(cls)
+        packet_deserializers[packet_id] = lambda conn: _read_packet(cls, conn)
 
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        _ = (conn)
-        return PacketCheckAlive()
+        return cls
+    return wrapper
 
-class PacketExit:
-    """
-    This packet is used to indicate that the dispatcher is no longer needed.
-    """
+# Packets
+# ----------------------------------------------------------------
 
-    def write(self, conn: Connection):
-        """
-        Serializes the whole packet and writes it to the given connection.
+@packet(type='response')
+class PacketAck(NamedTuple):
+    """This packet is used to acknowledge a previous PacketCheckAlive packet."""
+    pass # Required for pyminifier! Otherwise the block will not end as the docstring is removed!
 
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        _ = (self)
-        conn.write_u32(Packets.exit)
-        conn.flush()
+@packet(type='request')
+class PacketCheckAlive(NamedTuple):
+    """This packet is used to check whether a connection is alive.
+    The receiver must answer with PacketAck immediately."""
 
     def handle(self, conn: Connection):
-        """
-        Handles this packet.
+        _ = (self)
+        conn.write_packet(PacketAck())
 
-        Parameters
-        ----------
-        conn
-            The connection
-        """
+@packet(type='request')
+class PacketExit(NamedTuple):
+    """This packet is used to signal the server to close the connection and end the dispatcher."""
+    def handle(self, conn: Connection):
         _ = (self)
         conn.should_close = True
 
-    @staticmethod
-    def read(conn: Connection):
-        """
-        Deserializes a packet of this type from the given connection.
-
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        _ = (conn)
-        return PacketExit()
-
-class PacketInvalidField:
-    """
-    This packet is used to indicate that an invalid value was passed to a field of a packet.
-    """
-
-    def __init__(self, field: str, error_message: str):
-        self.field = field
-        self.error_message = error_message
-
-    def write(self, conn: Connection):
-        """
-        Serializes the whole packet and writes it to the given connection.
-
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        _ = (self)
-        conn.write_u32(Packets.invalid_field)
-        conn.write_str(self.field)
-        conn.write_str(self.error_message)
-        conn.flush()
+@packet(type='response')
+class PacketInvalidField(NamedTuple):
+    """This packet is used when an invalid value was given in a previous packet."""
+    field: str
+    error_message: str
 
     def handle(self, conn: Connection):
-        """
-        Handles this packet.
-
-        Parameters
-        ----------
-        conn
-            The connection
-        """
         _ = (conn)
         raise ValueError(f"Invalid value given for field '{self.field}': {self.error_message}")
 
-    @staticmethod
-    def read(conn: Connection):
-        """
-        Deserializes a packet of this type from the given connection.
-
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        return PacketInvalidField(
-            field=conn.read_str(),
-            error_message=conn.read_str())
-
-class PacketProcessRun:
-    """
-    This packet is used to start a new process.
-    """
-
-    def __init__(self, command: list[str],
-                 stdin: Optional[bytes] = None,
-                 capture_output: bool = True,
-                 user: Optional[str] = None,
-                 group: Optional[str] = None,
-                 umask: Optional[str] = None,
-                 cwd: Optional[str] = None):
-        self.command = command
-        self.stdin = stdin
-        self.capture_output = capture_output
-        self.user = user
-        self.group = group
-        self.umask = umask
-        self.cwd = cwd
-
-    def write(self, conn: Connection):
-        """
-        Serializes the whole packet and writes it to the given connection.
-
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        conn.write_u32(Packets.process_run)
-        conn.write_str_list(self.command)
-        conn.write_opt_bytes(self.stdin)
-        conn.write_bool(self.capture_output)
-        conn.write_opt_str(self.user)
-        conn.write_opt_str(self.group)
-        conn.write_opt_str(self.umask)
-        conn.write_opt_str(self.cwd)
-        conn.flush()
+@packet(type='request')
+class PacketProcessRun(NamedTuple):
+    """This packet is used to run a process."""
+    command: list[str]
+    stdin: Optional[bytes] = None
+    capture_output: bool = True
+    user: Optional[str] = None
+    group: Optional[str] = None
+    umask: Optional[str] = None
+    cwd: Optional[str] = None
 
     def handle(self, conn: Connection):
-        """
-        Handles this packet.
-
-        Parameters
-        ----------
-        conn
-            The connection
-        """
         # By default we will run commands as the current user.
         uid, gid = (None, None)
         umask_oct = 0o077
@@ -684,26 +345,26 @@ class PacketProcessRun:
             try:
                 umask_oct = resolve_umask(self.umask)
             except ValueError as e:
-                PacketInvalidField("umask", str(e)).write(conn)
+                conn.write_packet(PacketInvalidField("umask", str(e)))
                 return
 
         if self.user is not None:
             try:
                 (uid, gid) = resolve_user(self.user)
             except ValueError as e:
-                PacketInvalidField("user", str(e)).write(conn)
+                conn.write_packet(PacketInvalidField("user", str(e)))
                 return
 
         if self.group is not None:
             try:
                 gid = resolve_group(self.group)
             except ValueError as e:
-                PacketInvalidField("group", str(e)).write(conn)
+                conn.write_packet(PacketInvalidField("group", str(e)))
                 return
 
         if self.cwd is not None:
             if not os.path.isdir(self.cwd):
-                PacketInvalidField("cwd", "Requested working directory does not exist").write(conn)
+                conn.write_packet(PacketInvalidField("cwd", "Requested working directory does not exist"))
                 return
 
         def child_preexec():
@@ -727,152 +388,35 @@ class PacketProcessRun:
                 preexec_fn=child_preexec,
                 check=True)
         except subprocess.SubprocessError as e:
-            PacketProcessPreexecError().write(conn)
+            conn.write_packet(PacketProcessPreexecError())
             return
 
         # Send response for command result
-        PacketProcessCompleted(result.stdout, result.stderr, result.returncode).write(conn)
+        conn.write_packet(PacketProcessCompleted(result.stdout, result.stderr, i32(result.returncode)))
 
-    @staticmethod
-    def read(conn: Connection):
-        """
-        Deserializes a packet of this type from the given connection.
+@packet(type='response')
+class PacketProcessCompleted(NamedTuple):
+    """This packet is used to return the results of a process."""
+    stdout: Optional[bytes]
+    stderr: Optional[bytes]
+    returncode: i32
 
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        return PacketProcessRun(
-            command=conn.read_str_list(),
-            stdin=conn.read_opt_bytes(),
-            capture_output=conn.read_bool(),
-            user=conn.read_opt_str(),
-            group=conn.read_opt_str(),
-            umask=conn.read_opt_str(),
-            cwd=conn.read_opt_str())
+@packet(type='response')
+class PacketProcessPreexecError(NamedTuple):
+    """This packet is used to indicate an error in the preexec_fn when running the process."""
+    pass # Required for pyminifier! Otherwise the block will not end as the docstring is removed!
 
-class PacketProcessCompleted:
-    """
-    This packet is used to return the results of a process.
-    """
-
-    def __init__(self,
-                 stdout: Optional[bytes],
-                 stderr: Optional[bytes],
-                 returncode: int):
-        self.stdout = stdout
-        self.stderr = stderr
-        self.returncode = returncode
+@packet(type='request')
+class PacketStat(NamedTuple):
+    """This packet is used to retrieve information about a file or directory."""
+    path: str
+    follow_links: bool = False
 
     def handle(self, conn: Connection):
-        """
-        Handles this packet.
-
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        _ = (self, conn)
-        raise RuntimeError("This packet should never be sent by the client!")
-
-    def write(self, conn: Connection):
-        """
-        Serializes the whole packet and writes it to the given connection.
-
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        conn.write_u32(Packets.process_completed)
-        conn.write_opt_bytes(self.stdout)
-        conn.write_opt_bytes(self.stderr)
-        conn.write_i32(self.returncode)
-        conn.flush()
-
-    @staticmethod
-    def read(conn: Connection):
-        """
-        Deserializes a packet of this type from the given connection.
-
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        return PacketProcessCompleted(
-            stdout=conn.read_opt_bytes(),
-            stderr=conn.read_opt_bytes(),
-            returncode=conn.read_i32())
-
-class PacketProcessPreexecError:
-    """
-    This packet is used to indicate an error in the preexec_fn when running the process.
-    """
-
-    def handle(self, conn: Connection):
-        """
-        Handles this packet.
-
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        _ = (self, conn)
-        raise RuntimeError("This packet should never be sent by the client!")
-
-    def write(self, conn: Connection):
-        """
-        Serializes the whole packet and writes it to the given connection.
-
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        _ = (self)
-        conn.write_u32(Packets.process_preexec_error)
-        conn.flush()
-
-    @staticmethod
-    def read(conn: Connection):
-        """
-        Deserializes a packet of this type from the given connection.
-
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        _ = (conn)
-        return PacketProcessPreexecError()
-
-class PacketStat:
-    """
-    This packet is used to retrieve information about a file or directory.
-    """
-
-    def __init__(self, path: str, follow_links: bool = False):
-        self.path = path
-        self.follow_links = follow_links
-
-    def handle(self, conn: Connection):
-        """
-        Handles this packet.
-
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-
         try:
             s = os.stat(self.path, follow_symlinks=self.follow_links)
         except OSError:
-            PacketInvalidField("path", "Path doesn't exist").write(conn)
+            conn.write_packet(PacketInvalidField("path", "Path doesn't exist"))
             return
 
         ftype = "dir"  if stat.S_ISDIR(s.st_mode)  else \
@@ -895,132 +439,32 @@ class PacketStat:
             group = str(s.st_gid)
 
         # Send response
-        PacketStatResult(
+        conn.write_packet(PacketStatResult(
             type=ftype,
-            mode=stat.S_IMODE(s.st_mode),
+            mode=u64(stat.S_IMODE(s.st_mode)),
             owner=owner,
             group=group,
-            size=s.st_size,
-            mtime=s.st_mtime_ns,
-            ctime=s.st_ctime_ns).write(conn)
+            size=u64(s.st_size),
+            mtime=u64(s.st_mtime_ns),
+            ctime=u64(s.st_ctime_ns)))
 
-    def write(self, conn: Connection):
-        """
-        Serializes the whole packet and writes it to the given connection.
+@packet(type='response')
+class PacketStatResult(NamedTuple):
+    """This packet is used to return the results of a stat packet."""
+    type: str # pylint: disable=redefined-builtin
+    mode: u64
+    owner: str
+    group: str
+    size: u64
+    mtime: u64
+    ctime: u64
 
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        conn.write_u32(Packets.stat)
-        conn.write_str(self.path)
-        conn.write_bool(self.follow_links)
-        conn.flush()
-
-    @staticmethod
-    def read(conn: Connection):
-        """
-        Deserializes a packet of this type from the given connection.
-
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        return PacketStat(
-                path=conn.read_str(),
-                follow_links=conn.read_bool())
-
-class PacketStatResult:
-    """
-    This packet is used to return the results of a stat packet.
-    """
-
-    def __init__(self,
-                 type: str, # pylint: disable=redefined-builtin
-                 mode: int,
-                 owner: str,
-                 group: str,
-                 size: int,
-                 mtime: int,
-                 ctime: int):
-        self.type = type
-        self.mode = mode
-        self.owner = owner
-        self.group = group
-        self.size = size
-        self.mtime = mtime
-        self.ctime = ctime
+@packet(type='request')
+class PacketResolveUser(NamedTuple):
+    """This packet is used to canonicalize a user name / uid and to ensure it exists."""
+    user: str
 
     def handle(self, conn: Connection):
-        """
-        Handles this packet.
-
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        _ = (self, conn)
-        raise RuntimeError("This packet should never be sent by the client!")
-
-    def write(self, conn: Connection):
-        """
-        Serializes the whole packet and writes it to the given connection.
-
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        conn.write_u32(Packets.stat_result)
-        conn.write_str(self.type)
-        conn.write_u64(self.mode)
-        conn.write_str(self.owner)
-        conn.write_str(self.group)
-        conn.write_u64(self.size)
-        conn.write_u64(self.mtime)
-        conn.write_u64(self.ctime)
-        conn.flush()
-
-    @staticmethod
-    def read(conn: Connection):
-        """
-        Deserializes a packet of this type from the given connection.
-
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        return PacketStatResult(
-            type=conn.read_str(),
-            mode=conn.read_u64(),
-            owner=conn.read_str(),
-            group=conn.read_str(),
-            size=conn.read_u64(),
-            mtime=conn.read_u64(),
-            ctime=conn.read_u64())
-
-class PacketResolveUser:
-    """
-    This packet is used to canonicalize a user name / uid and to ensure it exists.
-    """
-
-    def __init__(self, user: str):
-        self.user = user
-
-    def handle(self, conn: Connection):
-        """
-        Handles this packet.
-
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-
         try:
             pw = getpwnam(self.user)
         except KeyError:
@@ -1028,56 +472,18 @@ class PacketResolveUser:
                 uid = int(self.user)
                 pw = getpwuid(uid)
             except (KeyError, ValueError):
-                PacketInvalidField("user", "The user does not exist").write(conn) # pylint: disable=raise-missing-from
+                conn.write_packet(PacketInvalidField("user", "The user does not exist")) # pylint: disable=raise-missing-from
                 return
 
         # Send response
-        PacketResolveResult(value=pw.pw_name).write(conn)
+        conn.write_packet(PacketResolveResult(value=pw.pw_name))
 
-    def write(self, conn: Connection):
-        """
-        Serializes the whole packet and writes it to the given connection.
-
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        conn.write_u32(Packets.resolve_user)
-        conn.write_str(self.user)
-        conn.flush()
-
-    @staticmethod
-    def read(conn: Connection):
-        """
-        Deserializes a packet of this type from the given connection.
-
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        return PacketResolveUser(
-                user=conn.read_str())
-
-class PacketResolveGroup:
-    """
-    This packet is used to canonicalize a group name / gid and to ensure it exists.
-    """
-
-    def __init__(self, group: str):
-        self.group = group
+@packet(type='request')
+class PacketResolveGroup(NamedTuple):
+    """This packet is used to canonicalize a group name / gid and to ensure it exists."""
+    group: str
 
     def handle(self, conn: Connection):
-        """
-        Handles this packet.
-
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-
         try:
             gr = getgrnam(self.group)
         except KeyError:
@@ -1085,99 +491,16 @@ class PacketResolveGroup:
                 gid = int(self.group)
                 gr = getgrgid(gid)
             except (KeyError, ValueError):
-                PacketInvalidField("group", "The group does not exist").write(conn) # pylint: disable=raise-missing-from
+                conn.write_packet(PacketInvalidField("group", "The group does not exist")) # pylint: disable=raise-missing-from
                 return
 
         # Send response
-        PacketResolveResult(value=gr.gr_name).write(conn)
+        conn.write_packet(PacketResolveResult(value=gr.gr_name))
 
-    def write(self, conn: Connection):
-        """
-        Serializes the whole packet and writes it to the given connection.
-
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        conn.write_u32(Packets.resolve_group)
-        conn.write_str(self.group)
-        conn.flush()
-
-    @staticmethod
-    def read(conn: Connection):
-        """
-        Deserializes a packet of this type from the given connection.
-
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        return PacketResolveGroup(
-                group=conn.read_str())
-
-class PacketResolveResult:
-    """
-    This packet is used to return the results of a resolve packet.
-    """
-
-    def __init__(self,
-                 value: str):
-        self.value = value
-
-    def handle(self, conn: Connection):
-        """
-        Handles this packet.
-
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        _ = (self, conn)
-        raise RuntimeError("This packet should never be sent by the client!")
-
-    def write(self, conn: Connection):
-        """
-        Serializes the whole packet and writes it to the given connection.
-
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        conn.write_u32(Packets.resolve_result)
-        conn.write_str(self.value)
-        conn.flush()
-
-    @staticmethod
-    def read(conn: Connection):
-        """
-        Deserializes a packet of this type from the given connection.
-
-        Parameters
-        ----------
-        conn
-            The connection
-        """
-        return PacketResolveResult(
-            value=conn.read_str())
-
-packet_deserializers: dict[int, Callable[[Connection], Any]] = {
-    Packets.ack: PacketAck.read,
-    Packets.check_alive: PacketCheckAlive.read,
-    Packets.exit: PacketExit.read,
-    Packets.invalid_field: PacketInvalidField.read,
-    Packets.process_run: PacketProcessRun.read,
-    Packets.process_completed: PacketProcessCompleted.read,
-    Packets.process_preexec_error: PacketProcessPreexecError.read,
-    Packets.stat: PacketStat.read,
-    Packets.stat_result: PacketStatResult.read,
-    Packets.resolve_user: PacketResolveUser.read,
-    Packets.resolve_group: PacketResolveGroup.read,
-    Packets.resolve_result: PacketResolveResult.read,
-}
+@packet(type='response')
+class PacketResolveResult(NamedTuple):
+    """This packet is used to return the results of a resolve packet."""
+    value: str
 
 def receive_packet(conn: Connection) -> Any:
     """
@@ -1194,14 +517,14 @@ def receive_packet(conn: Connection) -> Any:
         The received packet
     """
     try:
-        packet_id = conn.read_u32()
+        packet_id = deserialize(conn, u32)
         if packet_id not in packet_deserializers:
             raise IOError(f"Received invalid packet id '{packet_id}'")
 
         try:
-            packet_name = Packets(packet_id).name
+            packet_name = packets[packet_id].__name__
         except KeyError:
-            packet_name = f"unkown packet with id {packet_id}"
+            packet_name = f"[unkown packet with id {packet_id}]"
 
         log(f"got packet header for: {packet_name}")
         return packet_deserializers[packet_id](conn)
@@ -1209,10 +532,8 @@ def receive_packet(conn: Connection) -> Any:
         raise IOError("Unexpected EOF in data stream") from e
 
 def main():
-    """
-    Handles all incoming packets in a loop until an invalid packet or a
-    PacketExit is received.
-    """
+    """Handles all incoming packets in a loop until an invalid packet or a PacketExit is received."""
+
     # pylint: disable=global-statement
     global debug
     global is_server

@@ -35,7 +35,7 @@ class SshConnector(Connector):
             self.url: str = f"ssh://{getattr(host, 'ssh_host')}:{getattr(host, 'ssh_port')}"
 
         self.log: ConnectionLogger = logger.new_connection(host, self)
-        self.process: subprocess.Popen
+        self.process: Optional[subprocess.Popen] = None
         self.conn: SshConnection
         self.is_open: bool = False
 
@@ -51,10 +51,14 @@ class SshConnector(Connector):
         self.conn = SshConnection(self.process.stdout, self.process.stdin)
 
         try:
-            PacketCheckAlive().write(self.conn)
+            self.conn.write_packet(PacketCheckAlive())
             packet = receive_packet(self.conn)
             if packet is not None and not isinstance(packet, PacketAck):
                 raise RuntimeError("Invalid response from remote dispatcher. This is a bug.")
+
+            # As a last action record that the connection is opened successfully,
+            # otherwise the finally block will kill the process.
+            self.is_open = True
         except IOError as e:
             returncode = self.process.poll()
             if returncode is None:
@@ -62,8 +66,12 @@ class SshConnector(Connector):
             else:
                 self.log.failed(f"Dispatcher handshake failed: ssh exited with code {returncode}")
             raise AbortExecutionSignal() from e
+        finally:
+            # If the connection failed for any reason, be sure to kill the background process.
+            if not self.is_open:
+                self.process.terminate()
+                self.process = None
 
-        self.is_open = True
         self.log.established()
 
         # TODO assert Popen proccess is killed atexit
@@ -72,11 +80,14 @@ class SshConnector(Connector):
 
     def close(self):
         if self.is_open:
-            PacketExit().write(self.conn)
+            self.conn.write_packet(PacketExit())
             self.log.requested_close()
+
+        if self.process is not None:
             self.process.stdin.close()
             self.process.wait()
             self.process.stdout.close()
+            self.process = None
             self.log.closed()
 
     def run(self,
@@ -98,7 +109,7 @@ class SshConnector(Connector):
                 group=group,
                 umask=umask,
                 cwd=cwd)
-            packet_run.write(self.conn)
+            self.conn.write_packet(packet_run)
 
             # Wait for result packet
             packet = receive_packet(self.conn)
@@ -130,9 +141,9 @@ class SshConnector(Connector):
     def stat(self, path: str, follow_links: bool = False) -> Optional[StatResult]:
         try:
             # Construct and send packet with process information
-            PacketStat(
+            self.conn.write_packet(PacketStat(
                 path=path,
-                follow_links=follow_links).write(self.conn)
+                follow_links=follow_links))
 
             # Wait for result packet
             packet = receive_packet(self.conn)
@@ -164,7 +175,7 @@ class SshConnector(Connector):
         try:
             # Construct and send packet with process information
             packet_resolve = PacketResolveUser(user=user)
-            packet_resolve.write(self.conn)
+            self.conn.write_packet(packet_resolve)
 
             # Wait for result packet
             packet = receive_packet(self.conn)
@@ -189,7 +200,7 @@ class SshConnector(Connector):
         try:
             # Construct and send packet with process information
             packet_resolve = PacketResolveGroup(group=group)
-            packet_resolve.write(self.conn)
+            self.conn.write_packet(packet_resolve)
 
             # Wait for result packet
             packet = receive_packet(self.conn)
