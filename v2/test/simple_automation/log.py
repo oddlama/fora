@@ -81,6 +81,9 @@ class Logger:
     def print(self, msg):
         print(f"{self.indent_prefix()}{msg}")
 
+    def warn(self, msg):
+        print(f"{self.indent_prefix()}[33mWARN:[m {msg}")
+
     def error(self, msg):
         print(f"[ ERROR ] {msg}")
 

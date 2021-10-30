@@ -9,11 +9,11 @@ import subprocess
 
 from typing import Optional
 
-import simple_automation.connectors.tunnel_dispatcher_minified
+import simple_automation
+import simple_automation.connectors.tunnel_dispatcher as td
 
 from simple_automation import logger
 from simple_automation.connectors.connector import Connector, connector, CompletedRemoteCommand, StatResult
-from simple_automation.connectors.tunnel_dispatcher import Connection as SshConnection, PacketExit, PacketCheckAlive, PacketAck, PacketProcessRun, PacketProcessCompleted, PacketInvalidField, PacketStat, PacketStatResult, PacketResolveUser, PacketResolveGroup, PacketResolveResult, receive_packet
 from simple_automation.log import ConnectionLogger
 from simple_automation.types import HostType
 from simple_automation.utils import AbortExecutionSignal
@@ -36,24 +36,29 @@ class SshConnector(Connector):
 
         self.log: ConnectionLogger = logger.new_connection(host, self)
         self.process: Optional[subprocess.Popen] = None
-        self.conn: SshConnection
+        self.conn: td.Connection
         self.is_open: bool = False
+
+    def _expect_response_packet(self, packet, expected_type):
+        if not isinstance(packet, expected_type):
+            self.log.error(f"Invalid response '{type(packet)}'")
+            raise RuntimeError(f"Invalid response '{type(packet)}' from remote dispatcher. This is a bug.")
 
     def open(self):
         self.log.init()
-        with open(simple_automation.connectors.tunnel_dispatcher_minified.__file__, 'rb') as f:
+        with open(td.__file__, 'rb') as f:
             tunnel_dispatcher_gz_b64 = base64.b64encode(zlib.compress(f.read(), 9)).decode('ascii')
 
         # Start the remote dispatcher by uploading it inline as base64
         param_debug = "--debug" if simple_automation.args.debug else ""
         command = self._ssh_command(f"env python3 -c \"$(echo '{tunnel_dispatcher_gz_b64}' | base64 -d | openssl zlib -d)\" {param_debug}")
         self.process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=sys.stderr)
-        self.conn = SshConnection(self.process.stdout, self.process.stdin)
+        self.conn = td.Connection(self.process.stdout, self.process.stdin)
 
         try:
-            self.conn.write_packet(PacketCheckAlive())
-            packet = receive_packet(self.conn)
-            if packet is not None and not isinstance(packet, PacketAck):
+            self.conn.write_packet(td.PacketCheckAlive())
+            packet = td.receive_packet(self.conn)
+            if packet is not None and not isinstance(packet, td.PacketAck):
                 raise RuntimeError("Invalid response from remote dispatcher. This is a bug.")
 
             # As a last action record that the connection is opened successfully,
@@ -80,7 +85,7 @@ class SshConnector(Connector):
 
     def close(self):
         if self.is_open:
-            self.conn.write_packet(PacketExit())
+            self.conn.write_packet(td.PacketExit())
             self.log.requested_close()
 
         if self.process is not None:
@@ -101,7 +106,7 @@ class SshConnector(Connector):
             cwd: Optional[str] = None) -> CompletedRemoteCommand:
         try:
             # Construct and send packet with process information
-            packet_run = PacketProcessRun(
+            packet_run = td.PacketProcessRun(
                 command=command,
                 stdin=input,
                 capture_output=capture_output,
@@ -112,16 +117,16 @@ class SshConnector(Connector):
             self.conn.write_packet(packet_run)
 
             # Wait for result packet
-            packet = receive_packet(self.conn)
+            packet = td.receive_packet(self.conn)
         except IOError as e:
             self.log.error(f"Remote host disconnected unexpectedly: {str(e)}")
             raise AbortExecutionSignal() from e
 
         # Check type of incoming packet to handle errors differently
-        if isinstance(packet, PacketInvalidField):
+        if isinstance(packet, td.PacketInvalidField):
             raise ValueError(f"Invalid value '{getattr(packet_run, packet.field)}' given for field '{packet.field}': {packet.error_message}")
 
-        if not isinstance(packet, PacketProcessCompleted):
+        if not isinstance(packet, td.PacketProcessCompleted):
             self.log.error(f"Invalid response '{type(packet)}'")
             raise RuntimeError(f"Invalid response '{type(packet)}' from remote dispatcher. This is a bug.")
 
@@ -141,24 +146,21 @@ class SshConnector(Connector):
     def stat(self, path: str, follow_links: bool = False) -> Optional[StatResult]:
         try:
             # Construct and send packet with process information
-            self.conn.write_packet(PacketStat(
+            self.conn.write_packet(td.PacketStat(
                 path=path,
                 follow_links=follow_links))
 
             # Wait for result packet
-            packet = receive_packet(self.conn)
+            packet = td.receive_packet(self.conn)
         except IOError as e:
             self.log.error(f"Remote host disconnected unexpectedly: {str(e)}")
             raise AbortExecutionSignal() from e
 
         # Check type of incoming packet to handle errors
-        if isinstance(packet, PacketInvalidField):
+        if isinstance(packet, td.PacketInvalidField):
             return None
 
-        if not isinstance(packet, PacketStatResult):
-            self.log.error(f"Invalid response '{type(packet)}'")
-            raise RuntimeError(f"Invalid response '{type(packet)}' from remote dispatcher. This is a bug.")
-
+        self._expect_response_packet(packet, td.PacketStatResult)
         return StatResult(
             type=packet.type,
             mode=packet.mode,
@@ -173,24 +175,20 @@ class SshConnector(Connector):
             return None
 
         try:
-            # Construct and send packet with process information
-            packet_resolve = PacketResolveUser(user=user)
+            packet_resolve = td.PacketResolveUser(user=user)
             self.conn.write_packet(packet_resolve)
 
             # Wait for result packet
-            packet = receive_packet(self.conn)
+            packet = td.receive_packet(self.conn)
         except IOError as e:
             self.log.error(f"Remote host disconnected unexpectedly: {str(e)}")
             raise AbortExecutionSignal() from e
 
         # Check type of incoming packet to handle errors differently
-        if isinstance(packet, PacketInvalidField):
+        if isinstance(packet, td.PacketInvalidField):
             raise ValueError(f"User '{user}' doesn't exist")
 
-        if not isinstance(packet, PacketResolveResult):
-            self.log.error(f"Invalid response '{type(packet)}'")
-            raise RuntimeError(f"Invalid response '{type(packet)}' from remote dispatcher. This is a bug.")
-
+        self._expect_response_packet(packet, td.PacketResolveResult)
         return packet.value
 
     def resolve_group(self, group: Optional[str]) -> Optional[str]:
@@ -198,24 +196,38 @@ class SshConnector(Connector):
             return None
 
         try:
-            # Construct and send packet with process information
-            packet_resolve = PacketResolveGroup(group=group)
+            packet_resolve = td.PacketResolveGroup(group=group)
             self.conn.write_packet(packet_resolve)
 
             # Wait for result packet
-            packet = receive_packet(self.conn)
+            packet = td.receive_packet(self.conn)
         except IOError as e:
             self.log.error(f"Remote host disconnected unexpectedly: {str(e)}")
             raise AbortExecutionSignal() from e
 
         # Check type of incoming packet to handle errors differently
-        if isinstance(packet, PacketInvalidField):
+        if isinstance(packet, td.PacketInvalidField):
             raise ValueError(f"Group '{group}' doesn't exist")
 
-        if not isinstance(packet, PacketResolveResult):
-            self.log.error(f"Invalid response '{type(packet)}'")
-            raise RuntimeError(f"Invalid response '{type(packet)}' from remote dispatcher. This is a bug.")
+        self._expect_response_packet(packet, td.PacketResolveResult)
+        return packet.value
 
+    def save_content(self, file: str, content: bytes):
+        try:
+            packet_save_content = td.PacketSaveContent(file=file, content=content)
+            self.conn.write_packet(packet_save_content)
+
+            # Wait for result packet
+            packet = td.receive_packet(self.conn)
+        except IOError as e:
+            self.log.error(f"Remote host disconnected unexpectedly: {str(e)}")
+            raise AbortExecutionSignal() from e
+
+        # Check type of incoming packet to handle errors differently
+        if isinstance(packet, td.PacketInvalidField):
+            raise ValueError(f"Invalid value '{getattr(packet_save_content, packet.field)}' given for field '{packet.field}': {packet.error_message}")
+
+        self._expect_response_packet(packet, td.PacketOk)
         return packet.value
 
     def _ssh_command(self, remote_command_escaped: str) -> list[str]:

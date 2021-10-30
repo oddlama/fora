@@ -178,6 +178,27 @@ class Connector:
         """
         raise NotImplementedError("Must be overwritten by subclass.")
 
+    def save_content(self, file: str, content: bytes):
+        """
+        Saves the given content under the given file path on the remote system.
+        Neither the file user, group or mode are explicitly set and will be determined
+        by the , and therefore
+        should be changed and therefore and group are always the user as and umask will be determined.
+
+        Parameters
+        ----------
+        file
+            The file where the content will be saved.
+        content
+            The file content.
+
+        Returns
+        -------
+        CompletedRemoteCommand
+            The result of the remote command.
+        """
+        raise NotImplementedError("Must be overwritten by subclass.")
+
 def connector(cls):
     """
     The @connector class decorator used to register the connector

@@ -3,7 +3,8 @@
 
 """
 Provides a stdin/stdout based protocol to safely dispatch commands and return their
-results over any connection that forwards both stdin/stdout.
+results over any connection that forwards both stdin/stdout, as well as some other
+needed remote system related utilities.
 """
 
 import os
@@ -37,11 +38,11 @@ except ModuleNotFoundError:
 # Utility functions
 # ----------------------------------------------------------------
 
-def is_debug():
+def _is_debug():
     """Returns True if debugging output should be genereated."""
     return debug if is_server else simple_automation.args.debug
 
-def log(msg: str):
+def _log(msg: str):
     """
     Logs the given message to stderr, appending a prefix to indicate whether this
     is running on a remote (server) or locally (client).
@@ -51,14 +52,14 @@ def log(msg: str):
     msg
         The message to log.
     """
-    if not is_debug():
+    if not _is_debug():
         return
 
     # TODO color should be configurable
     prefix = "  [1;33mREMOTE[m: " if is_server else "   [1;32mLOCAL[m: "
     print(f"{prefix}{msg}", file=sys.stderr, flush=True)
 
-def resolve_umask(umask: str) -> int:
+def _resolve_umask(umask: str) -> int:
     """
     Resolves an octal string umask to a numeric umask.
     Raises a ValueError if the umask is malformed.
@@ -78,7 +79,7 @@ def resolve_umask(umask: str) -> int:
     except ValueError:
         raise ValueError(f"Invalid umask '{umask}': Must be in octal format.") # pylint: disable=raise-missing-from
 
-def resolve_user(user: str) -> tuple[int, int]:
+def _resolve_user(user: str) -> tuple[int, int]:
     """
     Resolves the given user string to a uid and gid.
     The string may be either a username or a uid.
@@ -107,7 +108,7 @@ def resolve_user(user: str) -> tuple[int, int]:
 
     return (pw.pw_uid, pw.pw_gid)
 
-def resolve_group(group: str) -> int:
+def _resolve_group(group: str) -> int:
     """
     Resolves the given group string to a gid.
     The string may be either a groupname or a gid.
@@ -171,11 +172,11 @@ class Connection:
 # Primary serialization and deserialization
 # ----------------------------------------------------------------
 
-def is_optional(field):
+def _is_optional(field):
     """Returns True when the given type annotation is Optional[...]."""
     return typing.get_origin(field) is Union and type(None) in typing.get_args(field)
 
-def is_list(field):
+def _is_list(field):
     """Returns True when the given type annotation is list[...]."""
     return typing.get_origin(field) is list
 
@@ -188,20 +189,20 @@ _serializers[u64]   = lambda conn, v: conn.write(pack(">Q", v), 8)
 _serializers[bytes] = lambda conn, v: (_serializers[u64](conn, len(v)), conn.write(v, len(v)))
 _serializers[str]   = lambda conn, v: _serializers[bytes](conn, v.encode('utf-8'))
 
-def serialize(conn: Connection, vtype, v: Any):
+def _serialize(conn: Connection, vtype, v: Any):
     """Serializes v based on the underlying type 'vtype' and writes it to the given connection."""
     if vtype in _serializers:
         _serializers[vtype](conn, v)
-    elif is_optional(vtype):
+    elif _is_optional(vtype):
         real_type = typing.get_args(vtype)[0]
         _serializers[bool](conn, v is not None)
         if v is not None:
-            serialize(conn, real_type, v)
-    elif is_list(vtype):
+            _serialize(conn, real_type, v)
+    elif _is_list(vtype):
         element_type = typing.get_args(vtype)[0]
         _serializers[u64](conn, len(v))
         for i in v:
-            serialize(conn, element_type, i)
+            _serialize(conn, element_type, i)
     else:
         raise ValueError(f"Cannot serialize object of type {vtype}")
 
@@ -214,19 +215,19 @@ _deserializers[u64]   = lambda conn: unpack(">Q", conn.read(8))[0]
 _deserializers[bytes] = lambda conn: conn.read(_deserializers[u64](conn))
 _deserializers[str]   = lambda conn: _deserializers[bytes](conn).decode('utf-8')
 
-def deserialize(conn: Connection, vtype):
+def _deserialize(conn: Connection, vtype):
     """Deserializes an object from the given connection based on the underlying type 'vtype' and returns it."""
     # pylint: disable=no-else-return
     if vtype in _deserializers:
         return _deserializers[vtype](conn)
-    elif is_optional(vtype):
+    elif _is_optional(vtype):
         real_type = typing.get_args(vtype)[0]
         if not _deserializers[bool](conn):
             return None
-        return deserialize(conn, real_type)
-    elif is_list(vtype):
+        return _deserialize(conn, real_type)
+    elif _is_list(vtype):
         element_type = typing.get_args(vtype)[0]
-        return list(deserialize(conn, element_type) for i in range(_deserializers[u64](conn)))
+        return list(_deserialize(conn, element_type) for i in range(_deserializers[u64](conn)))
     else:
         raise ValueError(f"Cannot deserialize object of type {vtype}")
 
@@ -244,14 +245,14 @@ def _read_packet(cls, conn: Connection):
     kwargs = {}
     for f in cls._fields:
         ftype = cls.__annotations__[f]
-        kwargs[f] = deserialize(conn, ftype)
+        kwargs[f] = _deserialize(conn, ftype)
     return cls(**kwargs)
 
 def _write_packet(cls, packet_id: u32, self, conn: Connection):
-    serialize(conn, u32, packet_id)
+    _serialize(conn, u32, packet_id)
     for f in cls._fields:
         ftype = cls.__annotations__[f]
-        serialize(conn, ftype, getattr(self, f))
+        _serialize(conn, ftype, getattr(self, f))
     conn.flush()
 
 def Packet(type): # pylint: disable=redefined-builtin
@@ -285,6 +286,12 @@ def Packet(type): # pylint: disable=redefined-builtin
 
 # Packets
 # ----------------------------------------------------------------
+
+@Packet(type='response')
+class PacketOk(NamedTuple):
+    """This packet is used by some requests as a generic successful status indicator."""
+    # Required for pyminifier! Otherwise the block will not end as the docstring is removed!
+    pass # pylint: disable=unnecessary-pass
 
 @Packet(type='response')
 class PacketAck(NamedTuple):
@@ -321,6 +328,19 @@ class PacketInvalidField(NamedTuple):
         _ = (conn)
         raise ValueError(f"Invalid value given for field '{self.field}': {self.error_message}")
 
+@Packet(type='response')
+class PacketProcessCompleted(NamedTuple):
+    """This packet is used to return the results of a process."""
+    stdout: Optional[bytes]
+    stderr: Optional[bytes]
+    returncode: i32
+
+@Packet(type='response')
+class PacketProcessPreexecError(NamedTuple):
+    """This packet is used to indicate an error in the preexec_fn when running the process."""
+    # Required for pyminifier! Otherwise the block will not end as the docstring is removed!
+    pass # pylint: disable=unnecessary-pass
+
 @Packet(type='request')
 class PacketProcessRun(NamedTuple):
     """This packet is used to run a process."""
@@ -340,21 +360,21 @@ class PacketProcessRun(NamedTuple):
 
         if self.umask is not None:
             try:
-                umask_oct = resolve_umask(self.umask)
+                umask_oct = _resolve_umask(self.umask)
             except ValueError as e:
                 conn.write_packet(PacketInvalidField("umask", str(e)))
                 return
 
         if self.user is not None:
             try:
-                (uid, gid) = resolve_user(self.user)
+                (uid, gid) = _resolve_user(self.user)
             except ValueError as e:
                 conn.write_packet(PacketInvalidField("user", str(e)))
                 return
 
         if self.group is not None:
             try:
-                gid = resolve_group(self.group)
+                gid = _resolve_group(self.group)
             except ValueError as e:
                 conn.write_packet(PacketInvalidField("group", str(e)))
                 return
@@ -392,17 +412,15 @@ class PacketProcessRun(NamedTuple):
         conn.write_packet(PacketProcessCompleted(result.stdout, result.stderr, i32(result.returncode)))
 
 @Packet(type='response')
-class PacketProcessCompleted(NamedTuple):
-    """This packet is used to return the results of a process."""
-    stdout: Optional[bytes]
-    stderr: Optional[bytes]
-    returncode: i32
-
-@Packet(type='response')
-class PacketProcessPreexecError(NamedTuple):
-    """This packet is used to indicate an error in the preexec_fn when running the process."""
-    # Required for pyminifier! Otherwise the block will not end as the docstring is removed!
-    pass # pylint: disable=unnecessary-pass
+class PacketStatResult(NamedTuple):
+    """This packet is used to return the results of a stat packet."""
+    type: str # pylint: disable=redefined-builtin
+    mode: u64
+    owner: str
+    group: str
+    size: u64
+    mtime: u64
+    ctime: u64
 
 @Packet(type='request')
 class PacketStat(NamedTuple):
@@ -448,15 +466,9 @@ class PacketStat(NamedTuple):
             ctime=u64(s.st_ctime_ns)))
 
 @Packet(type='response')
-class PacketStatResult(NamedTuple):
-    """This packet is used to return the results of a stat packet."""
-    type: str # pylint: disable=redefined-builtin
-    mode: u64
-    owner: str
-    group: str
-    size: u64
-    mtime: u64
-    ctime: u64
+class PacketResolveResult(NamedTuple):
+    """This packet is used to return the results of a resolve packet."""
+    value: str
 
 @Packet(type='request')
 class PacketResolveUser(NamedTuple):
@@ -498,10 +510,22 @@ class PacketResolveGroup(NamedTuple):
         # Send response
         conn.write_packet(PacketResolveResult(value=gr.gr_name))
 
-@Packet(type='response')
-class PacketResolveResult(NamedTuple):
-    """This packet is used to return the results of a resolve packet."""
-    value: str
+@Packet(type='request')
+class PacketSaveContent(NamedTuple):
+    """This packet is used to save the given content on the remote. Responds with PacketOk if saving was successful."""
+    file: str
+    content: bytes
+
+    def handle(self, conn: Connection):
+        """Saves the content under the given path."""
+        try:
+            with open(self.file, 'wb') as f:
+                f.write(self.content)
+        except OSError as e:
+            conn.write_packet(PacketInvalidField("file", str(e)))
+            return
+
+        conn.write_packet(PacketOk())
 
 def receive_packet(conn: Connection) -> Any:
     """
@@ -518,7 +542,7 @@ def receive_packet(conn: Connection) -> Any:
         The received packet
     """
     try:
-        packet_id = deserialize(conn, u32)
+        packet_id = _deserialize(conn, u32)
         if packet_id not in packet_deserializers:
             raise IOError(f"Received invalid packet id '{packet_id}'")
 
@@ -527,13 +551,14 @@ def receive_packet(conn: Connection) -> Any:
         except KeyError:
             packet_name = f"[unkown packet with id {packet_id}]"
 
-        log(f"got packet header for: {packet_name}")
+        _log(f"got packet header for: {packet_name}")
         return packet_deserializers[packet_id](conn)
     except struct.error as e:
         raise IOError("Unexpected EOF in data stream") from e
 
-def main():
+def _main():
     """Handles all incoming packets in a loop until an invalid packet or a PacketExit is received."""
+    os.umask(0o077)
 
     # pylint: disable=global-statement
     global debug
@@ -545,13 +570,13 @@ def main():
 
     while not conn.should_close:
         try:
-            log("waiting for packet")
+            _log("waiting for packet")
             packet = receive_packet(conn)
         except IOError as e:
             print(f"{str(e)}. Aborting.", file=sys.stderr, flush=True)
             sys.exit(3)
-        log(f"received packet {type(packet).__name__}")
+        _log(f"received packet {type(packet).__name__}")
         packet.handle(conn)
 
 if __name__ == '__main__':
-    main()
+    _main()
