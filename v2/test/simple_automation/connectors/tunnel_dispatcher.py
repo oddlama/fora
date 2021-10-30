@@ -13,11 +13,10 @@ import subprocess
 import sys
 import typing
 
-from enum import IntEnum
 from pwd import getpwnam, getpwuid
 from grp import getgrnam, getgrgid
 from struct import pack, unpack
-from typing import cast, Any, TypeVar, Callable, Optional, Union, NamedTuple, NewType
+from typing import Any, TypeVar, Callable, Optional, Union, NamedTuple, NewType
 
 T = TypeVar('T')
 i32 = NewType('i32', int)
@@ -166,8 +165,8 @@ class Connection:
         if not hasattr(packet, '_is_packet') or not bool(getattr(packet, '_is_packet')):
             raise ValueError("Invalid argument: Must be a packet!")
         # We don't expose write directly, as the type checker currently is unable
-        # to determine whether this function exists, as it is added by the @packet decorator.
-        packet._write(self)
+        # to determine whether this function exists, as it is added by the @Packet decorator.
+        packet._write(self) # pylint: disable=protected-access
 
 # Primary serialization and deserialization
 # ----------------------------------------------------------------
@@ -217,6 +216,7 @@ _deserializers[str]   = lambda conn: _deserializers[bytes](conn).decode('utf-8')
 
 def deserialize(conn: Connection, vtype):
     """Deserializes an object from the given connection based on the underlying type 'vtype' and returns it."""
+    # pylint: disable=no-else-return
     if vtype in _deserializers:
         return _deserializers[vtype](conn)
     elif is_optional(vtype):
@@ -233,15 +233,7 @@ def deserialize(conn: Connection, vtype):
 # Packet helpers
 # ----------------------------------------------------------------
 
-class Packet:
-    """Dummy packet type for type checking."""
-    def write(self, conn: Connection):
-        pass
-
-    def handle(self, conn: Connection):
-        pass
-
-packets: list[Packet] = []
+packets: list[Any] = []
 packet_deserializers: dict[int, Callable[[Connection], Any]] = {}
 
 def _handle_response_packet():
@@ -262,27 +254,27 @@ def _write_packet(cls, packet_id: u32, self, conn: Connection):
         serialize(conn, ftype, getattr(self, f))
     conn.flush()
 
-def packet(type): # pylint: disable=redefined-builtin
+def Packet(type): # pylint: disable=redefined-builtin
     """Decorator for packet types. Registers the packet and generates read and write methods."""
     if type not in ['response', 'request']:
-        raise RuntimeError("Invalid @packet decoration: type must be either 'response' or 'request'.")
+        raise RuntimeError("Invalid @Packet decoration: type must be either 'response' or 'request'.")
 
     def wrapper(cls):
         # Assert cls is a NamedTuple
         if not hasattr(cls, '_fields'):
-            raise RuntimeError("Invalid @packet decoration: Decorated class must inherit from NamedTuple.")
+            raise RuntimeError("Invalid @Packet decoration: Decorated class must inherit from NamedTuple.")
 
         # Find next packet id
         packet_id = len(packets)
 
         # Replace functions
-        cls._is_packet = True
-        cls._write = lambda self, conn: _write_packet(cls, packet_id, self, conn)
+        cls._is_packet = True # pylint: disable=protected-access
+        cls._write = lambda self, conn: _write_packet(cls, packet_id, self, conn) # pylint: disable=protected-access
         if type == 'response':
             cls.handle = _handle_response_packet
         elif type == 'request':
             if not hasattr(cls, 'handle') or not callable(getattr(cls, 'handle')):
-                raise RuntimeError("Invalid @packet decoration: request packets must provide a handle method!")
+                raise RuntimeError("Invalid @Packet decoration: request packets must provide a handle method!")
 
         # Register packet
         packets.append(cls)
@@ -294,38 +286,42 @@ def packet(type): # pylint: disable=redefined-builtin
 # Packets
 # ----------------------------------------------------------------
 
-@packet(type='response')
+@Packet(type='response')
 class PacketAck(NamedTuple):
     """This packet is used to acknowledge a previous PacketCheckAlive packet."""
-    pass # Required for pyminifier! Otherwise the block will not end as the docstring is removed!
+    # Required for pyminifier! Otherwise the block will not end as the docstring is removed!
+    pass # pylint: disable=unnecessary-pass
 
-@packet(type='request')
+@Packet(type='request')
 class PacketCheckAlive(NamedTuple):
     """This packet is used to check whether a connection is alive.
     The receiver must answer with PacketAck immediately."""
 
     def handle(self, conn: Connection):
+        """Responds with PacketAck."""
         _ = (self)
         conn.write_packet(PacketAck())
 
-@packet(type='request')
+@Packet(type='request')
 class PacketExit(NamedTuple):
     """This packet is used to signal the server to close the connection and end the dispatcher."""
     def handle(self, conn: Connection):
+        """Signals the connection to close."""
         _ = (self)
         conn.should_close = True
 
-@packet(type='response')
+@Packet(type='response')
 class PacketInvalidField(NamedTuple):
     """This packet is used when an invalid value was given in a previous packet."""
     field: str
     error_message: str
 
     def handle(self, conn: Connection):
+        """Raises an error including a description of the invalid field."""
         _ = (conn)
         raise ValueError(f"Invalid value given for field '{self.field}': {self.error_message}")
 
-@packet(type='request')
+@Packet(type='request')
 class PacketProcessRun(NamedTuple):
     """This packet is used to run a process."""
     command: list[str]
@@ -337,6 +333,7 @@ class PacketProcessRun(NamedTuple):
     cwd: Optional[str] = None
 
     def handle(self, conn: Connection):
+        """Runs the requested command."""
         # By default we will run commands as the current user.
         uid, gid = (None, None)
         umask_oct = 0o077
@@ -394,25 +391,27 @@ class PacketProcessRun(NamedTuple):
         # Send response for command result
         conn.write_packet(PacketProcessCompleted(result.stdout, result.stderr, i32(result.returncode)))
 
-@packet(type='response')
+@Packet(type='response')
 class PacketProcessCompleted(NamedTuple):
     """This packet is used to return the results of a process."""
     stdout: Optional[bytes]
     stderr: Optional[bytes]
     returncode: i32
 
-@packet(type='response')
+@Packet(type='response')
 class PacketProcessPreexecError(NamedTuple):
     """This packet is used to indicate an error in the preexec_fn when running the process."""
-    pass # Required for pyminifier! Otherwise the block will not end as the docstring is removed!
+    # Required for pyminifier! Otherwise the block will not end as the docstring is removed!
+    pass # pylint: disable=unnecessary-pass
 
-@packet(type='request')
+@Packet(type='request')
 class PacketStat(NamedTuple):
     """This packet is used to retrieve information about a file or directory."""
     path: str
     follow_links: bool = False
 
     def handle(self, conn: Connection):
+        """Stats the requested path."""
         try:
             s = os.stat(self.path, follow_symlinks=self.follow_links)
         except OSError:
@@ -448,7 +447,7 @@ class PacketStat(NamedTuple):
             mtime=u64(s.st_mtime_ns),
             ctime=u64(s.st_ctime_ns)))
 
-@packet(type='response')
+@Packet(type='response')
 class PacketStatResult(NamedTuple):
     """This packet is used to return the results of a stat packet."""
     type: str # pylint: disable=redefined-builtin
@@ -459,12 +458,13 @@ class PacketStatResult(NamedTuple):
     mtime: u64
     ctime: u64
 
-@packet(type='request')
+@Packet(type='request')
 class PacketResolveUser(NamedTuple):
     """This packet is used to canonicalize a user name / uid and to ensure it exists."""
     user: str
 
     def handle(self, conn: Connection):
+        """Resolves the requested user."""
         try:
             pw = getpwnam(self.user)
         except KeyError:
@@ -478,12 +478,13 @@ class PacketResolveUser(NamedTuple):
         # Send response
         conn.write_packet(PacketResolveResult(value=pw.pw_name))
 
-@packet(type='request')
+@Packet(type='request')
 class PacketResolveGroup(NamedTuple):
     """This packet is used to canonicalize a group name / gid and to ensure it exists."""
     group: str
 
     def handle(self, conn: Connection):
+        """Resolves the requested group."""
         try:
             gr = getgrnam(self.group)
         except KeyError:
@@ -497,7 +498,7 @@ class PacketResolveGroup(NamedTuple):
         # Send response
         conn.write_packet(PacketResolveResult(value=gr.gr_name))
 
-@packet(type='response')
+@Packet(type='response')
 class PacketResolveResult(NamedTuple):
     """This packet is used to return the results of a resolve packet."""
     value: str

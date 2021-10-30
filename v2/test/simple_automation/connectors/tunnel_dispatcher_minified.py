@@ -5,11 +5,10 @@ import struct
 import subprocess
 import sys
 import typing
-from enum import IntEnum
 from pwd import getpwnam,getpwuid
 from grp import getgrnam,getgrgid
 from struct import pack,unpack
-from typing import cast,Any,TypeVar,Callable,Optional,Union,NamedTuple,NewType
+from typing import Any,TypeVar,Callable,Optional,Union,NamedTuple,NewType
 T=TypeVar('T')
 i32=NewType('i32',int)
 u32=NewType('u32',int)
@@ -120,12 +119,7 @@ def deserialize(conn:Connection,vtype):
   return list(deserialize(conn,element_type)for i in range(_deserializers[u64](conn)))
  else:
   raise ValueError(f"Cannot deserialize object of type {vtype}")
-class Packet:
- def write(self,conn:Connection):
-  pass
- def handle(self,conn:Connection):
-  pass
-packets:list[Packet]=[]
+packets:list[Any]=[]
 packet_deserializers:dict[int,Callable[[Connection],Any]]={}
 def _handle_response_packet():
  raise RuntimeError("This packet is a server-side response packet and must never be sent by the client!")
@@ -141,45 +135,45 @@ def _write_packet(cls,packet_id:u32,self,conn:Connection):
   ftype=cls.__annotations__[f]
   serialize(conn,ftype,getattr(self,f))
  conn.flush()
-def packet(type):
+def Packet(type):
  if type not in['response','request']:
-  raise RuntimeError("Invalid @packet decoration: type must be either 'response' or 'request'.")
+  raise RuntimeError("Invalid @Packet decoration: type must be either 'response' or 'request'.")
  def wrapper(cls):
   if not hasattr(cls,'_fields'):
-   raise RuntimeError("Invalid @packet decoration: Decorated class must inherit from NamedTuple.")
+   raise RuntimeError("Invalid @Packet decoration: Decorated class must inherit from NamedTuple.")
   packet_id=len(packets)
-  cls._is_packet=True
+  cls._is_packet=True 
   cls._write=lambda self,conn:_write_packet(cls,packet_id,self,conn)
   if type=='response':
    cls.handle=_handle_response_packet
   elif type=='request':
    if not hasattr(cls,'handle')or not callable(getattr(cls,'handle')):
-    raise RuntimeError("Invalid @packet decoration: request packets must provide a handle method!")
+    raise RuntimeError("Invalid @Packet decoration: request packets must provide a handle method!")
   packets.append(cls)
   packet_deserializers[packet_id]=lambda conn:_read_packet(cls,conn)
   return cls
  return wrapper
-@packet(type='response')
+@Packet(type='response')
 class PacketAck(NamedTuple):
  pass 
-@packet(type='request')
+@Packet(type='request')
 class PacketCheckAlive(NamedTuple):
  def handle(self,conn:Connection):
   _=(self)
   conn.write_packet(PacketAck())
-@packet(type='request')
+@Packet(type='request')
 class PacketExit(NamedTuple):
  def handle(self,conn:Connection):
   _=(self)
   conn.should_close=True
-@packet(type='response')
+@Packet(type='response')
 class PacketInvalidField(NamedTuple):
  field:str
  error_message:str
  def handle(self,conn:Connection):
   _=(conn)
   raise ValueError(f"Invalid value given for field '{self.field}': {self.error_message}")
-@packet(type='request')
+@Packet(type='request')
 class PacketProcessRun(NamedTuple):
  command:list[str]
  stdin:Optional[bytes]=None
@@ -227,15 +221,15 @@ class PacketProcessRun(NamedTuple):
    conn.write_packet(PacketProcessPreexecError())
    return
   conn.write_packet(PacketProcessCompleted(result.stdout,result.stderr,i32(result.returncode)))
-@packet(type='response')
+@Packet(type='response')
 class PacketProcessCompleted(NamedTuple):
  stdout:Optional[bytes]
  stderr:Optional[bytes]
  returncode:i32
-@packet(type='response')
+@Packet(type='response')
 class PacketProcessPreexecError(NamedTuple):
  pass 
-@packet(type='request')
+@Packet(type='request')
 class PacketStat(NamedTuple):
  path:str
  follow_links:bool=False
@@ -255,7 +249,7 @@ class PacketStat(NamedTuple):
   except KeyError:
    group=str(s.st_gid)
   conn.write_packet(PacketStatResult(type=ftype,mode=u64(stat.S_IMODE(s.st_mode)),owner=owner,group=group,size=u64(s.st_size),mtime=u64(s.st_mtime_ns),ctime=u64(s.st_ctime_ns)))
-@packet(type='response')
+@Packet(type='response')
 class PacketStatResult(NamedTuple):
  type:str 
  mode:u64
@@ -264,7 +258,7 @@ class PacketStatResult(NamedTuple):
  size:u64
  mtime:u64
  ctime:u64
-@packet(type='request')
+@Packet(type='request')
 class PacketResolveUser(NamedTuple):
  user:str
  def handle(self,conn:Connection):
@@ -278,7 +272,7 @@ class PacketResolveUser(NamedTuple):
     conn.write_packet(PacketInvalidField("user","The user does not exist"))
     return
   conn.write_packet(PacketResolveResult(value=pw.pw_name))
-@packet(type='request')
+@Packet(type='request')
 class PacketResolveGroup(NamedTuple):
  group:str
  def handle(self,conn:Connection):
@@ -292,7 +286,7 @@ class PacketResolveGroup(NamedTuple):
     conn.write_packet(PacketInvalidField("group","The group does not exist"))
     return
   conn.write_packet(PacketResolveResult(value=gr.gr_name))
-@packet(type='response')
+@Packet(type='response')
 class PacketResolveResult(NamedTuple):
  value:str
 def receive_packet(conn:Connection)->Any:
