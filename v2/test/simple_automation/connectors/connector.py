@@ -19,7 +19,8 @@ class CompletedRemoteCommand:
 class StatResult:
     """
     The return value of stat(), representing information about a remote file.
-    The type will be one of [ "dir", "chr", "blk", "file", "fifo", "link", "sock", "other" ]
+    The type will be one of [ "dir", "chr", "blk", "file", "fifo", "link", "sock", "other" ].
+    If requested, the sha512sum of the file will be included.
     """
     def __init__(self,
                  type: str, # pylint: disable=redefined-builtin
@@ -28,7 +29,8 @@ class StatResult:
                  group: str,
                  size: int,
                  mtime: int,
-                 ctime: int):
+                 ctime: int,
+                 sha512sum: Optional[bytes]):
         self.type = type
         self.mode: str = mode if isinstance(mode, str) else oct(mode)[2:]
         self.owner = owner
@@ -36,6 +38,7 @@ class StatResult:
         self.size = size
         self.mtime = mtime
         self.ctime = ctime
+        self.sha512sum = sha512sum
 
 class Connector:
     """
@@ -157,10 +160,10 @@ class Connector:
         """
         raise NotImplementedError("Must be overwritten by subclass.")
 
-    def stat(self, path: str, follow_links: bool = False) -> Optional[StatResult]:
+    def stat(self, path: str, follow_links: bool = False, sha512sum: bool = False) -> Optional[StatResult]:
         """
         Runs stat() on the given path on the remote. Follows links if follow_links
-        is true.
+        is true. Includes the sha512sum if desired and if the path is a file.
 
         Returns None if the remote couldn't stat the given path.
 
@@ -170,6 +173,8 @@ class Connector:
             The path to stat.
         follow_links
             Whether to follow symbolic links instead of running stat on the link.
+        sha512sum
+            Whether to include the sha512sum if the path is a file.
 
         Returns
         -------
@@ -178,12 +183,14 @@ class Connector:
         """
         raise NotImplementedError("Must be overwritten by subclass.")
 
-    def save_content(self, file: str, content: bytes):
+    def save_content(self,
+            file: str,
+            content: bytes,
+            mode: Optional[str] = None,
+            owner: Optional[str] = None,
+            group: Optional[str] = None):
         """
         Saves the given content under the given file path on the remote system.
-        Neither the file user, group or mode are explicitly set and will be determined
-        by the , and therefore
-        should be changed and therefore and group are always the user as and umask will be determined.
 
         Parameters
         ----------
@@ -191,11 +198,13 @@ class Connector:
             The file where the content will be saved.
         content
             The file content.
-
-        Returns
-        -------
-        CompletedRemoteCommand
-            The result of the remote command.
+        owner
+            The owner for the file. Defaults to root if not given.
+        group
+            The group for the file. If the owner is given, defaults to the primary
+            group of the owner, otherwise defaults to root.
+        mode
+            The mode for the file. Defaults to '600' if not given.
         """
         raise NotImplementedError("Must be overwritten by subclass.")
 

@@ -143,12 +143,14 @@ class SshConnector(Connector):
 
         return result
 
-    def stat(self, path: str, follow_links: bool = False) -> Optional[StatResult]:
+    def stat(self, path: str, follow_links: bool = False, sha512sum: bool = False) -> Optional[StatResult]:
         try:
             # Construct and send packet with process information
-            self.conn.write_packet(td.PacketStat(
+            packet_stat = td.PacketStat(
                 path=path,
-                follow_links=follow_links))
+                follow_links=follow_links,
+                sha512sum=sha512sum)
+            self.conn.write_packet(packet_stat)
 
             # Wait for result packet
             packet = td.receive_packet(self.conn)
@@ -168,7 +170,8 @@ class SshConnector(Connector):
             group=packet.group,
             size=packet.size,
             mtime=packet.mtime,
-            ctime=packet.ctime)
+            ctime=packet.ctime,
+            sha512sum=packet.sha512sum)
 
     def resolve_user(self, user: Optional[str]) -> Optional[str]:
         if user is None:
@@ -212,9 +215,19 @@ class SshConnector(Connector):
         self._expect_response_packet(packet, td.PacketResolveResult)
         return packet.value
 
-    def save_content(self, file: str, content: bytes):
+    def save_content(self,
+            file: str,
+            content: bytes,
+            mode: Optional[str] = None,
+            owner: Optional[str] = None,
+            group: Optional[str] = None):
         try:
-            packet_save_content = td.PacketSaveContent(file=file, content=content)
+            packet_save_content = td.PacketSaveContent(
+                    file=file,
+                    content=content,
+                    mode=mode,
+                    owner=owner,
+                    group=group)
             self.conn.write_packet(packet_save_content)
 
             # Wait for result packet
@@ -228,7 +241,6 @@ class SshConnector(Connector):
             raise ValueError(f"Invalid value '{getattr(packet_save_content, packet.field)}' given for field '{packet.field}': {packet.error_message}")
 
         self._expect_response_packet(packet, td.PacketOk)
-        return packet.value
 
     def _ssh_command(self, remote_command_escaped: str) -> list[str]:
         """

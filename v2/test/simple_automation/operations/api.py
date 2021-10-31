@@ -157,7 +157,7 @@ def operation(op_name):
     def operation_wrapper(function):
         def wrapper(*args, **kwargs):
             op = Operation(op_name=op_name, name=kwargs.pop("name", None))
-            check = kwargs.pop("check", True)
+            # TODO check = kwargs.pop("check", True)
 
             try:
                 ret = function(*args, **kwargs, op=op)

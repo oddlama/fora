@@ -7,6 +7,7 @@ results over any connection that forwards both stdin/stdout, as well as some oth
 needed remote system related utilities.
 """
 
+import hashlib
 import os
 import stat
 import struct
@@ -59,25 +60,25 @@ def _log(msg: str):
     prefix = "  [1;33mREMOTE[m: " if is_server else "   [1;32mLOCAL[m: "
     print(f"{prefix}{msg}", file=sys.stderr, flush=True)
 
-def _resolve_umask(umask: str) -> int:
+def _resolve_oct(value: str) -> int:
     """
-    Resolves an octal string umask to a numeric umask.
-    Raises a ValueError if the umask is malformed.
+    Resolves an octal string to a numeric value (e.g. for umask or mode).
+    Raises a ValueError if the value is malformed.
 
     Parameters
     ----------
-    umask
-        The string umask
+    value
+        The octal string value
 
     Returns
     -------
     int
-        The numeric represenation of the umask
+        The numeric representation of the octal value
     """
     try:
-        return int(umask, 8)
+        return int(value, 8)
     except ValueError:
-        raise ValueError(f"Invalid umask '{umask}': Must be in octal format.") # pylint: disable=raise-missing-from
+        raise ValueError(f"Invalid value '{value}': Must be in octal format.") # pylint: disable=raise-missing-from
 
 def _resolve_user(user: str) -> tuple[int, int]:
     """
@@ -360,7 +361,7 @@ class PacketProcessRun(NamedTuple):
 
         if self.umask is not None:
             try:
-                umask_oct = _resolve_umask(self.umask)
+                umask_oct = _resolve_oct(self.umask)
             except ValueError as e:
                 conn.write_packet(PacketInvalidField("umask", str(e)))
                 return
@@ -421,12 +422,14 @@ class PacketStatResult(NamedTuple):
     size: u64
     mtime: u64
     ctime: u64
+    sha512sum: Optional[bytes]
 
 @Packet(type='request')
 class PacketStat(NamedTuple):
     """This packet is used to retrieve information about a file or directory."""
     path: str
     follow_links: bool = False
+    sha512sum: bool = False
 
     def handle(self, conn: Connection):
         """Stats the requested path."""
@@ -455,6 +458,13 @@ class PacketStat(NamedTuple):
         except KeyError:
             group = str(s.st_gid)
 
+        sha512sum: Optional[bytes]
+        if self.sha512sum and ftype == "file":
+            with open(self.path, 'rb') as f:
+                sha512sum = hashlib.sha512(f.read()).digest()
+        else:
+            sha512sum = None
+
         # Send response
         conn.write_packet(PacketStatResult(
             type=ftype,
@@ -463,7 +473,8 @@ class PacketStat(NamedTuple):
             group=group,
             size=u64(s.st_size),
             mtime=u64(s.st_mtime_ns),
-            ctime=u64(s.st_ctime_ns)))
+            ctime=u64(s.st_ctime_ns),
+            sha512sum=sha512sum))
 
 @Packet(type='response')
 class PacketResolveResult(NamedTuple):
@@ -512,18 +523,53 @@ class PacketResolveGroup(NamedTuple):
 
 @Packet(type='request')
 class PacketSaveContent(NamedTuple):
-    """This packet is used to save the given content on the remote. Responds with PacketOk if saving was successful."""
+    """This packet is used to save the given content on the remote.
+    Responds with PacketOk if saving was successful, or PacketInvalidField if any
+    field contained an invalid value."""
     file: str
     content: bytes
+    mode: Optional[str] = None
+    owner: Optional[str] = None
+    group: Optional[str] = None
 
     def handle(self, conn: Connection):
         """Saves the content under the given path."""
+        uid, gid = (None, None)
+        mode_oct = 0o600
+
+        if self.mode is not None:
+            try:
+                mode_oct = _resolve_oct(self.mode)
+            except ValueError as e:
+                conn.write_packet(PacketInvalidField("mode", str(e)))
+                return
+
+        if self.owner is not None:
+            try:
+                (uid, gid) = _resolve_user(self.owner)
+            except ValueError as e:
+                conn.write_packet(PacketInvalidField("owner", str(e)))
+                return
+
+        if self.group is not None:
+            try:
+                gid = _resolve_group(self.group)
+            except ValueError as e:
+                conn.write_packet(PacketInvalidField("group", str(e)))
+                return
+
         try:
+            os.umask(0o22)
             with open(self.file, 'wb') as f:
                 f.write(self.content)
+            os.chmod(self.file, mode_oct)
+            if uid is not None or gid is not None:
+                os.chown(self.file, uid or 0, gid or 0)
         except OSError as e:
             conn.write_packet(PacketInvalidField("file", str(e)))
             return
+        finally:
+            os.umask(0o77)
 
         conn.write_packet(PacketOk())
 

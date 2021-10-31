@@ -116,13 +116,30 @@ class Connection:
         """
         return self.connector.resolve_group(group)
 
-    def stat(self, path: str, follow_links: bool = False) -> Optional[StatResult]:
+    def stat(self, path: str, follow_links: bool = False, sha512sum: bool = False) -> Optional[StatResult]:
         """
         See :func:`simple_automation.connectors.connector.stat`.
         """
         return self.connector.stat(
             path=path,
-            follow_links=follow_links)
+            follow_links=follow_links,
+            sha512sum=sha512sum)
+
+    def save_content(self,
+            file: str,
+            content: bytes,
+            mode: Optional[str] = None,
+            owner: Optional[str] = None,
+            group: Optional[str] = None):
+        """
+        See :func:`simple_automation.connectors.connector.save_content`.
+        """
+        return self.connector.save_content(
+            file=file,
+            content=content,
+            mode=mode,
+            owner=owner,
+            group=group)
 
 def open_connection(host: HostType) -> Connection:
     """
