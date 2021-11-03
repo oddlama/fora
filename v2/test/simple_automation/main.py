@@ -98,8 +98,8 @@ def main():
             help="Print what would be done instead of performing any actions. Probing commands will still be executed to determine the current state of the systems.")
     parser.add_argument('-v', '--verbose', dest='verbose', action='count', default=0,
             help="Increase output verbosity. Can be given multiple times. ")
-    parser.add_argument('-c', '--changes', dest='changes', action='store_true',
-            help="Display changes for each operation in a short diff-like format.")
+    parser.add_argument('--no-changes', dest='changes', action='store_false',
+            help="Don't display changes for each operation in a short diff-like format.")
     parser.add_argument('--diff', dest='diff', action='store_true',
             help="Display an actual diff when an operation changes a file. Use with care, as this might print secrets!")
     parser.add_argument('--debug', dest='debug', action='store_true',

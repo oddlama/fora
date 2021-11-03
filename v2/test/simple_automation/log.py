@@ -2,6 +2,9 @@
 Provides logging utilities.
 """
 
+from typing import Any
+
+import simple_automation
 from simple_automation.utils import col
 
 class IndentationContext:
@@ -116,29 +119,6 @@ class Logger:
         Prints the operation summary
         """
         # TODO make inventory.py able to set verbose=3 without needing to do -v everytime
-        # TODO format proposal:
-        # normal:
-        #   dir /tmp/very/special/dir (This is some directory that needs creation)
-        # -c:
-        #   dir /tmp/very/special/dir (This is some directory that needs creation)
-        #   └ exists: False → True, mode: 755, sha: 84rghuir.. -> 4grethiu..
-        #   dir /tmp/very/special/dir (This is some directory that needs creation)
-        #   └ exists: True, mode: 755
-        # -c --diff:
-        #   dir /tmp/very/special/dir (This is some directory that needs creation)
-        #   ├ exists: False → True, mode: 755, sha: 84rghuir.. -> 4grethiu..
-        #   └ diff
-        #     | /(thgrbrp/tkrgfr
-        #     | -a
-        #     | +b
-        # -cv:
-        #   dir /tmp/very/special/dir (This is some directory that needs creation)
-        #   ├ exists: False → True
-        #   ├ sha: 84rghuir3ru09wjgrgiu3ho -> 4grethiugrr380u8rhuir3wgr
-        #   └ mode: mode: 755
-        #   dir /tmp/very/special/dir (This is some directory that needs creation)
-        #   └ fail: error message
-        verbose = True # TODO
         if result.success:
             if result.changed:
                 title_color = col("[1;32m")
@@ -152,33 +132,33 @@ class Logger:
         self.print_operation_title(op, title_color)
 
         if result.success:
-            # Print key: value pairs with changes
-            state_infos = []
-            for k,final_v in result.final.items():
-                initial_v = result.initial[k]
+            if simple_automation.args.changes:
+                # Print key: value pairs with changes
+                state_infos = []
+                for k,final_v in result.final.items():
+                    initial_v = result.initial[k]
 
-                # Add ellipsis on long strings
-                str_k = ellipsis(k, 12)
-                str_initial_v = ellipsis(str(initial_v), 9)
-                str_final_v = ellipsis(str(final_v), 9+3+9 if initial_v is None else 9)
+                    def to_str(v: Any) -> str:
+                        return v.hex() if isinstance(v, bytes) else str(v)
 
-                if initial_v == final_v:
-                    if verbose >= 1:
-                        # TODO = instead of : for better readability
-                        entry_str = f"{col('[37m')}{str_k}: {str_initial_v}{col('[m')}"
-                        state_infos.append(entry_str)
-                else:
-                    if initial_v is None:
-                        entry_str = f"{col('[33m')}{str_k}: {col('[32m')}{str_final_v}{col('[m')}"
+                    # Add ellipsis on long strings
+                    str_k = ellipsis(k, 12)
+                    str_initial_v = ellipsis(to_str(initial_v), 9)
+                    str_final_v = ellipsis(to_str(final_v), 9+3+9 if initial_v is None else 9)
+
+                    if initial_v == final_v:
+                        if simple_automation.args.verbose >= 1:
+                            # TODO = instead of : for better readability
+                            entry_str = f"{col('[37m')}{str_k}: {str_initial_v}{col('[m')}"
+                            state_infos.append(entry_str)
                     else:
-                        entry_str = f"{col('[33m')}{str_k}: {col('[31m')}{str_initial_v}{col('[33m')} → {col('[32m')}{str_final_v}{col('[m')}"
-                    state_infos.append(entry_str)
-            print(f"{col('[37m')},{col('[m')} ".join(state_infos))
-        else:
-            print(f"{col('[31m')}{result.failure_message}{col('[m')}")
+                        if initial_v is None:
+                            entry_str = f"{col('[33m')}{str_k}: {col('[32m')}{str_final_v}{col('[m')}"
+                        else:
+                            entry_str = f"{col('[33m')}{str_k}: {col('[31m')}{str_initial_v}{col('[33m')} → {col('[32m')}{str_final_v}{col('[m')}"
+                        state_infos.append(entry_str)
 
-        #if verbose >= 1 and op.extra_info is not None:
-        #    extra_infos = []
-        #    for k,v in op.extra_info.items():
-        #        extra_infos.append(f"[37m{str(k)}: {str(v)}[m")
-        #    print(" " * 15 + "[37m,[m ".join(extra_infos))
+                if len(state_infos) > 0:
+                    self.print(f" {col('[37m')}└{col('[m')} " + f"{col('[37m')},{col('[m')} ".join(state_infos))
+        else:
+            self.print(f" {col('[37m')}└{col('[m')} " + f"{col('[31m')}{result.failure_message}{col('[m')}")

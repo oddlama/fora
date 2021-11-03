@@ -27,7 +27,12 @@ def col(color_code: str) -> str:
     """
     Returns the given argument only if color is enabled.
     """
-    return "" if simple_automation.args.no_color else color_code
+    if isinstance(simple_automation.args, simple_automation.NotYetLoaded):
+        use_color = os.getenv("NO_COLOR") is None
+    else:
+        use_color = not simple_automation.args.no_color
+
+    return color_code if use_color else ""
 
 class AbortExecutionSignal(Exception):
     """
