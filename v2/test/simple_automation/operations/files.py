@@ -68,9 +68,6 @@ def directory(op: Operation,
             if op.changed("owner") or op.changed("group"):
                 op.connection().run(["chown", f"{attr.owner}:{attr.group}", "--", path])
 
-            # TODO: diff imporant things
-            #if simple_automation.args.diff:
-
         return op.success()
 
 @operation("save_content")
@@ -125,7 +122,14 @@ def save_content(op: Operation,
         if not simple_automation.args.dry:
             # Create directory if it doesn't exist
             if op.changed("exists") or op.changed("sha512"):
-                op.connection().save_content(
+                if simple_automation.args.diff:
+                    try:
+                        old_content: Optional[bytes] = op.connection().download(file=dest)
+                    except ValueError:
+                        old_content = None
+                    op.diff(file=dest, old=old_content, new=content)
+
+                op.connection().upload(
                         file=dest,
                         content=content,
                         mode=attr.file_mode,
@@ -139,9 +143,6 @@ def save_content(op: Operation,
                 # Set correct owner and group, if needed
                 if op.changed("owner") or op.changed("group"):
                     op.connection().run(["chown", f"{attr.owner}:{attr.group}", "--", dest])
-
-            # TODO: diff imporant things
-            #if simple_automation.args.diff:
 
         return op.success()
 

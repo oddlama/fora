@@ -215,20 +215,20 @@ class SshConnector(Connector):
         self._expect_response_packet(packet, td.PacketResolveResult)
         return packet.value
 
-    def save_content(self,
+    def upload(self,
             file: str,
             content: bytes,
             mode: Optional[str] = None,
             owner: Optional[str] = None,
             group: Optional[str] = None):
         try:
-            packet_save_content = td.PacketSaveContent(
+            packet_upload = td.PacketUpload(
                     file=file,
                     content=content,
                     mode=mode,
                     owner=owner,
                     group=group)
-            self.conn.write_packet(packet_save_content)
+            self.conn.write_packet(packet_upload)
 
             # Wait for result packet
             packet = td.receive_packet(self.conn)
@@ -238,9 +238,27 @@ class SshConnector(Connector):
 
         # Check type of incoming packet to handle errors differently
         if isinstance(packet, td.PacketInvalidField):
-            raise ValueError(f"Invalid value '{getattr(packet_save_content, packet.field)}' given for field '{packet.field}': {packet.error_message}")
+            raise ValueError(f"Invalid value '{getattr(packet_upload, packet.field)}' given for field '{packet.field}': {packet.error_message}")
 
         self._expect_response_packet(packet, td.PacketOk)
+
+    def download(self, file: str) -> bytes:
+        try:
+            packet_download = td.PacketDownload(file=file)
+            self.conn.write_packet(packet_download)
+
+            # Wait for result packet
+            packet = td.receive_packet(self.conn)
+        except IOError as e:
+            self.log.error(f"Remote host disconnected unexpectedly: {str(e)}")
+            raise AbortExecutionSignal() from e
+
+        # Check type of incoming packet to handle errors differently
+        if isinstance(packet, td.PacketInvalidField):
+            raise ValueError(f"Invalid value '{getattr(packet_download, packet.field)}' given for field '{packet.field}': {packet.error_message}")
+
+        self._expect_response_packet(packet, td.PacketDownloadResult)
+        return packet.content
 
     def _ssh_command(self, remote_command_escaped: str) -> list[str]:
         """

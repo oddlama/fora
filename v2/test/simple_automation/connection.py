@@ -125,21 +125,27 @@ class Connection:
             follow_links=follow_links,
             sha512sum=sha512sum)
 
-    def save_content(self,
+    def upload(self,
             file: str,
             content: bytes,
             mode: Optional[str] = None,
             owner: Optional[str] = None,
             group: Optional[str] = None):
         """
-        See :func:`simple_automation.connectors.connector.save_content`.
+        See :func:`simple_automation.connectors.connector.upload`.
         """
-        return self.connector.save_content(
+        return self.connector.upload(
             file=file,
             content=content,
             mode=mode,
             owner=owner,
             group=group)
+
+    def download(self, file: str) -> bytes:
+        """
+        See :func:`simple_automation.connectors.connector.download`.
+        """
+        return self.connector.download(file=file)
 
 def open_connection(host: HostType) -> Connection:
     """

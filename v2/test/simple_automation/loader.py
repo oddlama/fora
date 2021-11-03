@@ -7,9 +7,10 @@ import inspect
 import os
 import sys
 from itertools import combinations
-from typing import cast
+from typing import cast, Optional
 
 import simple_automation
+from simple_automation import logger
 from simple_automation.types import GroupType, HostType, InventoryType, ScriptType
 from simple_automation.utils import die_error, print_error, load_py_module, rank_sort, CycleError
 from simple_automation.connectors.connector import Connector
@@ -417,35 +418,43 @@ def load_site(inventories: list[str]):
     # Load all hosts defined in the inventory
     simple_automation.hosts = load_hosts()
 
-def run_script(script: str, frame: inspect.FrameInfo):
+def run_script(script: str, frame: inspect.FrameInfo, name: Optional[str] = None):
     """
     Loads and implicitly runs the given script by creating a new instance.
 
     Parameters
     ----------
-    script : str
+    script
         The path to the script that should be instanciated
     frame
         The FrameInfo object as given by inspect.getouterframes(inspect.currentframe())[?]
         where the script call originates from. Used to keep track of the script invocation stack,
         which helps with debugging (e.g. cyclic script calls).
+    name
+        A printable name for the script. Defaults to the script path.
     """
 
-    name = os.path.splitext(os.path.basename(script))[0]
-    meta = ScriptType(name, script)
+    # It is intended that the name is passed before resolving it, so
+    # that it is None if the user didn't pass one specifically.
+    logger.run_script(script, name=name)
 
-    script_stack.append((meta, frame))
-    try:
-        with simple_automation.set_this(meta):
-            # New script instance starts with fresh set of default values.
-            # Use defaults() here to resolve them at least once.
-            with meta.defaults():
-                load_py_module(script, pre_exec=lambda module: setattr(meta, 'module', module))
-    except Exception as e:
-        # Save the current script_stack in any exception thrown from this context
-        # for later use in any exception handler.
-        if not hasattr(e, 'script_stack'):
-            setattr(e, 'script_stack', script_stack.copy())
-        raise e
-    finally:
-        script_stack.pop()
+    with logger.indent():
+        if name is None:
+            name = os.path.splitext(os.path.basename(script))[0]
+
+        meta = ScriptType(name, script)
+        script_stack.append((meta, frame))
+        try:
+            with simple_automation.set_this(meta):
+                # New script instance starts with fresh set of default values.
+                # Use defaults() here to resolve them at least once.
+                with meta.defaults():
+                    load_py_module(script, pre_exec=lambda module: setattr(meta, 'module', module))
+        except Exception as e:
+            # Save the current script_stack in any exception thrown from this context
+            # for later use in any exception handler.
+            if not hasattr(e, 'script_stack'):
+                setattr(e, 'script_stack', script_stack.copy())
+            raise e
+        finally:
+            script_stack.pop()

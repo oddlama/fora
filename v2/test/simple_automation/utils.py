@@ -13,6 +13,7 @@ from typing import TypeVar, Callable, Iterable, Optional
 import importlib.machinery
 import importlib.util
 
+import simple_automation
 from simple_automation.types import ScriptType
 
 T = TypeVar('T')
@@ -21,6 +22,12 @@ T = TypeVar('T')
 # These are guaranteed to be unique across all possible modules,
 # as a random uuid will be generated at load-time for each module.
 dynamically_loaded_modules: set[str] = set()
+
+def col(color_code: str) -> str:
+    """
+    Returns the given argument only if color is enabled.
+    """
+    return "" if simple_automation.args.no_color else color_code
 
 class AbortExecutionSignal(Exception):
     """
@@ -33,16 +40,16 @@ def print_warning(msg: str):
     """
     Prints a message with a colored 'warning: ' prefix.
     """
-    print(f"[1;33mwarning:[m {msg}")
+    print(f"{col('[1;33m')}warning:{col('[m')} {msg}")
 
 def print_error(msg: str, loc=None):
     """
     Prints a message with a colored 'error: ' prefix.
     """
     if loc is None:
-        print(f"[1;31merror:[m {msg}")
+        print(f"{col('[1;31m')}error:{col('[m')} {msg}")
     else:
-        print(f"[1m{loc}: [1;31merror:[m {msg}")
+        print(f"{col('[1m')}{loc}: {col('[1;31m')}error:{col('[m')} {msg}")
 
 def die_error(msg: str, loc=None, status_code=1):
     """

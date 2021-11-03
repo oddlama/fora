@@ -1,3 +1,9 @@
+"""
+Provides logging utilities.
+"""
+
+from simple_automation.utils import col
+
 class IndentationContext:
     """
     A context manager to modify the indentation level.
@@ -17,14 +23,10 @@ class ConnectionLogger:
         self.connector = connector
 
     def init(self):
-        #print(f"[ CONN ] Establishing connection to {self.host.name} via {self.connector.schema}")
-        #print(f"[1;34m{self.connector.schema}[m [1;33mconnecting[m")
-        print(f"[1;34m{self.connector.schema}[m connecting... ", end="", flush=True)
+        print(f"{col('[1;34m')}{self.connector.schema}{col('[m')} connecting... ", end="", flush=True)
 
     def established(self):
-        #print(f"[ CONN ] Connection to {self.host.name} established")
-        #print(f"[1;34m{self.connector.schema}[m [1;32mconnected[m")
-        print("[1;32mOK[m")
+        print(col("[1;32m") + "OK" + col("[m"))
 
     def requested_close(self):
         pass
@@ -82,7 +84,7 @@ class Logger:
         print(f"{self.indent_prefix()}{msg}")
 
     def warn(self, msg):
-        print(f"{self.indent_prefix()}[33mWARN:[m {msg}")
+        print(f"{self.indent_prefix()}{col('[33m')}WARN:{col('[m')} {msg}")
 
     def error(self, msg):
         print(f"[ ERROR ] {msg}")
@@ -92,65 +94,62 @@ class Logger:
 
     def run_script(self, script, name=None):
         if name is not None:
-            print(f"{self.indent_prefix()}[33;1mscript[m {script} [37m({name})[m")
+            print(f"{self.indent_prefix()}{col('[33;1m')}script{col('[m')} {script} {col('[37m')}({name}){col('[m')}")
         else:
-            print(f"{self.indent_prefix()}[33;1mscript[m {script}")
+            print(f"{self.indent_prefix()}{col('[33;1m')}script{col('[m')} {script}")
 
-    def print_transaction_title(self, transaction, title_color, status_char):
+    def print_operation_title(self, op, title_color, end="\n"):
         """
-        Prints the transaction title and desc
+        Prints the operation title and desc
         """
-        #title = align_ellipsis(transaction.op_name, 10)
-        #name_align_at = 30 * (1 + (len(transaction.desc) // 30))
-        #desc = f"{transaction.desc:<{name_align_at}}"
-        title = transaction.op_name
-        desc = transaction.description
-        print(f"{self.indent_prefix()}{title_color}{title}[m {desc} ", end="", flush=True)
+        print(f"{self.indent_prefix()}{title_color}{op.op_name}{col('[m')} {op.description} {col('[37m')}({op.name}){col('[m')}", end=end, flush=True)
 
-    def print_transaction_early(self, transaction):
+    def print_operation_early(self, op):
         """
-        Prints the transaction summary early (i.e. without changes)
+        Prints the op summary early (i.e. without changes)
         """
-        title_color = "[1;33m"
-        status_char = "[33m?[m"
+        title_color = col("[1;33m")
+        self.print_operation_title(op, title_color, end="")
 
-        # Print title and name
-        self.print_transaction_title(transaction, title_color, status_char)
-
-    def print_transaction(self, transaction, result):
+    def print_operation(self, op, result):
         """
-        Prints the transaction summary
+        Prints the operation summary
         """
         # TODO make inventory.py able to set verbose=3 without needing to do -v everytime
         # TODO format proposal:
         # normal:
         #   dir /tmp/very/special/dir (This is some directory that needs creation)
-        # -v:
+        # -c:
         #   dir /tmp/very/special/dir (This is some directory that needs creation)
-        #   └ exists: False → True, mode: 755
+        #   └ exists: False → True, mode: 755, sha: 84rghuir.. -> 4grethiu..
         #   dir /tmp/very/special/dir (This is some directory that needs creation)
         #   └ exists: True, mode: 755
-        # -vv:
+        # -c --diff:
+        #   dir /tmp/very/special/dir (This is some directory that needs creation)
+        #   ├ exists: False → True, mode: 755, sha: 84rghuir.. -> 4grethiu..
+        #   └ diff
+        #     | /(thgrbrp/tkrgfr
+        #     | -a
+        #     | +b
+        # -cv:
         #   dir /tmp/very/special/dir (This is some directory that needs creation)
         #   ├ exists: False → True
+        #   ├ sha: 84rghuir3ru09wjgrgiu3ho -> 4grethiugrr380u8rhuir3wgr
         #   └ mode: mode: 755
         #   dir /tmp/very/special/dir (This is some directory that needs creation)
         #   └ fail: error message
         verbose = True # TODO
         if result.success:
             if result.changed:
-                title_color = "[1;32m"
-                status_char = "[1;32m+[m"
+                title_color = col("[1;32m")
             else:
-                title_color = "[1m"
-                status_char = "[37m.[m"
+                title_color = col("[1m")
         else:
-            title_color = "[1;31m"
-            status_char = "[1;31m![m"
+            title_color = col("[1;31m")
 
         # Print title and name, overwriting the transitive status
         print("\r", end="")
-        self.print_transaction_title(transaction, title_color, status_char)
+        self.print_operation_title(op, title_color)
 
         if result.success:
             # Print key: value pairs with changes
@@ -166,20 +165,20 @@ class Logger:
                 if initial_v == final_v:
                     if verbose >= 1:
                         # TODO = instead of : for better readability
-                        entry_str = f"[37m{str_k}: {str_initial_v}[m"
+                        entry_str = f"{col('[37m')}{str_k}: {str_initial_v}{col('[m')}"
                         state_infos.append(entry_str)
                 else:
                     if initial_v is None:
-                        entry_str = f"[33m{str_k}: [32m{str_final_v}[m"
+                        entry_str = f"{col('[33m')}{str_k}: {col('[32m')}{str_final_v}{col('[m')}"
                     else:
-                        entry_str = f"[33m{str_k}: [31m{str_initial_v}[33m → [32m{str_final_v}[m"
+                        entry_str = f"{col('[33m')}{str_k}: {col('[31m')}{str_initial_v}{col('[33m')} → {col('[32m')}{str_final_v}{col('[m')}"
                     state_infos.append(entry_str)
-            print("[37m,[m ".join(state_infos))
+            print(f"{col('[37m')},{col('[m')} ".join(state_infos))
         else:
-            print(f"[31m{result.failure_message}[m")
+            print(f"{col('[31m')}{result.failure_message}{col('[m')}")
 
-        #if verbose >= 1 and transaction.extra_info is not None:
+        #if verbose >= 1 and op.extra_info is not None:
         #    extra_infos = []
-        #    for k,v in transaction.extra_info.items():
+        #    for k,v in op.extra_info.items():
         #        extra_infos.append(f"[37m{str(k)}: {str(v)}[m")
         #    print(" " * 15 + "[37m,[m ".join(extra_infos))

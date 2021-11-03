@@ -43,11 +43,11 @@ class Operation:
         self.description: str
         self.initial_state_dict: Optional[dict[str, Any]] = None
         self.final_state_dict: Optional[dict[str, Any]] = None
-        logger.print(f"[37m# {self.name}[m")
+        self.diffs: list[tuple[str, Optional[bytes], Optional[bytes]]] = []
 
     def desc(self, description: str):
         self.description = description
-        logger.print_transaction_early(self)
+        logger.print_operation_early(self)
 
     def connection(self) -> Connection:
         """
@@ -115,6 +115,21 @@ class Operation:
             raise OperationError("Both initial and final state must have been set before 'changed()' may be called.")
         return self.initial_state_dict[key] != self.final_state_dict[key]
 
+    def diff(self, file: str, old: Optional[bytes], new: Optional[bytes]):
+        """
+        Adds a file to the diffing output.
+
+        Parameters
+        ----------
+        file
+            The filename which the diff belongs to.
+        old
+            The previous content or None if the file didn't exist previously.
+        new
+            The new content or None if the file was deleted.
+        """
+        self.diffs.append((file, old, new))
+
     def failure(self, msg: str) -> OperationResult:
         """
         Returns a failed operation result.
@@ -129,7 +144,7 @@ class Operation:
                 initial=self.initial_state_dict or {},
                 final={},
                 failure_message=msg)
-        logger.print_transaction(self, result)
+        logger.print_operation(self, result)
         return result
 
     def success(self) -> OperationResult:
@@ -147,7 +162,7 @@ class Operation:
                 changed=self.initial_state_dict != self.final_state_dict,
                 initial=self.initial_state_dict,
                 final=self.final_state_dict)
-        logger.print_transaction(self, result)
+        logger.print_operation(self, result)
         return result
 
 def operation(op_name):

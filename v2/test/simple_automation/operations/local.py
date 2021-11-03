@@ -24,6 +24,4 @@ def script(name: str,
             if os.path.samefile(script, meta.loaded_from):
                 raise AbortExecutionSignal(f"Invalid recursive call to script '{script}'. Use recursive=True to allow this.")
 
-    logger.run_script(script, name=name)
-    with logger.indent():
-        run_script(script, outer_frame)
+    run_script(script, outer_frame, name=name)

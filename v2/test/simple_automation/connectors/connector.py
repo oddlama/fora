@@ -183,14 +183,14 @@ class Connector:
         """
         raise NotImplementedError("Must be overwritten by subclass.")
 
-    def save_content(self,
+    def upload(self,
             file: str,
             content: bytes,
             mode: Optional[str] = None,
             owner: Optional[str] = None,
             group: Optional[str] = None):
         """
-        Saves the given content under the given file path on the remote system.
+        Uploads the given content to the remote system and saves it under the given file path.
 
         Parameters
         ----------
@@ -205,6 +205,17 @@ class Connector:
             group of the owner, otherwise defaults to root.
         mode
             The mode for the file. Defaults to '600' if not given.
+        """
+        raise NotImplementedError("Must be overwritten by subclass.")
+
+    def download(self, file: str) -> bytes:
+        """
+        Downloads the given file from the remote system.
+
+        Parameters
+        ----------
+        file
+            The file to download.
         """
         raise NotImplementedError("Must be overwritten by subclass.")
 

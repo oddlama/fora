@@ -522,8 +522,8 @@ class PacketResolveGroup(NamedTuple):
         conn.write_packet(PacketResolveResult(value=gr.gr_name))
 
 @Packet(type='request')
-class PacketSaveContent(NamedTuple):
-    """This packet is used to save the given content on the remote.
+class PacketUpload(NamedTuple):
+    """This packet is used to upload the given content to the remote and save it as a file.
     Responds with PacketOk if saving was successful, or PacketInvalidField if any
     field contained an invalid value."""
     file: str
@@ -572,6 +572,29 @@ class PacketSaveContent(NamedTuple):
             os.umask(0o77)
 
         conn.write_packet(PacketOk())
+
+@Packet(type='response')
+class PacketDownloadResult(NamedTuple):
+    """This packet is used to return the content of a file."""
+    content: bytes
+
+@Packet(type='request')
+class PacketDownload(NamedTuple):
+    """This packet is used to download the contents of a given file.
+    Responds with PacketDownloadResult if reading was successful, or PacketInvalidField if any
+    field contained an invalid value."""
+    file: str
+
+    def handle(self, conn: Connection):
+        """Reads the file."""
+        try:
+            with open(self.file, 'rb') as f:
+                content = f.read()
+        except OSError as e:
+            conn.write_packet(PacketInvalidField("file", str(e)))
+            return
+
+        conn.write_packet(PacketDownloadResult(content))
 
 def receive_packet(conn: Connection) -> Any:
     """

@@ -5,6 +5,7 @@ the CLI interface and coordination of submodule loading.
 
 import argparse
 import inspect
+import os
 import sys
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
@@ -12,7 +13,7 @@ import simple_automation
 from simple_automation import logger
 from simple_automation.connection import open_connection
 from simple_automation.loader import load_site, run_script
-from simple_automation.utils import AbortExecutionSignal, die_error, install_exception_hook
+from simple_automation.utils import AbortExecutionSignal, col, die_error, install_exception_hook
 from simple_automation.version import __version__
 
 def init_runtime():
@@ -30,7 +31,7 @@ def main_run(args: argparse.Namespace):
 
     Parameters
     ----------
-    args : argparse.Namespace
+    args
         The parsed arguments
     """
 
@@ -51,12 +52,11 @@ def main_run(args: argparse.Namespace):
         host = simple_automation.hosts[h]
 
         try:
-            print(f"[1;34mhost[m {host.name}")
+            logger.print(f"{col('[1;34m')}host{col('[m')} {host.name}")
             with open_connection(host):
                 with simple_automation.current_host(host):
-                    logger.run_script(args.script)
-                    with logger.indent():
-                        run_script(args.script, inspect.getouterframes(inspect.currentframe())[0])
+                    run_script(args.script, inspect.getouterframes(inspect.currentframe())[0], name="Commandline argument")
+            print()
         except AbortExecutionSignal as e:
             # TODO --> Abort because of errors, unless --continue, --ignore-errors or smth
             print("EXEC ABORT REQUESTED, pls log beforehand, TODO check if we should continue on other hosts")
@@ -98,8 +98,14 @@ def main():
             help="Print what would be done instead of performing any actions. Probing commands will still be executed to determine the current state of the systems.")
     parser.add_argument('-v', '--verbose', dest='verbose', action='count', default=0,
             help="Increase output verbosity. Can be given multiple times. ")
+    parser.add_argument('-c', '--changes', dest='changes', action='store_true',
+            help="Display changes for each operation in a short diff-like format.")
+    parser.add_argument('--diff', dest='diff', action='store_true',
+            help="Display an actual diff when an operation changes a file. Use with care, as this might print secrets!")
     parser.add_argument('--debug', dest='debug', action='store_true',
             help="Enable debugging output. Forces verbosity to max value.")
+    parser.add_argument('--no-color', dest='no_color', action='store_true',
+            help="Disables any color output. Color can also be disabled by setting the NO_COLOR environment variable.")
     parser.add_argument('inventory', type=str, nargs='+',
             help="The inventories on which the script should be run on. A inventory is either a full inventory module file (determined by the presenence of a .py extension, e.g. inventory.py), or a single-host defined in any syntax that is accepted by ssh (e.g. root@localhost or ssh://[user]@host)")
     parser.add_argument('script', type=str,
@@ -115,6 +121,10 @@ def main():
     # TODO define max verbosity = 2 or 3?
     if args.debug:
         args.verbose = 99
+
+    # Disable color when NO_COLOR is set
+    if os.getenv("NO_COLOR") is not None:
+        args.no_color = True
 
     # Install exception hook to modify traceback, if debug isn't set.
     # Exceptions raised from a dynamically loaded module will then
