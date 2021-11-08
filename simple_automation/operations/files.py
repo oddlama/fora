@@ -7,14 +7,12 @@ import os
 from os.path import join, relpath, normpath
 from typing import Optional, Union
 
-from jinja2 import Template
 from jinja2.exceptions import TemplateNotFound, UndefinedError
 
 import simple_automation
 from simple_automation import logger
 from simple_automation.operations.api import Operation, OperationError, OperationResult, operation
 from simple_automation.operations.utils import check_absolute_path
-from simple_automation.utils import col
 
 @operation("dir")
 def directory(path: str,
@@ -22,7 +20,7 @@ def directory(path: str,
               owner: Optional[str] = None,
               group: Optional[str] = None,
               name: Optional[str] = None,
-              op: Operation = Operation._internal_use_only) -> OperationResult:
+              op: Operation = Operation.internal_use_only) -> OperationResult:
     """
     Manages the state of an directory on the remote host.
     If the path already exists but isn't a directory, the operation will fail.
@@ -85,7 +83,7 @@ def _save_content(content: Union[bytes, str],
                   mode: Optional[str] = None,
                   owner: Optional[str] = None,
                   group: Optional[str] = None,
-                  op: Operation = Operation._internal_use_only) -> OperationResult:
+                  op: Operation = Operation.internal_use_only) -> OperationResult:
     """
     Saves the given content as dest on the remote host.
 
@@ -165,7 +163,7 @@ def upload_content(content: Union[str, bytes],
                    owner: Optional[str] = None,
                    group: Optional[str] = None,
                    name: Optional[str] = None,
-                   op: Operation = Operation._internal_use_only) -> OperationResult:
+                   op: Operation = Operation.internal_use_only) -> OperationResult:
     """
     Uploads the given content as a file to the remote host.
 
@@ -195,7 +193,7 @@ def upload(src: str,
            owner: Optional[str] = None,
            group: Optional[str] = None,
            name: Optional[str] = None,
-           op: Operation = Operation._internal_use_only) -> OperationResult:
+           op: Operation = Operation.internal_use_only) -> OperationResult:
     """
     Uploads the given file or to the remote host.
 
@@ -227,7 +225,7 @@ def upload_dir(src: str,
                owner: Optional[str] = None,
                group: Optional[str] = None,
                name: Optional[str] = None,
-               op: Operation = Operation._internal_use_only) -> OperationResult:
+               op: Operation = Operation.internal_use_only) -> OperationResult:
     # TODO "recursive operation". The beginning headline cant be updated afterwards.
     # TODO clean=True operation? i.e. ensure that nothing else is in the specified folder.
     """
@@ -317,7 +315,7 @@ def template_content(content: str,
                      owner: Optional[str] = None,
                      group: Optional[str] = None,
                      name: Optional[str] = None,
-                     op: Operation = Operation._internal_use_only) -> OperationResult:
+                     op: Operation = Operation.internal_use_only) -> OperationResult:
     """
     Templates the given content and uploads the result to the remote host.
 
@@ -357,7 +355,7 @@ def template(src: str,
              owner: Optional[str] = None,
              group: Optional[str] = None,
              name: Optional[str] = None,
-             op: Operation = Operation._internal_use_only) -> OperationResult:
+             op: Operation = Operation.internal_use_only) -> OperationResult:
     """
     Templates the given file and uploads the result to the remote host.
 

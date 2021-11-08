@@ -13,6 +13,9 @@ from typing import TypeVar, Callable, Iterable, Optional
 import importlib.machinery
 import importlib.util
 
+# pylint: disable=cyclic-import
+# Cyclic import is correct at this point, as this module will not access anything from simple_automation
+# when it is being loaded, but only when certain functions are used.
 import simple_automation
 from simple_automation.types import ScriptType
 

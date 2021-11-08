@@ -8,14 +8,14 @@ of the expected contents of the dynamically loaded modules.
 from __future__ import annotations
 
 from types import ModuleType
-from typing import Union, Callable, Optional, Any, TYPE_CHECKING
+from typing import Union, Callable, Optional, Any, cast, TYPE_CHECKING
 import functools
 
 # pylint: disable=cyclic-import
 # Cyclic import is correct at this point, as this module will not access anything from simple_automation
 # when it is being loaded, but only when certain functions are used.
 import simple_automation
-from simple_automation.remote_settings import RemoteSettings
+from simple_automation.remote_settings import RemoteSettings, base_settings
 
 if TYPE_CHECKING:
     from simple_automation.connection import Connection
@@ -39,11 +39,12 @@ class RemoteDefaultsContext:
         self.new_defaults = new_defaults
 
     def __enter__(self):
-        self.new_defaults = simple_automation.host.connection.resolve_defaults(self.new_defaults)
+        self.new_defaults = cast(Connection, cast(HostType, simple_automation.host).connection).resolve_defaults(self.new_defaults)
         self.obj._defaults_stack.append(self.new_defaults)
-        return RemoteSettings.base_settings.overlay(self.new_defaults)
+        return base_settings.overlay(self.new_defaults)
 
     def __exit__(self, type_t, value, traceback):
+        _ = (type_t, value, traceback)
         self.obj._defaults_stack.pop()
 
 class MockupType(ModuleType):
@@ -521,7 +522,7 @@ class ScriptType(MockupType):
         RemoteSettings
             The currently active remote defaults.
         """
-        return RemoteSettings.base_settings.overlay(self._defaults_stack[-1])
+        return base_settings.overlay(self._defaults_stack[-1])
 
     @staticmethod
     def get_variables(script: ScriptType) -> set[str]:

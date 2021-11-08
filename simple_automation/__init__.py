@@ -95,6 +95,7 @@ class SetVariableContextManager:
         setattr(self.obj, self.var, self.value)
 
     def __exit__(self, exc_type, exc_value, trace):
+        _ = (exc_type, exc_value, trace)
         setattr(self.obj, self.var, self.old_value)
 
 def current_host(active_host: HostType):

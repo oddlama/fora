@@ -37,7 +37,7 @@ class Operation:
     This class is used to ease the building of operations with consistent output and state tracking.
     """
 
-    _internal_use_only: "Operation" = cast("Operation", None)
+    internal_use_only: "Operation" = cast("Operation", None)
 
     def __init__(self, op_name: str, name: str):
         self.op_name = op_name
@@ -48,6 +48,15 @@ class Operation:
         self.diffs: list[tuple[str, Optional[bytes], Optional[bytes]]] = []
 
     def desc(self, description: str):
+        """
+        Sets the description of the operation, and prints an
+        early status via the logger.
+
+        Parameters
+        ----------
+        description
+            The new description.
+        """
         self.description = description
         logger.print_operation_early(self)
 

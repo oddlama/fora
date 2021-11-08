@@ -22,7 +22,7 @@ files.upload_content(name="saveeeeee",
              dest="/tmp/save_1",
              mode="700")
 files.upload_dir(name="Create a temporary directory",
-                 src="../test/groups", dest="/tmp/mygroups")
+                 src="groups", dest="/tmp/mygroups")
 files.template_content(name="templ content",
                        content="host.name = {{host.name}}\n",
                        dest="/tmp/tmpl")

@@ -3,37 +3,39 @@ Provides a class that represents execution defaults for a remote host.
 """
 
 from __future__ import annotations
-from typing import Optional
+from typing import Optional, NamedTuple
 
-class RemoteSettings:
+class ResolvedRemoteSettings(NamedTuple):
+    """
+    This class stores a resolved version of the RemoteSettings object,
+    it only has more strict types for typechecking and is otherwise
+    identical to the original object.
+    """
+
+    as_user: str
+    as_group: str
+    owner: str
+    group: str
+    file_mode: str
+    dir_mode: str
+    umask: str
+    cwd: Optional[str] = None
+
+class RemoteSettings(NamedTuple):
     """
     This class stores certain values that determine how things are executed on
     the remote host. This includes things such as the owner and group of newly
     created files, or the user as which commands are run.
     """
 
-    base_settings: RemoteSettings
-    """
-    The base remote settings that are used, if no other preferences are given.
-    """
-
-    def __init__(self,
-                 as_user: Optional[str] = None,
-                 as_group: Optional[str] = None,
-                 owner: Optional[str] = None,
-                 group: Optional[str] = None,
-                 file_mode: Optional[str] = None,
-                 dir_mode: Optional[str] = None,
-                 umask: Optional[str] = None,
-                 cwd: Optional[str] = None):
-        self.as_user   = as_user
-        self.as_group  = as_group
-        self.owner     = owner
-        self.group     = group
-        self.file_mode = file_mode
-        self.dir_mode  = dir_mode
-        self.umask     = umask
-        self.cwd       = cwd
+    as_user: Optional[str] = None
+    as_group: Optional[str] = None
+    owner: Optional[str] = None
+    group: Optional[str] = None
+    file_mode: Optional[str] = None
+    dir_mode: Optional[str] = None
+    umask: Optional[str] = None
+    cwd: Optional[str] = None
 
     def overlay(self, settings: RemoteSettings) -> RemoteSettings:
         """
@@ -73,7 +75,7 @@ class RemoteSettings:
         member_str = ','.join([f"{n}={v}" for (n,v) in members])
         return f"RemoteSettings{{{member_str}}}"
 
-RemoteSettings.base_settings = RemoteSettings(
+base_settings = RemoteSettings(
     as_user=None,
     as_group=None,
     owner="root",
@@ -82,3 +84,6 @@ RemoteSettings.base_settings = RemoteSettings(
     dir_mode="700",
     umask="077",
     cwd="/tmp")
+"""
+The base remote settings that are used, if no other preferences are given.
+"""

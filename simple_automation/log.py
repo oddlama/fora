@@ -4,6 +4,9 @@ Provides logging utilities.
 
 from typing import Any
 
+# pylint: disable=cyclic-import
+# Cyclic import is correct at this point, as this module will not access anything from simple_automation
+# when it is being loaded, but only when certain functions are used.
 import simple_automation
 from simple_automation.utils import col
 
@@ -18,6 +21,7 @@ class IndentationContext:
         self.logger.indentation_level += 1
 
     def __exit__(self, type_t, value, traceback):
+        _ = (type_t, value, traceback)
         self.logger.indentation_level -= 1
 
 class ConnectionLogger:
@@ -79,7 +83,7 @@ class Logger:
 
     def indent_prefix(self):
         ret = ""
-        for i in range(self.indentation_level):
+        for _ in range(self.indentation_level):
             ret += "  "
         return ret
 

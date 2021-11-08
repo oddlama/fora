@@ -13,7 +13,7 @@ import simple_automation
 from simple_automation import logger
 from simple_automation.connection import open_connection
 from simple_automation.loader import load_site, run_script
-from simple_automation.utils import AbortExecutionSignal, col, die_error, install_exception_hook
+from simple_automation.utils import AbortExecutionSignal, col, die_error, install_exception_hook, print_exception
 from simple_automation.version import __version__
 
 def init_runtime():
@@ -58,9 +58,10 @@ def main_run(args: argparse.Namespace):
                     run_script(args.script, inspect.getouterframes(inspect.currentframe())[0], name="Commandline argument")
             print()
         except AbortExecutionSignal as e:
+            _ = (e)
             # TODO --> Abort because of errors, unless --continue, --ignore-errors or smth
             print("EXEC ABORT REQUESTED, pls log beforehand, TODO check if we should continue on other hosts")
-            simple_automation.utils.print_exception(*sys.exc_info())
+            print_exception(*sys.exc_info())
             sys.exit(1)
 
 class ArgumentParserError(Exception):

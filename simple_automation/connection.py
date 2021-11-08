@@ -31,10 +31,11 @@ class Connection:
         return self
 
     def __exit__(self, type_t, value, traceback):
+        _ = (type_t, value, traceback)
         self.host.connection = None
         self.connector.close()
 
-    def resolve_defaults(self, settings: RemoteSettings) -> RemoteSettings:
+    def resolve_defaults(self, settings: RemoteSettings) -> ResolvedRemoteSettings:
         """
         Resolves (and verifies) the given settings against the current defaults,
         and returns tha actual values that should now be in effect. Verification

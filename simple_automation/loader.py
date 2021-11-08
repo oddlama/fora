@@ -33,7 +33,7 @@ class DefaultHost:
 
     def __init__(self, name):
         from simple_automation import this # pylint: disable=import-outside-toplevel
-        this.url = name
+        cast(HostType, this).url = name
 
 def load_inventory(file: str) -> InventoryType:
     """
@@ -347,8 +347,8 @@ def load_host(name: str, module_file: str) -> HostType:
         setattr(ret, '__getattr__', lambda attr: HostType.getattr_hierarchical(ret, attr))
         setattr(ret, '__hasattr__', lambda attr: HostType.hasattr_hierarchical(ret, attr))
     else:
-        setattr(ret, '__getattr__', lambda s, attr: HostType.getattr_hierarchical(ret, attr))
-        setattr(ret, '__hasattr__', lambda s, attr: HostType.hasattr_hierarchical(ret, attr))
+        setattr(ret, '__getattr__', lambda _, attr: HostType.getattr_hierarchical(ret, attr))
+        setattr(ret, '__hasattr__', lambda _, attr: HostType.hasattr_hierarchical(ret, attr))
 
     return ret
 
