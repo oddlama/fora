@@ -5,9 +5,10 @@ This is the main module of simple_automation.
 import argparse
 
 from typing import Optional, Union, Any, cast
+from jinja2 import Environment
+
 from .types import InventoryType, GroupType, HostType, ScriptType
 from .log import Logger
-
 
 class NotYetLoaded:
     """
@@ -73,7 +74,7 @@ The currently active host. Only set when a script is currently being executed on
 """
 
 
-_jinja2_env = NotYetLoaded()
+jinja2_env: Environment = cast(Environment, NotYetLoaded())
 """
 The jinja2 environment used for templating
 """

@@ -105,7 +105,8 @@ class Logger:
         """
         Prints the operation title and desc
         """
-        print(f"{self.indent_prefix()}{title_color}{op.op_name}{col('[m')} {op.description} {col('[37m')}({op.name}){col('[m')}", end=end, flush=True)
+        name_if_given = (" " + col('[37m') + f"({op.name})" + col('[m')) if op.name is not None else ""
+        print(f"{self.indent_prefix()}{title_color}{op.op_name}{col('[m')} {op.description}{name_if_given}", end=end, flush=True)
 
     def print_operation_early(self, op):
         """

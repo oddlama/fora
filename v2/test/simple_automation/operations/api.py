@@ -37,6 +37,8 @@ class Operation:
     This class is used to ease the building of operations with consistent output and state tracking.
     """
 
+    _internal_use_only: "Operation" = cast("Operation", None)
+
     def __init__(self, op_name: str, name: str):
         self.op_name = op_name
         self.name = name
