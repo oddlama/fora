@@ -6,8 +6,7 @@ from typing import cast, Any, Optional
 
 import simple_automation
 from simple_automation import logger
-from simple_automation.connection import Connection
-from simple_automation.types import RemoteDefaultsContext, HostType, ScriptType
+from simple_automation.types import RemoteDefaultsContext, ScriptType
 from simple_automation.utils import AbortExecutionSignal
 
 class OperationError(Exception):
@@ -59,18 +58,6 @@ class Operation:
         """
         self.description = description
         logger.print_operation_early(self)
-
-    def connection(self) -> Connection:
-        """
-        A wrapper to get the current host without mypy complaining.
-
-        Returns
-        -------
-        Connection
-            The connection on which the operation is operating.
-        """
-        _ = (self)
-        return cast(Connection, cast(HostType, simple_automation.host).connection)
 
     def defaults(self, *args, **kwargs) -> RemoteDefaultsContext:
         """

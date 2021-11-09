@@ -1,5 +1,4 @@
-from simple_automation import this, host
-from simple_automation.operations import local, files
+from simple_automation.operations import files
 
 #print(f"[+] Run script {__file__} on host {host.name}")
 #local.script(name="Run script",

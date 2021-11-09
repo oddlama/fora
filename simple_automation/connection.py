@@ -32,10 +32,10 @@ class Connection:
 
     def __exit__(self, type_t, value, traceback):
         _ = (type_t, value, traceback)
-        self.host.connection = None
+        self.host.connection = cast(Connection, None)
         self.connector.close()
 
-    def resolve_defaults(self, settings: RemoteSettings) -> ResolvedRemoteSettings:
+    def resolve_defaults(self, settings: RemoteSettings) -> RemoteSettings:
         """
         Resolves (and verifies) the given settings against the current defaults,
         and returns tha actual values that should now be in effect. Verification

@@ -1,5 +1,5 @@
-from simple_automation import this, host
-from simple_automation.operations import local, files
+from simple_automation import host
+from simple_automation.operations import local
 
 somedefault = 134
 

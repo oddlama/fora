@@ -58,7 +58,7 @@ A dict containing all host definitions, mapped by host_id.
 """
 
 
-this: Optional[Union[GroupType, HostType, ScriptType]] = None
+this: Union[GroupType, HostType, ScriptType] = cast(ScriptType, None) # Cast None to ease typechecking in user code.
 """
 This variable holds all meta information available to a module when itself is being loaded.
 The module can be a host, group or script module, and will hold an instance of the mockup type as defined in :module:`simple_automation.types`.
@@ -68,7 +68,7 @@ This variable must not be used anywhere else but inside the primary definition o
 aforementioned modules, otherwise it will be None.
 """
 
-host: Optional[HostType] = None
+host: HostType = cast(HostType, None) # Cast None to ease typechecking in user code.
 """
 The currently active host. Only set when a script is currently being executed on a host.
 """

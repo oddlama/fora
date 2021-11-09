@@ -3,25 +3,28 @@ Provides a class that represents execution defaults for a remote host.
 """
 
 from __future__ import annotations
-from typing import Optional, NamedTuple
+from typing import Optional
+from dataclasses import dataclass
 
-class ResolvedRemoteSettings(NamedTuple):
+@dataclass
+class ResolvedRemoteSettings:
     """
     This class stores a resolved version of the RemoteSettings object,
     it only has more strict types for typechecking and is otherwise
     identical to the original object.
     """
 
-    as_user: str
-    as_group: str
     owner: str
     group: str
     file_mode: str
     dir_mode: str
     umask: str
-    cwd: Optional[str] = None
+    cwd: str
+    as_user: Optional[str] = None
+    as_group: Optional[str] = None
 
-class RemoteSettings(NamedTuple):
+@dataclass
+class RemoteSettings:
     """
     This class stores certain values that determine how things are executed on
     the remote host. This includes things such as the owner and group of newly

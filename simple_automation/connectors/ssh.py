@@ -89,9 +89,11 @@ class SshConnector(Connector):
             self.log.requested_close()
 
         if self.process is not None:
-            self.process.stdin.close()
+            if self.process.stdin is not None:
+                self.process.stdin.close()
             self.process.wait()
-            self.process.stdout.close()
+            if self.process.stdout is not None:
+                self.process.stdout.close()
             self.process = None
             self.log.closed()
 

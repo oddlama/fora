@@ -18,7 +18,7 @@ import typing
 from pwd import getpwnam, getpwuid
 from grp import getgrnam, getgrgid
 from struct import pack, unpack
-from typing import Any, TypeVar, Callable, Optional, Union, NamedTuple, NewType
+from typing import Any, TypeVar, Callable, Optional, Union, NamedTuple, NewType, cast
 
 T = TypeVar('T')
 i32 = NewType('i32', int)
@@ -101,9 +101,10 @@ def _resolve_user(user: str) -> tuple[int, int]:
     except KeyError:
         try:
             uid = int(user)
-            pw = getpwuid(uid)
-        except KeyError:
-            raise ValueError(f"The user with the uid '{uid}' does not exist.") # pylint: disable=raise-missing-from
+            try:
+                pw = getpwuid(uid)
+            except KeyError:
+                raise ValueError(f"The user with the uid '{uid}' does not exist.") # pylint: disable=raise-missing-from
         except ValueError:
             raise ValueError(f"The user with the name '{user}' does not exist.") # pylint: disable=raise-missing-from
 
@@ -130,9 +131,10 @@ def _resolve_group(group: str) -> int:
     except KeyError:
         try:
             gid = int(group)
-            gr = getgrgid(gid)
-        except KeyError:
-            raise ValueError(f"The group with the gid '{gid}' does not exist.") # pylint: disable=raise-missing-from
+            try:
+                gr = getgrgid(gid)
+            except KeyError:
+                raise ValueError(f"The group with the gid '{gid}' does not exist.") # pylint: disable=raise-missing-from
         except ValueError:
             raise ValueError(f"The group with the name '{group}' does not exist.") # pylint: disable=raise-missing-from
 
@@ -228,7 +230,7 @@ def _deserialize(conn: Connection, vtype):
         return _deserialize(conn, real_type)
     elif _is_list(vtype):
         element_type = typing.get_args(vtype)[0]
-        return list(_deserialize(conn, element_type) for i in range(_deserializers[u64](conn)))
+        return list(_deserialize(conn, element_type) for _ in range(_deserializers[u64](conn)))
     else:
         raise ValueError(f"Cannot deserialize object of type {vtype}")
 
@@ -267,7 +269,7 @@ def Packet(type): # pylint: disable=redefined-builtin
             raise RuntimeError("Invalid @Packet decoration: Decorated class must inherit from NamedTuple.")
 
         # Find next packet id
-        packet_id = len(packets)
+        packet_id = u32(len(packets))
 
         # Replace functions
         cls._is_packet = True # pylint: disable=protected-access
@@ -611,7 +613,7 @@ def receive_packet(conn: Connection) -> Any:
         The received packet
     """
     try:
-        packet_id = _deserialize(conn, u32)
+        packet_id = cast(u32, _deserialize(conn, u32))
         if packet_id not in packet_deserializers:
             raise IOError(f"Received invalid packet id '{packet_id}'")
 

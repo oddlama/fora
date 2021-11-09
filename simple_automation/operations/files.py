@@ -5,7 +5,7 @@ Provides operations related to creating and modifying files and directories.
 import hashlib
 import os
 from os.path import join, relpath, normpath
-from typing import Optional, Union
+from typing import Optional, Union, cast
 
 from jinja2.exceptions import TemplateNotFound, UndefinedError
 
@@ -43,11 +43,12 @@ def directory(path: str,
     check_absolute_path(path)
     op.desc(path)
 
+    conn = simple_automation.host.connection
     with op.defaults(dir_mode=mode, owner=owner, group=group) as attr:
         op.final_state(exists=True, mode=attr.dir_mode, owner=attr.owner, group=attr.group)
 
         # Examine current state
-        stat = op.connection().stat(path)
+        stat = conn.stat(path)
         if stat is None:
             # The directory doesn't exist
             op.initial_state(exists=False, mode=None, owner=None, group=None)
@@ -66,15 +67,15 @@ def directory(path: str,
         if not simple_automation.args.dry:
             # Create directory if it doesn't exist
             if op.changed("exists"):
-                op.connection().run(["mkdir", "--", path])
+                conn.run(["mkdir", "--", path])
 
             # Set correct mode, if needed
             if op.changed("mode"):
-                op.connection().run(["chmod", attr.dir_mode, "--", path])
+                conn.run(["chmod", attr.dir_mode, "--", path])
 
             # Set correct owner and group, if needed
             if op.changed("owner") or op.changed("group"):
-                op.connection().run(["chown", f"{attr.owner}:{attr.group}", "--", path])
+                conn.run(["chown", f"{attr.owner}:{attr.group}", "--", path])
 
         return op.success()
 
@@ -108,12 +109,13 @@ def _save_content(content: Union[bytes, str],
     if isinstance(content, str):
         content = content.encode('utf-8')
 
+    conn = simple_automation.host.connection
     with op.defaults(file_mode=mode, owner=owner, group=group) as attr:
         final_sha512sum = hashlib.sha512(content).digest()
         op.final_state(exists=True, mode=attr.file_mode, owner=attr.owner, group=attr.group, sha512=final_sha512sum)
 
         # Examine current state
-        stat = op.connection().stat(dest, sha512sum=True)
+        stat = conn.stat(dest, sha512sum=True)
         if stat is None:
             # The directory doesn't exist
             op.initial_state(exists=False, mode=None, owner=None, group=None, sha512=None)
@@ -134,12 +136,12 @@ def _save_content(content: Union[bytes, str],
             if op.changed("exists") or op.changed("sha512"):
                 if simple_automation.args.diff:
                     try:
-                        old_content: Optional[bytes] = op.connection().download(file=dest)
+                        old_content: Optional[bytes] = conn.download(file=dest)
                     except ValueError:
                         old_content = None
                     op.diff(file=dest, old=old_content, new=content)
 
-                op.connection().upload(
+                conn.upload(
                         file=dest,
                         content=content,
                         mode=attr.file_mode,
@@ -148,11 +150,11 @@ def _save_content(content: Union[bytes, str],
             else:
                 # Set correct mode, if needed
                 if op.changed("mode"):
-                    op.connection().run(["chmod", attr.file_mode, "--", dest])
+                    conn.run(["chmod", attr.file_mode, "--", dest])
 
                 # Set correct owner and group, if needed
                 if op.changed("owner") or op.changed("group"):
-                    op.connection().run(["chown", f"{attr.owner}:{attr.group}", "--", dest])
+                    conn.run(["chown", f"{attr.owner}:{attr.group}", "--", dest])
 
         return op.success()
 
@@ -306,6 +308,9 @@ def upload_dir(src: str,
             directory(path=d, mode=dir_mode, owner=owner, group=group)
         for sf,df in files:
             upload(src=sf, dest=df, mode=file_mode, owner=owner, group=group)
+
+    # TODO accumulate results, don't create our own (no printing from us)
+    return cast(OperationResult, None)
 
 @operation("template_content")
 def template_content(content: str,
