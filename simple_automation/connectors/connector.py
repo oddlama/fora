@@ -120,7 +120,7 @@ class Connector:
         CompletedRemoteCommand
             The result of the remote command.
         """
-        _ = (command, input, capture_output, check, user, group, umask, cwd)
+        _ = (self, command, input, capture_output, check, user, group, umask, cwd)
         raise NotImplementedError("Must be overwritten by subclass.")
 
     def resolve_user(self, user: Optional[str]) -> Optional[str]:
@@ -140,7 +140,7 @@ class Connector:
         Optional[str]
             The resolved username or None if the input was None.
         """
-        _ = (user)
+        _ = (self, user)
         raise NotImplementedError("Must be overwritten by subclass.")
 
     def resolve_group(self, group: Optional[str]) -> Optional[str]:
@@ -160,7 +160,7 @@ class Connector:
         Optional[str]
             The resolved groupname or None if the input was None.
         """
-        _ = (group)
+        _ = (self, group)
         raise NotImplementedError("Must be overwritten by subclass.")
 
     def stat(self, path: str, follow_links: bool = False, sha512sum: bool = False) -> Optional[StatResult]:
@@ -184,7 +184,7 @@ class Connector:
         Optional[StatResult]
             The resolved groupname or None if the input was None.
         """
-        _ = (path, follow_links, sha512sum)
+        _ = (self, path, follow_links, sha512sum)
         raise NotImplementedError("Must be overwritten by subclass.")
 
     def upload(self,
@@ -210,7 +210,7 @@ class Connector:
         mode
             The mode for the file. Defaults to '600' if not given.
         """
-        _ = (file, content, mode, owner, group)
+        _ = (self, file, content, mode, owner, group)
         raise NotImplementedError("Must be overwritten by subclass.")
 
     def download(self, file: str) -> bytes:
@@ -222,7 +222,7 @@ class Connector:
         file
             The file to download.
         """
-        _ = (file)
+        _ = (self, file)
         raise NotImplementedError("Must be overwritten by subclass.")
 
 def connector(cls):
