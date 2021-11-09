@@ -1,14 +1,15 @@
 """
 This is the main module of simple_automation.
 """
+from __future__ import annotations
 
 import argparse
 
 from typing import Optional, Union, Any, cast
 from jinja2 import Environment
 
-from .types import InventoryType, GroupType, HostType, ScriptType
 from .log import Logger
+from .types import InventoryType, GroupType, HostType, ScriptType
 
 class NotYetLoaded:
     """

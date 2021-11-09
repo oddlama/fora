@@ -85,7 +85,6 @@ def main():
     The main program entry point. This will parse arguments, load inventory and task
     definitions and run the given user script.
     """
-
     parser = ThrowingArgumentParser(description="Runs a simple automation script.")
 
     # General options

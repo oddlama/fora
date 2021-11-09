@@ -15,10 +15,10 @@ import functools
 # Cyclic import is correct at this point, as this module will not access anything from simple_automation
 # when it is being loaded, but only when certain functions are used.
 import simple_automation
-from simple_automation.connection import Connection
 from simple_automation.remote_settings import RemoteSettings, ResolvedRemoteSettings, base_settings
 
 if TYPE_CHECKING:
+    from simple_automation.connection import Connection
     from simple_automation.connectors.connector import Connector
 
 def transfer(function):
@@ -275,7 +275,7 @@ class HostType(MockupType):
         The connector class to use. If unset the connector will be determined by the url.
         """
 
-        self.connection: Connection = cast(Connection, None) # Cast None to ease typechecking in user code.
+        self.connection: Connection = cast("Connection", None) # Cast None to ease typechecking in user code.
         """
         The connection to this host, if it is opened.
         """
