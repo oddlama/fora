@@ -41,7 +41,7 @@ def load_inventory(file: str) -> InventoryType:
 
     Parameters
     ----------
-    file : str
+    file
         The inventory module file to load
 
     Returns
@@ -63,7 +63,7 @@ def load_group(module_file: str) -> GroupType:
 
     Parameters
     ----------
-    module_file : str
+    module_file
         The path to the file containing to the group definition
 
     Returns
@@ -97,9 +97,9 @@ def check_modules_for_conflicts(a: GroupType, b: GroupType) -> bool:
 
     Parameters
     ----------
-    a : GroupType
+    a
         The first group module
-    b : GroupType
+    b
         The second group module
 
     Returns
@@ -125,7 +125,7 @@ def merge_group_dependencies(groups: dict[str, GroupType]):
 
     Parameters
     ----------
-    groups : dict[str, GroupType]
+    groups
         The dictionary of groups
     """
     # Unify _before and _after dependencies
@@ -154,7 +154,7 @@ def sort_and_validate_groups(groups: dict[str, GroupType]) -> list[str]:
 
     Parameters
     ----------
-    groups : dict[str, GroupType]
+    groups
         The sorted dictionary of groups.
 
     Returns
@@ -240,7 +240,7 @@ def load_groups() -> tuple[dict[str, GroupType], list[str]]:
 
     Parameters
     ----------
-    groups : dict[str, GroupType]
+    groups
         The sorted dictionary of groups.
 
     Returns
@@ -379,7 +379,7 @@ def load_site(inventories: list[str]):
 
     Parameters
     ----------
-    inventories : list[str]
+    inventories
         A possibly mixed list of inventory definition files (e.g. inventory.py) and single
         host definitions in any ssh accepted syntax. The .py extension is used to disscern
         between these cases. If multiple python inventory modules are given, the first will
@@ -455,6 +455,6 @@ def run_script(script: str, frame: inspect.FrameInfo, name: Optional[str] = None
             # for later use in any exception handler.
             if not hasattr(e, 'script_stack'):
                 setattr(e, 'script_stack', script_stack.copy())
-            raise e
+            raise
         finally:
             script_stack.pop()

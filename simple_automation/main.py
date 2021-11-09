@@ -70,7 +70,7 @@ class ArgumentParserError(Exception):
     """
 
 class ThrowingArgumentParser(argparse.ArgumentParser):
-    """
+    """                                                                                                                                                                                           mple_automation/connection.html#simple_automation.connection.Connection
     An argument parser that throws when invalid argument types are passed.
     """
 

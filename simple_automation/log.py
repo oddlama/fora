@@ -51,15 +51,6 @@ class ConnectionLogger:
         pass
         #print(f"[ CONN ] Connection error on {self.host.name}: {msg}")
 
-def align_ellipsis(s, width):
-    """
-    Shrinks the given string to width (including an ellipsis character),
-    and additionally pads the string with spaces to match the given with.
-    """
-    if len(s) > width:
-        s = s[:width - 1] + "…"
-    return f"{s:<{width}}"
-
 def ellipsis(s, width):
     """
     Shrinks the given string to width (including an ellipsis character).

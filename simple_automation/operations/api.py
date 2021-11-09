@@ -2,23 +2,21 @@
 Provides necessary components to define operations.
 """
 
+import sys
+
 from functools import wraps
 from typing import cast, Any, Optional
+from types import TracebackType, FrameType
 
 import simple_automation
 from simple_automation import logger
 from simple_automation.types import RemoteDefaultsContext, ScriptType
-from simple_automation.utils import AbortExecutionSignal
 
 class OperationError(Exception):
-    """
-    An exception that indicates an error while executing an operation.
-    """
+    """An exception that indicates an error while executing an operation."""
 
 class OperationResult:
-    """
-    Stores the result of an operation.
-    """
+    """Stores the result of an operation."""
 
     def __init__(self,
                  success: bool,
@@ -33,19 +31,32 @@ class OperationResult:
         self.failure_message = failure_message
 
 class Operation:
-    """
-    This class is used to ease the building of operations with consistent output and state tracking.
-    """
+    """This class is used to ease the building of operations with consistent output and state tracking."""
 
     internal_use_only: "Operation" = cast("Operation", None)
+    """operation's op variable is defaulted to this value to indicate that it must not be given by the user."""
 
     def __init__(self, op_name: str, name: str):
         self.op_name = op_name
         self.name = name
+        self.has_nested = False
         self.description: str
         self.initial_state_dict: Optional[dict[str, Any]] = None
         self.final_state_dict: Optional[dict[str, Any]] = None
         self.diffs: list[tuple[str, Optional[bytes], Optional[bytes]]] = []
+
+    def nested(self, has_nested: bool):
+        """
+        Sets whet this operation spawns nested operations. In this case,
+        this operation will not have separate state, and the printing will be
+        handled differently.
+
+        Parameters
+        ----------
+        has_nested
+            Whether the operation has nested operations.
+        """
+        self.has_nested = has_nested
 
     def desc(self, description: str):
         """
@@ -59,6 +70,8 @@ class Operation:
         """
         self.description = description
         logger.print_operation_early(self)
+        if self.has_nested:
+            print()
 
     def defaults(self, *args, **kwargs) -> RemoteDefaultsContext:
         """
@@ -71,6 +84,8 @@ class Operation:
         """
         Sets the initial state.
         """
+        if self.has_nested:
+            raise OperationError("An operation that nests other operations cannot have state on its own.")
         if self.initial_state_dict is not None:
             raise OperationError("An operation's 'initial_state' can only be set once.")
         self.initial_state_dict = dict(kwargs)
@@ -79,6 +94,8 @@ class Operation:
         """
         Sets the final state.
         """
+        if self.has_nested:
+            raise OperationError("An operation that nests other operations cannot have state on its own.")
         if self.final_state_dict is not None:
             raise OperationError("An operation's 'final_state' can only be set once.")
         self.final_state_dict = dict(kwargs)
@@ -92,6 +109,8 @@ class Operation:
         bool
             Whether the states differ.
         """
+        if self.has_nested:
+            raise OperationError("An operation that nests other operations cannot have state on its own.")
         if self.initial_state_dict is None or self.final_state_dict is None:
             raise OperationError("Both initial and final state must have been set before 'unchanged()' may be called.")
         return self.initial_state_dict == self.final_state_dict
@@ -110,6 +129,8 @@ class Operation:
         bool
             Whether the states differ.
         """
+        if self.has_nested:
+            raise OperationError("An operation that nests other operations cannot have state on its own.")
         if self.initial_state_dict is None or self.final_state_dict is None:
             raise OperationError("Both initial and final state must have been set before 'changed()' may be called.")
         return self.initial_state_dict[key] != self.final_state_dict[key]
@@ -127,6 +148,8 @@ class Operation:
         new
             The new content or None if the file was deleted.
         """
+        if self.has_nested:
+            raise OperationError("An operation that nests other operations cannot have state on its own.")
         self.diffs.append((file, old, new))
 
     def failure(self, msg: str) -> OperationResult:
@@ -138,6 +161,8 @@ class Operation:
         OperationResult
             The OperationResult for this failed operation.
         """
+        if self.has_nested:
+            raise OperationError("An operation that nests other operations cannot have state on its own.")
         result = OperationResult(success=False,
                 changed=False,
                 initial=self.initial_state_dict or {},
@@ -155,6 +180,8 @@ class Operation:
         OperationResult
             The OperationResult for this successful operation.
         """
+        if self.has_nested:
+            raise OperationError("An operation that nests other operations cannot have state on its own.")
         if self.initial_state_dict is None or self.final_state_dict is None:
             raise OperationError("Both initial and final state must have been set before 'success()' may be called.")
         result = OperationResult(success=True,
@@ -165,20 +192,55 @@ class Operation:
         return result
 
 def operation(op_name):
-    """
-    Operation function decorator.
-    """
+    """Operation function decorator."""
+    def _calling_site_traceback() -> TracebackType:
+        """
+        Returns a modified traceback object which can be used in Exception.with_traceback() to make
+        the exception appear as if it originated at the calling site of the operation.
+        """
+        try:
+            raise AssertionError
+        except AssertionError:
+            traceback = cast(TracebackType, sys.exc_info()[2])
+            back_frame = cast(FrameType, traceback.tb_frame)
+            back_frame = cast(FrameType, back_frame.f_back) # Omit this function
+            back_frame = cast(FrameType, back_frame.f_back) # Omit the function where _calling_site_traceback is called (the operation_wrapper below)
+
+        return TracebackType(tb_next=None,
+                             tb_frame=back_frame,
+                             tb_lasti=back_frame.f_lasti,
+                             tb_lineno=back_frame.f_lineno)
+
     def operation_wrapper(function):
         @wraps(function)
         def wrapper(*args, **kwargs):
-            op = Operation(op_name=op_name, name=kwargs.pop("name", None))
-            # TODO check = kwargs.pop("check", True)
+            op = Operation(op_name=op_name, name=kwargs.get("name", None))
+            check = kwargs.get("check", True)
 
             try:
                 ret = function(*args, **kwargs, op=op)
+            except OperationError as e:
+                ret = op.failure(str(e))
+                if check:
+                    # If we are not in debug mode, we modify the traceback such that the exception
+                    # seems to originate at the calling site where the operation is called.
+                    if simple_automation.args.debug:
+                        raise
+                    raise e.with_traceback(_calling_site_traceback())
             except Exception as e:
                 ret = op.failure(str(e))
-                raise AbortExecutionSignal() from e
+                raise
+
+            if ret is None:
+                raise OperationError("The operation failed to return a status. THIS IS A BUG! Please report it to the package maintainer of the package which the operation belongs to.")
+
+            if check and not ret.success:
+                e = OperationError(ret.failure_message)
+                # If we are not in debug mode, we modify the traceback such that the exception
+                # seems to originate at the calling site where the operation is called.
+                if simple_automation.args.debug:
+                    raise e
+                raise e.with_traceback(_calling_site_traceback())
 
             return ret
         return wrapper

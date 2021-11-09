@@ -16,23 +16,20 @@ from simple_automation import logger
 from simple_automation.connectors.connector import Connector, connector, CompletedRemoteCommand, StatResult
 from simple_automation.log import ConnectionLogger
 from simple_automation.types import HostType
-from simple_automation.utils import AbortExecutionSignal
 
 @connector
 class SshConnector(Connector):
-    """
-    A connector that provides remote access via SSH.
-    """
+    """A connector that provides remote access via SSH."""
     schema = "ssh"
 
     def __init__(self, url: Optional[str], host: HostType):
         super().__init__(url, host)
 
         self.ssh_opts: list[str] = getattr(host, 'ssh_opts') if hasattr(host, 'ssh_opts') else []
-        if url is not None and url.startswith("ssh://"):
+        if url is not None and url.startswith(f"{self.schema}://"):
             self.url = url
         else:
-            self.url: str = f"ssh://{getattr(host, 'ssh_host')}:{getattr(host, 'ssh_port')}"
+            self.url: str = f"{self.schema}://{getattr(host, 'ssh_host')}:{getattr(host, 'ssh_port')}"
 
         self.log: ConnectionLogger = logger.new_connection(host, self)
         self.process: Optional[subprocess.Popen] = None
@@ -70,7 +67,7 @@ class SshConnector(Connector):
                 self.log.failed(f"Dispatcher handshake failed: {str(e)}")
             else:
                 self.log.failed(f"Dispatcher handshake failed: ssh exited with code {returncode}")
-            raise AbortExecutionSignal() from e
+            raise
         finally:
             # If the connection failed for any reason, be sure to kill the background process.
             if not self.is_open:
@@ -122,7 +119,7 @@ class SshConnector(Connector):
             packet = td.receive_packet(self.conn)
         except IOError as e:
             self.log.error(f"Remote host disconnected unexpectedly: {str(e)}")
-            raise AbortExecutionSignal() from e
+            raise
 
         # Check type of incoming packet to handle errors differently
         if isinstance(packet, td.PacketInvalidField):
@@ -158,7 +155,7 @@ class SshConnector(Connector):
             packet = td.receive_packet(self.conn)
         except IOError as e:
             self.log.error(f"Remote host disconnected unexpectedly: {str(e)}")
-            raise AbortExecutionSignal() from e
+            raise
 
         # Check type of incoming packet to handle errors
         if isinstance(packet, td.PacketInvalidField):
@@ -187,7 +184,7 @@ class SshConnector(Connector):
             packet = td.receive_packet(self.conn)
         except IOError as e:
             self.log.error(f"Remote host disconnected unexpectedly: {str(e)}")
-            raise AbortExecutionSignal() from e
+            raise
 
         # Check type of incoming packet to handle errors differently
         if isinstance(packet, td.PacketInvalidField):
@@ -208,7 +205,7 @@ class SshConnector(Connector):
             packet = td.receive_packet(self.conn)
         except IOError as e:
             self.log.error(f"Remote host disconnected unexpectedly: {str(e)}")
-            raise AbortExecutionSignal() from e
+            raise
 
         # Check type of incoming packet to handle errors differently
         if isinstance(packet, td.PacketInvalidField):
@@ -236,7 +233,7 @@ class SshConnector(Connector):
             packet = td.receive_packet(self.conn)
         except IOError as e:
             self.log.error(f"Remote host disconnected unexpectedly: {str(e)}")
-            raise AbortExecutionSignal() from e
+            raise
 
         # Check type of incoming packet to handle errors differently
         if isinstance(packet, td.PacketInvalidField):
@@ -253,7 +250,7 @@ class SshConnector(Connector):
             packet = td.receive_packet(self.conn)
         except IOError as e:
             self.log.error(f"Remote host disconnected unexpectedly: {str(e)}")
-            raise AbortExecutionSignal() from e
+            raise
 
         # Check type of incoming packet to handle errors differently
         if isinstance(packet, td.PacketInvalidField):
