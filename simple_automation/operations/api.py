@@ -2,6 +2,7 @@
 Provides necessary components to define operations.
 """
 
+from functools import wraps
 from typing import cast, Any, Optional
 
 import simple_automation
@@ -168,6 +169,7 @@ def operation(op_name):
     Operation function decorator.
     """
     def operation_wrapper(function):
+        @wraps(function)
         def wrapper(*args, **kwargs):
             op = Operation(op_name=op_name, name=kwargs.pop("name", None))
             # TODO check = kwargs.pop("check", True)

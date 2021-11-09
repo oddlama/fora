@@ -45,7 +45,7 @@ errors early when referencing undefined groups.
 
 groups: dict[str, GroupType] = cast(dict[str, GroupType], NotYetLoaded())
 """
-A dict containing all group modules loaded from groups/*.py, mapped by name.
+A dict containing all group modules loaded from `groups/*.py`, mapped by name.
 """
 
 group_order: list[str] = cast(list[str], NotYetLoaded())
@@ -62,7 +62,7 @@ A dict containing all host definitions, mapped by host_id.
 this: Union[GroupType, HostType, ScriptType] = cast(ScriptType, None) # Cast None to ease typechecking in user code.
 """
 This variable holds all meta information available to a module when itself is being loaded.
-The module can be a host, group or script module, and will hold an instance of the mockup type as defined in :module:`simple_automation.types`.
+The module can be a host, group or script module, and will hold an instance of the mockup type as defined in :mod:`simple_automation.types`.
 For more information on how to use the specific meta type objects, refer to the documentation of the respective class.
 
 This variable must not be used anywhere else but inside the primary definition of one of the

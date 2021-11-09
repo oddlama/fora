@@ -76,6 +76,7 @@ class MockupType(ModuleType):
             if callable(a) and hasattr(a, '_transfer') and getattr(a, '_transfer') is True:
                 setattr(module, attr, functools.partial(getattr(self, attr), module))
 
+# TODO make Example a section in the sphinx documentation
 class GroupType(MockupType):
     """
     A mockup type for group modules. This is not the actual type of an instanciated
@@ -88,16 +89,16 @@ class GroupType(MockupType):
     When writing a group module, you can simply import :attr:`simple_automation.this`,
     which exposes an API to access/modify this information.
 
-    .. topic:: Example: Using meta information (groups/webserver.py)
+    Example: Using meta information (groups/webserver.py)
 
-        .. code-block:: python
+    .. code-block:: python
 
-            from simple_automation import this
+        from simple_automation import this
 
-            # Require that the 'servers' groups is processed before this group when resolving
-            # variables for a host at execution time. This is important to avoid variable
-            # definition ambiguity (which would be detected and reported as an error).
-            this.after("server")
+        # Require that the 'servers' groups is processed before this group when resolving
+        # variables for a host at execution time. This is important to avoid variable
+        # definition ambiguity (which would be detected and reported as an error).
+        this.after("server")
     """
 
     reserved_vars: set[str] = set(["module", "name", "loaded_from", "groups_before", "groups_after"])
@@ -208,6 +209,7 @@ class GroupType(MockupType):
         """
         return _get_variables(GroupType, group)
 
+# TODO make Example a section in the sphinx documentation
 class HostType(MockupType):
     """
     A mockup type for host modules. This is not the actual type of an instanciated
@@ -220,20 +222,20 @@ class HostType(MockupType):
     When writing a host module, you can simply import :attr:`simple_automation.this`,
     which exposes an API to access/modify this information.
 
-    .. topic:: Example: Using meta information (hosts/myhost.py)
+    Example: Using meta information (hosts/myhost.py)
 
-        .. code-block:: python
+    .. code-block:: python
 
-            from simple_automation import this
+        from simple_automation import this
 
-            # The host name used for instanciation as defined in the inventory
-            print(this.name)
+        # The host name used for instanciation as defined in the inventory
+        print(this.name)
 
-            # Set the ssh host (useful if it differs from the name)
-            this.ssh_host = "root@localhost"
+        # Set the ssh host (useful if it differs from the name)
+        this.ssh_host = "root@localhost"
 
-            # Add the host to a group
-            this.add_group("desktops")
+        # Add the host to a group
+        this.add_group("desktops")
     """
 
     reserved_vars: set[str] = set(["module", "name", "loaded_from", "groups", "url", "connector", "connection"])
@@ -364,11 +366,12 @@ class HostType(MockupType):
         """
         Checks whether the given attribute exists in the host's hierarchy.
         Checks are done in the following order:
-          1. Host variables
-          2. Group variables (respecting topological order), the global "all" group
-             implicitly will be the last in the chain
-          3. Script variables
-          4. False
+
+           1. Host variables
+           2. Group variables (respecting topological order), the global "all" group
+              implicitly will be the last in the chain
+           3. Script variables
+           4. False
 
         If the attribute start with an underscore, the lookup will always be from the host object
         itself, and won't be propagated.
