@@ -11,7 +11,7 @@ from jinja2 import Template
 from jinja2.exceptions import TemplateNotFound, UndefinedError
 
 import simple_automation.host
-from simple_automation import globals, logger
+from simple_automation import globals as G, logger
 from simple_automation.operations.api import Operation, OperationError, OperationResult, operation
 from simple_automation.operations.utils import check_absolute_path
 
@@ -78,10 +78,10 @@ def _save_content(content: Union[bytes, str],
             return op.success()
 
         # Apply actions to reach desired state, but only if we are not doing a dry run
-        if not globals.args.dry:
+        if not G.args.dry:
             # Create directory if it doesn't exist
             if op.changed("exists") or op.changed("sha512"):
-                if globals.args.diff:
+                if G.args.diff:
                     try:
                         old_content: Optional[bytes] = conn.download(file=dest)
                     except ValueError:
@@ -168,7 +168,7 @@ def directory(path: str,
             return op.success()
 
         # Apply actions to reach desired state, but only if we are not doing a dry run
-        if not globals.args.dry:
+        if not G.args.dry:
             if present:
                 # Create directory if it doesn't exist
                 if op.changed("exists"):
@@ -254,7 +254,7 @@ def file(path: str,
             return op.success()
 
         # Apply actions to reach desired state, but only if we are not doing a dry run
-        if not globals.args.dry:
+        if not G.args.dry:
             if present:
                 # Create file if it doesn't exist
                 if op.changed("exists"):
@@ -340,7 +340,7 @@ def link(path: str,
             return op.success()
 
         # Apply actions to reach desired state, but only if we are not doing a dry run
-        if not globals.args.dry:
+        if not G.args.dry:
             if present:
                 # Create link if it doesn't exist
                 if op.changed("exists"):
@@ -565,7 +565,7 @@ def template_content(content: str,
     """
     _ = (name, check) # Processed automatically.
     try:
-        templ = globals.jinja2_env.from_string(content)
+        templ = G.jinja2_env.from_string(content)
         rendered_content = _render_template(templ, context)
     except UndefinedError as e:
         raise OperationError(f"error while templating string: {str(e)}") from e
@@ -610,7 +610,7 @@ def template(src: str,
     """
     _ = (name, check) # Processed automatically.
     try:
-        templ = globals.jinja2_env.get_template(src)
+        templ = G.jinja2_env.get_template(src)
     except TemplateNotFound as e:
         raise OperationError("template not found: " + str(e)) from e
 

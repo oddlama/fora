@@ -4,7 +4,7 @@ Provides version information
 
 import re
 
-__version__ = '0.9.6'
+__version__ = '2.0.0'
 
 def _parse_version_info():
     matches = re.match(r'(\d+).(\d+).(\d+)', __version__)

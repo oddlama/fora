@@ -3,8 +3,8 @@ Defines the connector interface.
 """
 
 from __future__ import annotations
-
 from typing import Callable, Optional, Union
+
 from simple_automation.types import HostType
 
 class CompletedRemoteCommand:

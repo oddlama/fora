@@ -9,7 +9,7 @@ from typing import cast, Any, Optional
 from types import TracebackType, FrameType
 
 import simple_automation.script
-from simple_automation import globals, logger
+from simple_automation import globals as G, logger
 from simple_automation.script import RemoteDefaultsContext
 
 class OperationError(Exception):
@@ -225,7 +225,7 @@ def operation(op_name):
                 if check:
                     # If we are not in debug mode, we modify the traceback such that the exception
                     # seems to originate at the calling site where the operation is called.
-                    if globals.args.debug:
+                    if G.args.debug:
                         raise
                     raise e.with_traceback(_calling_site_traceback())
             except Exception as e:
@@ -239,7 +239,7 @@ def operation(op_name):
                 error = OperationError(ret.failure_message)
                 # If we are not in debug mode, we modify the traceback such that the exception
                 # seems to originate at the calling site where the operation is called.
-                if globals.args.debug:
+                if G.args.debug:
                     raise error
                 raise error.with_traceback(_calling_site_traceback())
 

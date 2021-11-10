@@ -4,7 +4,6 @@ simple_automation scripts are executed.
 
 import inspect
 import os
-
 from typing import Any, Optional
 
 from simple_automation.loader import script_stack, run_script

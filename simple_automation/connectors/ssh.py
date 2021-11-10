@@ -6,10 +6,9 @@ import sys
 import base64
 import zlib
 import subprocess
-
 from typing import Any, Optional, Type
 
-from simple_automation import globals, logger
+from simple_automation import globals as G, logger
 from simple_automation.connectors import tunnel_dispatcher as td
 from simple_automation.connectors.connector import CompletedRemoteCommand, Connector, StatResult, connector
 from simple_automation.types import HostType
@@ -52,7 +51,7 @@ class SshConnector(Connector):
             tunnel_dispatcher_gz_b64 = base64.b64encode(zlib.compress(f.read(), 9)).decode('ascii')
 
         # Start the remote dispatcher by uploading it inline as base64
-        param_debug = "--debug" if globals.args.debug else ""
+        param_debug = "--debug" if G.args.debug else ""
         command = self._ssh_command(f"env python3 -c \"$(echo '{tunnel_dispatcher_gz_b64}' | base64 -d | openssl zlib -d)\" {param_debug}")
 
         # pylint: disable=consider-using-with

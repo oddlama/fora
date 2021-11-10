@@ -2,6 +2,8 @@
 Provides utility functions.
 """
 
+import importlib.machinery
+import importlib.util
 import inspect
 import os
 import sys
@@ -9,9 +11,6 @@ import traceback
 import uuid
 from types import ModuleType
 from typing import Any, TypeVar, Callable, Iterable, Optional
-
-import importlib.machinery
-import importlib.util
 
 import simple_automation.group
 import simple_automation.host

@@ -1,5 +1,5 @@
 from simple_automation.operations import files
-from simple_automation.script import script_params
+from simple_automation.script import defaults, script_params
 
 @script_params
 class params:
@@ -9,32 +9,35 @@ class params:
 #local.script(name="Run script",
 #             script="deploy.py")
 
+with defaults():
+    pass
+
 files.upload_content(name=params.filename,
-             content=b"a\n",
-             dest="/tmp/save_1",
-             mode="755")
+    content=b"a\n",
+    dest="/tmp/save_1",
+    mode="755")
 files.upload_content(name=params.filename,
-             content=b"a\n",
-             dest="/tmp/save_1",
-             mode="700")
+    content=b"a\n",
+    dest="/tmp/save_1",
+    mode="700")
 files.upload_content(name=params.filename,
-             content=b"b\n",
-             dest="/tmp/save_1",
-             mode="700")
+    content=b"b\n",
+    dest="/tmp/save_1",
+    mode="700")
 files.upload_content(name=params.filename,
-             content=b"b\n",
-             dest="/tmp/save_1",
-             mode="700")
+    content=b"b\n",
+    dest="/tmp/save_1",
+    mode="700")
 files.upload_dir(name="Create a temporary directory",
-                 src="groups", dest="/tmp/mygroups")
+    src="groups", dest="/tmp/mygroups")
 files.template_content(name="templ content",
-                       content="host.name = {{host.name}}\n",
-                       dest="/tmp/tmpl")
+    content="host.name = {{host.name}}\n",
+    dest="/tmp/tmpl")
 files.directory(name="Create a temporary directory",
-          path="/tmp/abc_755",
-          mode="755")
+    path="/tmp/abc_755",
+    mode="755")
 files.directory(name="Create a temporary directory",
-          path="/tmp/abc_700",
-          mode="700")
+    path="/tmp/abc_700",
+    mode="700")
 files.directory(name="Create a temporary directory",
-          path="/tmp/abc_def")
+    path="/tmp/abc_def")

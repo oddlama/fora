@@ -13,7 +13,6 @@ class ResolvedRemoteSettings:
     it only has more strict types for typechecking and is otherwise
     identical to the original object.
     """
-
     owner: str
     group: str
     file_mode: str
@@ -30,7 +29,6 @@ class RemoteSettings:
     the remote host. This includes things such as the owner and group of newly
     created files, or the user as which commands are run.
     """
-
     as_user: Optional[str] = None
     as_group: Optional[str] = None
     owner: Optional[str] = None
@@ -87,6 +85,4 @@ base_settings = RemoteSettings(
     dir_mode="700",
     umask="077",
     cwd="/tmp")
-"""
-The base remote settings that are used, if no other preferences are given.
-"""
+"""The base remote settings that are used, if no other preferences are given."""

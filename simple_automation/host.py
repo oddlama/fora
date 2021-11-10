@@ -5,7 +5,7 @@ Provides API for host definitions.
 from __future__ import annotations
 from typing import Any, cast
 
-from simple_automation import globals
+from simple_automation import globals as G
 from simple_automation.types import HostType
 
 def name() -> str:
@@ -32,7 +32,7 @@ def add_group(group: str):
     """
     if _this is None:
         raise RuntimeError("This function may only be called inside a host module definition.")
-    if group not in globals.groups:
+    if group not in G.groups:
         raise ValueError(f"Referenced invalid group '{group}'!")
     _this.groups.add(group)
 
@@ -90,13 +90,13 @@ def getattr_hierarchical(host: HostType, attr: str) -> Any:
         return host.__dict__[attr]
 
     # Look up variable on groups
-    for g in globals.group_order:
+    for g in G.group_order:
         # Only consider a group if the host is in that group
         if g not in host.__dict__["groups"]:
             continue
 
         # Return the attribute if it is set on the group
-        group = globals.groups[g]
+        group = G.groups[g]
         if hasattr(group, attr):
             return getattr(group, attr)
 
@@ -143,13 +143,13 @@ def hasattr_hierarchical(host: HostType, attr: str) -> Any:
         return True
 
     # Look up variable on groups
-    for g in globals.group_order:
+    for g in G.group_order:
         # Only consider a group if the host is in that group
         if g not in host.__dict__["groups"]:
             continue
 
         # Return the attribute if it is set on the group
-        group = globals.groups[g]
+        group = G.groups[g]
         if hasattr(group, attr):
             return True
 

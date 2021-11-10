@@ -4,7 +4,7 @@ from __future__ import annotations
 from types import ModuleType
 from typing import cast
 
-from simple_automation import globals
+from simple_automation import globals as G
 from simple_automation.types import GroupType
 
 # TODO: get rid of HostType except for mockup!!!!!
@@ -39,7 +39,7 @@ def before(group: str):
     """
     if _this is None:
         raise RuntimeError("This function may only be called inside a group module definition.")
-    if group not in globals.available_groups:
+    if group not in G.available_groups:
         raise ValueError(f"Referenced invalid group '{group}'!")
     if group == _this.name:
         raise ValueError("Cannot add reverse-dependency to self!")
@@ -71,7 +71,7 @@ def after(group: str):
     """
     if _this is None:
         raise RuntimeError("This function may only be called inside a group module definition.")
-    if group not in globals.available_groups:
+    if group not in G.available_groups:
         raise ValueError(f"Referenced invalid group '{group}'!")
     if group == _this.name:
         raise ValueError("Cannot add dependency to self!")

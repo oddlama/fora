@@ -1,7 +1,6 @@
 """Stores all global state."""
 
 import argparse
-
 from typing import cast
 from jinja2 import Environment
 

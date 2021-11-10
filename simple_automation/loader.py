@@ -13,7 +13,7 @@ import simple_automation.host
 import simple_automation.group
 import simple_automation.script
 
-from simple_automation import globals, logger
+from simple_automation import globals as G, logger
 from simple_automation.types import GroupType, HostType, InventoryType, ScriptType
 from simple_automation.utils import die_error, print_error, load_py_module, rank_sort, CycleError, set_this_group, set_this_host, set_this_script
 from simple_automation.connectors.connector import Connector
@@ -218,7 +218,7 @@ def sort_and_validate_groups(groups: dict[str, GroupType]) -> list[str]:
         has_conflicts |= check_modules_for_conflicts(groups[a], groups[b])
 
     if has_conflicts:
-        if globals.args.debug:
+        if G.args.debug:
             raise RuntimeError("Exiting because of group module conflicts.")
         sys.exit(1)
 
@@ -257,7 +257,7 @@ def load_groups() -> tuple[dict[str, GroupType], list[str]]:
         available_groups.append(os.path.splitext(os.path.basename(file))[0])
 
     # Store available_groups so it can be accessed while groups are actually loaded.
-    globals.available_groups = available_groups
+    G.available_groups = available_groups
 
     # Load all groups defined in groups/*.py
     loaded_groups = {}
@@ -362,7 +362,7 @@ def load_hosts() -> dict[str, HostType]:
         A mapping from name to host module
     """
     loaded_hosts = {}
-    for host in globals.inventory.hosts:
+    for host in G.inventory.hosts:
         if isinstance(host, str):
             loaded_hosts[host] = load_host(name=host, module_file=f"hosts/{host}.py")
         elif isinstance(host, tuple):
@@ -399,24 +399,24 @@ def load_site(inventories: list[str]):
     # Load inventory module
     if len(module_files) == 0:
         # Use a default empty inventory
-        globals.inventory = InventoryType()
+        G.inventory = InventoryType()
     else:
         # Load first inventory module file and append hosts from other inventory modules
-        globals.inventory = load_inventory(module_files[0])
+        G.inventory = load_inventory(module_files[0])
         # Append hosts from other inventory modules
         for inv in module_files[1:]:
-            globals.inventory.hosts.extend(load_inventory(inv).hosts)
+            G.inventory.hosts.extend(load_inventory(inv).hosts)
 
     # Append single hosts
     for shost in single_hosts:
-        globals.inventory.hosts.append(shost)
+        G.inventory.hosts.append(shost)
 
     # Load all groups from groups/*.py, then sort
     # groups respecting their declared dependencies
-    globals.groups, globals.group_order = load_groups()
+    G.groups, G.group_order = load_groups()
 
     # Load all hosts defined in the inventory
-    globals.hosts = load_hosts()
+    G.hosts = load_hosts()
 
 def run_script(script: str,
                frame: inspect.FrameInfo,

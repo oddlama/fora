@@ -29,7 +29,7 @@ u64 = NewType('u64', int)
 is_server = False
 debug = False
 try:
-    from simple_automation import globals
+    from simple_automation import globals as G
 except ModuleNotFoundError:
     pass
 
@@ -41,7 +41,7 @@ except ModuleNotFoundError:
 
 def _is_debug():
     """Returns True if debugging output should be genereated."""
-    return debug if is_server else globals.args.debug
+    return debug if is_server else G.args.debug
 
 def _log(msg: str):
     """
