@@ -8,7 +8,7 @@ from typing import cast, Optional
 import simple_automation.script
 from simple_automation.connectors.connector import Connector, CompletedRemoteCommand, StatResult
 from simple_automation.remote_settings import RemoteSettings
-from simple_automation.types import HostType, ScriptType
+from simple_automation.types import HostType
 
 class Connection:
     """
@@ -51,7 +51,7 @@ class Connection:
             The resolved settings
         """
         # pylint: disable=protected-access
-        if not isinstance(simple_automation.script._this, ScriptType):
+        if simple_automation.script._this is None:
             raise RuntimeError("Cannot resolve defaults, when no script is currently running.")
 
         # Overlay settings on top of defaults

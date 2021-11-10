@@ -453,6 +453,7 @@ def run_script(script: str,
                 # Use defaults() here to resolve them at least once.
                 with simple_automation.script.defaults():
                     def _pre_exec(module):
+                        meta.transfer(module)
                         ctx.update(module)
                         setattr(module, '_params', params or {})
                     load_py_module(script, pre_exec=_pre_exec)
