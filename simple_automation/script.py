@@ -7,6 +7,21 @@ from typing import Any, Optional, cast
 
 from simple_automation.types import MockupType
 
+class RemoteDefaultsContext:
+    """A context manager to overlay remote defaults on a stack of defaults."""
+    def __init__(self, obj: ScriptType, new_defaults: RemoteSettings):
+        self.obj = obj
+        self.new_defaults = new_defaults
+
+    def __enter__(self) -> ResolvedRemoteSettings:
+        self.new_defaults = simple_automation.current_host.connection.resolve_defaults(self.new_defaults)
+        self.obj._defaults_stack.append(self.new_defaults)
+        return cast(ResolvedRemoteSettings, base_settings.overlay(self.new_defaults))
+
+    def __exit__(self, type_t, value, traceback):
+        _ = (type_t, value, traceback)
+        self.obj._defaults_stack.pop()
+
 class ScriptType(MockupType):
     """
     A mockup type for script modules. This is not the actual type of an instanciated
@@ -51,7 +66,6 @@ class ScriptType(MockupType):
         the context manager returned in :meth:`self.defaults() <simple_automation.types.ScriptType.defaults>`.
         """
 
-    @transfer
     def defaults(self,
                  as_user: Optional[str] = None,
                  as_group: Optional[str] = None,
@@ -85,7 +99,6 @@ class ScriptType(MockupType):
         new_defaults = self._defaults_stack[-1].overlay(new_defaults)
         return RemoteDefaultsContext(self, new_defaults)
 
-    @transfer
     def current_defaults(self) -> RemoteSettings:
         """
         Returns the fully resolved currently active defaults.

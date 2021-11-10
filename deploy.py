@@ -1,4 +1,4 @@
-from simple_automation import host
+from simple_automation import current_host as host
 from simple_automation.operations import local
 
 somedefault = 134
@@ -8,7 +8,8 @@ somedefault = 134
 #                path="/tmp/abc_700",
 #                mode="700")
 local.script(name="Run script",
-             script="deploy2.py")
+             script="deploy2.py",
+             params=dict(filename="tolll"))
 
 if "desktops" in host.groups:
     print("is desktop")

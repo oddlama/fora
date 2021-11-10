@@ -1,22 +1,27 @@
 from simple_automation.operations import files
+from simple_automation.script import script_params
+
+@script_params
+class params:
+    filename: str
 
 #print(f"[+] Run script {__file__} on host {host.name}")
 #local.script(name="Run script",
 #             script="deploy.py")
 
-files.upload_content(name="saveeeeee",
+files.upload_content(name=params.filename,
              content=b"a\n",
              dest="/tmp/save_1",
              mode="755")
-files.upload_content(name="saveeeeee",
+files.upload_content(name=params.filename,
              content=b"a\n",
              dest="/tmp/save_1",
              mode="700")
-files.upload_content(name="saveeeeee",
+files.upload_content(name=params.filename,
              content=b"b\n",
              dest="/tmp/save_1",
              mode="700")
-files.upload_content(name="saveeeeee",
+files.upload_content(name=params.filename,
              content=b"b\n",
              dest="/tmp/save_1",
              mode="700")

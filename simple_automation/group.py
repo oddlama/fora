@@ -4,6 +4,10 @@ Provides api for group definitions.
 
 from typing import cast
 
+# TODO get rid of HostType except for mockup!!!!!
+# -> functions go to module level
+# -> mockup type becomes dataclass effectively
+aaaaaa
 # TODO make Example a section in the sphinx documentation
 class GroupType(MockupType):
     """
@@ -60,7 +64,6 @@ class GroupType(MockupType):
         This group will be loaded after this set of other groups.
         """
 
-    @transfer
     def before(self, group: str):
         """
         Adds a reverse-dependency on the given group.
@@ -77,7 +80,6 @@ class GroupType(MockupType):
 
         self.groups_before.add(group)
 
-    @transfer
     def before_all(self, groups: list[str]):
         """
         Adds a reverse-dependency on all given groups.
@@ -90,7 +92,6 @@ class GroupType(MockupType):
         for g in groups:
             self.before(g)
 
-    @transfer
     def after(self, group: str):
         """
         Adds a dependency on the given group.
@@ -107,7 +108,6 @@ class GroupType(MockupType):
 
         self.groups_after.add(group)
 
-    @transfer
     def after_all(self, groups: list[str]):
         """
         Adds a dependency on all given groups.

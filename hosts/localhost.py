@@ -1,4 +1,4 @@
-from simple_automation import this
+from simple_automation.host import this
 
 this.url = "ssh://root@localhost"
 this.add_group("desktops")

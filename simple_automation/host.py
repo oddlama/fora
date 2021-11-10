@@ -77,7 +77,6 @@ class HostType(MockupType):
         The connection to this host, if it is opened.
         """
 
-    @transfer
     def add_group(self, group: str):
         """
         Adds a this host to the specified group.
@@ -91,7 +90,6 @@ class HostType(MockupType):
             raise ValueError(f"Referenced invalid group '{group}'!")
         self.groups.add(group)
 
-    @transfer
     def add_groups(self, groups: list[str]):
         """
         Adds a this host to the specified list of groups.
