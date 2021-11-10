@@ -5,7 +5,7 @@ Provides API for script definitions.
 import inspect
 from typing import Any, Optional, cast
 
-from simple_automation.remote_settings import RemoteSettings, ResolvedRemoteSettings, base_settings
+from simple_automation.remote_settings import RemoteSettings, ResolvedRemoteSettings
 from simple_automation.types import ScriptType
 
 class RemoteDefaultsContext:
@@ -15,12 +15,11 @@ class RemoteDefaultsContext:
         self.new_defaults = new_defaults
 
     def __enter__(self) -> ResolvedRemoteSettings:
-    # pylint: disable=import-outside-toplevel,cyclic-import
+        # pylint: disable=import-outside-toplevel,cyclic-import
         import simple_automation.host
-
         self.new_defaults = simple_automation.host.current_host.connection.resolve_defaults(self.new_defaults)
         self.obj._defaults_stack.append(self.new_defaults)
-        return cast(ResolvedRemoteSettings, base_settings.overlay(self.new_defaults))
+        return cast(ResolvedRemoteSettings, simple_automation.host.current_host.connection.base_settings.overlay(self.new_defaults))
 
     def __exit__(self, type_t, value, traceback):
         _ = (type_t, value, traceback)
@@ -39,21 +38,29 @@ def defaults(as_user: Optional[str] = None,
 
     .. code-block:: python
 
-        from simple_automation.script import this
-        with this.defaults(owner="root", file_mode="644", dir_mode="755"):
+        from simple_automation.script import defaults
+        with defaults(owner="root", file_mode="644", dir_mode="755"):
             # ...
     """
+    def canonicalize_mode(mode: Optional[str]) -> Optional[str]:
+        return None if mode is None else oct(int(mode, 8))[2:]
+
     new_defaults = RemoteSettings(
-                as_user=as_user,
-                as_group=as_group,
-                owner=owner,
-                group=group,
-                file_mode=None if file_mode is None else oct(int(file_mode, 8))[2:],
-                dir_mode=None if dir_mode is None else oct(int(dir_mode, 8))[2:],
-                umask=None if umask is None else oct(int(umask, 8))[2:],
-                cwd=cwd)
-    # pylint: disable=protected-access
-    new_defaults = _this._defaults_stack[-1].overlay(new_defaults)
+            as_user=as_user,
+            as_group=as_group,
+            owner=owner,
+            group=group,
+            file_mode=canonicalize_mode(file_mode),
+            dir_mode=canonicalize_mode(dir_mode),
+            umask=canonicalize_mode(umask),
+            cwd=cwd)
+
+    # pylint: disable=import-outside-toplevel,cyclic-import
+    import simple_automation.host
+
+    new_defaults = simple_automation.host.current_host.connection.base_settings
+    new_defaults = new_defaults.overlay(current_defaults())
+    new_defaults = new_defaults.overlay(new_defaults)
     return RemoteDefaultsContext(_this, new_defaults)
 
 def current_defaults() -> RemoteSettings:
@@ -66,7 +73,7 @@ def current_defaults() -> RemoteSettings:
         The currently active remote defaults.
     """
     # pylint: disable=protected-access
-    return base_settings.overlay(_this._defaults_stack[-1])
+    return _this._defaults_stack[-1]
 
 def script_params(params_cls):
     """

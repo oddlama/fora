@@ -75,14 +75,3 @@ class RemoteSettings:
         members = [x for x in members if x is not None]
         member_str = ','.join([f"{n}={v}" for (n,v) in members])
         return f"RemoteSettings{{{member_str}}}"
-
-base_settings = RemoteSettings(
-    as_user=None,
-    as_group=None,
-    owner="root",
-    group="root",
-    file_mode="600",
-    dir_mode="700",
-    umask="077",
-    cwd="/tmp")
-"""The base remote settings that are used, if no other preferences are given."""

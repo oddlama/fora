@@ -6,6 +6,7 @@ Stores state along with the connection.
 from typing import cast, Optional
 
 import simple_automation.script
+from simple_automation import globals as G
 from simple_automation.connectors.connector import Connector, CompletedRemoteCommand, StatResult
 from simple_automation.remote_settings import RemoteSettings
 from simple_automation.types import HostType
@@ -23,16 +24,31 @@ class Connection:
         if self.host.connector is None:
             raise ValueError("host.connector must be set")
         self.connector: Connector = self.host.connector(host.url, host)
+        self.base_settings: RemoteSettings = G.base_remote_settings
 
     def __enter__(self):
         self.connector.open()
         self.host.connection = self
+        self._resolve_identity()
         return self
 
     def __exit__(self, type_t, value, traceback):
         _ = (type_t, value, traceback)
         self.host.connection = cast(Connection, None)
         self.connector.close()
+
+    def _resolve_identity(self):
+        """
+        Query the user and group under which we are operating, and store it
+        in our base_settings. This ensures that the base settings reflect
+        the actual user as which we operate.
+        """
+        user = self.resolve_user(None)
+        group = self.resolve_group(None)
+        self.base_settings.as_user = user
+        self.base_settings.as_group = group
+        self.base_settings.owner = user
+        self.base_settings.group = group
 
     def resolve_defaults(self, settings: RemoteSettings) -> RemoteSettings:
         """
@@ -66,10 +82,10 @@ class Connection:
             except ValueError:
                 raise ValueError(f"Error while resolving settings: {name} is '{mask}' but must be octal!") # pylint: disable=raise-missing-from
 
-        settings.as_user = self.resolve_user(settings.as_user)
-        settings.as_group = self.resolve_group(settings.as_group)
-        settings.owner = self.resolve_user(settings.owner)
-        settings.group = self.resolve_group(settings.group)
+        settings.as_user  =  None if settings.as_user  is None else self.resolve_user(settings.as_user)
+        settings.as_group =  None if settings.as_group is None else self.resolve_group(settings.as_group)
+        settings.owner    =  None if settings.owner    is None else self.resolve_user(settings.owner)
+        settings.group    =  None if settings.group    is None else self.resolve_group(settings.group)
         check_mask(settings.file_mode, "file_mode")
         check_mask(settings.dir_mode, "dir_mode")
         check_mask(settings.umask, "umask")

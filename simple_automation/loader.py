@@ -21,10 +21,6 @@ from simple_automation.connectors.connector import Connector
 script_stack: list[tuple[ScriptType, inspect.FrameInfo]] = []
 """A stack of all currently executed scripts ((name, file), frame)."""
 
-# TODO: test variable conflicts, especially from ... import host as this type style imports
-# TODO: test default host good?
-# TODO: test whether name is set correctly
-
 class DefaultGroup:
     """This class will be instanciated for the 'all' group, if it hasn't been defined externally."""
 
@@ -33,9 +29,6 @@ class DefaultHost:
     This class will be instanciated for each host that has not been defined by a corresponding
     host module file, and is used to represent a host with no special configuration.
     """
-
-    def __init__(self, name):
-        self.url = name
 
 def load_inventory(file: str) -> InventoryType:
     """
@@ -336,8 +329,9 @@ def load_host(name: str, module_file: str) -> HostType:
                 ctx.update(module)
             ret = cast(HostType, load_py_module(module_file, pre_exec=_pre_exec))
         else:
-            # Instanciate default module and set ssh_host to the name
-            ret = cast(HostType, DefaultHost(name))
+            # Instanciate default module and set url to the name
+            ret = cast(HostType, DefaultHost)
+            meta.url = name
             meta.transfer(ret)
 
     resolve_connector(ret)
@@ -450,7 +444,7 @@ def run_script(script: str,
         try:
             with set_this_script(meta) as ctx:
                 # New script instance starts with fresh set of default values.
-                # Use defaults() here to resolve them at least once.
+                # Use defaults() here to start with the connections base settings.
                 with simple_automation.script.defaults():
                     def _pre_exec(module):
                         meta.transfer(module)

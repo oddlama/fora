@@ -89,9 +89,6 @@ class Connector:
         Runs the given command on the remote, returning a CompletedRemoteCommand
         containing the returned information (if any) and the status code.
 
-        Raises a ValueError if the command cannot be run for various reasons (e.g.
-        the specified user does not exist, the cwd does not exist, ...).
-
         Parameters
         ----------
         command
@@ -119,46 +116,71 @@ class Connector:
         -------
         CompletedRemoteCommand
             The result of the remote command.
+
+        Raises
+        ------
+        ValueError
+            A parameter was invalid.
+        RemoteOSError
+            If the remote command fails because of an remote OSError.
+        IOError
+            An error occurred with the connection.
         """
         _ = (self, command, input, capture_output, check, user, group, umask, cwd)
         raise NotImplementedError("Must be overwritten by subclass.")
 
-    def resolve_user(self, user: Optional[str]) -> Optional[str]:
+    def resolve_user(self, user: Optional[str]) -> str:
         """
-        Resolves the given user (if not None) on the remote, returning
-        the canonicalized username.
-
-        Raises a ValueError if the user doesn't exist.
+        Resolves the given user on the remote, returning
+        the canonicalized username. If the given user is None, instead
+        returns the user as which the remote command is running.
 
         Parameters
         ----------
         user
-            The username or uid that should be resolved.
+            The username or uid that should be resolved, or None to query the current user.
 
         Returns
         -------
         Optional[str]
             The resolved username or None if the input was None.
+
+        Raises
+        ------
+        ValueError
+            If the user could not be resolved.
+        RemoteOSError
+            If the remote command fails because of an remote OSError.
+        IOError
+            An error occurred with the connection.
         """
         _ = (self, user)
         raise NotImplementedError("Must be overwritten by subclass.")
 
-    def resolve_group(self, group: Optional[str]) -> Optional[str]:
+    def resolve_group(self, group: Optional[str]) -> str:
         """
-        Resolves the given group (if not None) on the remote, returning
-        the canonicalized groupname.
-
-        Raises a ValueError if the group doesn't exist.
+        Resolves the given group on the remote, returning
+        the canonicalized groupname. If the given group is None, instead
+        returns the group as which the remote command is running.
 
         Parameters
         ----------
         group
-            The groupname or gid that should be resolved.
+            The groupname or gid that should be resolved, or None to query the current group.
 
         Returns
         -------
         Optional[str]
             The resolved groupname or None if the input was None.
+
+        Raises
+        ------
+        ValueError
+            If the group could not be resolved.
+        RemoteOSError
+            If the remote command fails because of an remote OSError.
+        IOError
+            An error occurred with the connection.
         """
         _ = (self, group)
         raise NotImplementedError("Must be overwritten by subclass.")
@@ -168,7 +190,7 @@ class Connector:
         Runs stat() on the given path on the remote. Follows links if follow_links
         is true. Includes the sha512sum if desired and if the path is a file.
 
-        Returns None if the remote couldn't stat the given path.
+        Returns None if the remote path doesn't exist.
 
         Parameters
         ----------
@@ -182,17 +204,24 @@ class Connector:
         Returns
         -------
         Optional[StatResult]
-            The resolved groupname or None if the input was None.
+            The stat result or None if the path didn't exist.
+
+        Raises
+        ------
+        RemoteOSError
+            If the remote command fails for any reason other than file not found.
+        IOError
+            An error occurred with the connection.
         """
         _ = (self, path, follow_links, sha512sum)
         raise NotImplementedError("Must be overwritten by subclass.")
 
     def upload(self,
-            file: str,
-            content: bytes,
-            mode: Optional[str] = None,
-            owner: Optional[str] = None,
-            group: Optional[str] = None):
+               file: str,
+               content: bytes,
+               mode: Optional[str] = None,
+               owner: Optional[str] = None,
+               group: Optional[str] = None):
         """
         Uploads the given content to the remote system and saves it under the given file path.
 
@@ -209,6 +238,15 @@ class Connector:
             group of the owner, otherwise defaults to root.
         mode
             The mode for the file. Defaults to '600' if not given.
+
+        Raises
+        ------
+        ValueError
+            A parameter was invalid.
+        RemoteOSError
+            If the remote command fails because of an remote OSError.
+        IOError
+            An error occurred with the connection.
         """
         _ = (self, file, content, mode, owner, group)
         raise NotImplementedError("Must be overwritten by subclass.")
@@ -221,6 +259,15 @@ class Connector:
         ----------
         file
             The file to download.
+
+        Raises
+        ------
+        ValueError
+            If the file was not found.
+        RemoteOSError
+            If the remote command fails for any reason other than file not found.
+        IOError
+            An error occurred with the connection.
         """
         _ = (self, file)
         raise NotImplementedError("Must be overwritten by subclass.")

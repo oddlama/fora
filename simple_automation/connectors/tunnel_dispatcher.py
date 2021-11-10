@@ -7,6 +7,7 @@ results over any connection that forwards both stdin/stdout, as well as some oth
 needed remote system related utilities.
 """
 
+import errno
 import hashlib
 import os
 import stat
@@ -33,8 +34,16 @@ try:
 except ModuleNotFoundError:
     pass
 
-# TODO timeout
-# TODO env
+# TODO: timeout on commands
+# TODO: interactive commands?
+# TODO: env
+
+class RemoteOSError(Exception):
+    """An exception type for remote OSErrors."""
+    def __init__(self, errno, strerror, msg):
+        super().__init__(msg)
+        self.errno = errno
+        self.strerror = strerror
 
 # Utility functions
 # ----------------------------------------------------------------
@@ -317,15 +326,17 @@ class PacketExit(NamedTuple):
         conn.should_close = True
 
 @Packet(type='response')
+class PacketOSError(NamedTuple):
+    """This packet is sent when an OSError occurs."""
+    errno: i64
+    strerror: str
+    msg: str
+
+@Packet(type='response')
 class PacketInvalidField(NamedTuple):
     """This packet is used when an invalid value was given in a previous packet."""
     field: str
     error_message: str
-
-    def handle(self, conn: Connection):
-        """Raises an error including a description of the invalid field."""
-        _ = (conn)
-        raise ValueError(f"Invalid value given for field '{self.field}': {self.error_message}")
 
 @Packet(type='response')
 class PacketProcessCompleted(NamedTuple):
@@ -378,7 +389,7 @@ class PacketProcessRun(NamedTuple):
 
         if self.cwd is not None:
             if not os.path.isdir(self.cwd):
-                conn.write_packet(PacketInvalidField("cwd", "Requested working directory does not exist"))
+                conn.write_packet(PacketInvalidField("cwd", f"The directory does not exist"))
                 return
 
         def child_preexec():
@@ -431,8 +442,10 @@ class PacketStat(NamedTuple):
         """Stats the requested path."""
         try:
             s = os.stat(self.path, follow_symlinks=self.follow_links)
-        except OSError:
-            conn.write_packet(PacketInvalidField("path", "Path doesn't exist"))
+        except OSError as e:
+            if e.errno != errno.ENOENT:
+                raise
+            conn.write_packet(PacketInvalidField("path", str(e)))
             return
 
         ftype = "dir"  if stat.S_ISDIR(s.st_mode)  else \
@@ -479,16 +492,21 @@ class PacketResolveResult(NamedTuple):
 
 @Packet(type='request')
 class PacketResolveUser(NamedTuple):
-    """This packet is used to canonicalize a user name / uid and to ensure it exists."""
-    user: str
+    """
+    This packet is used to canonicalize a user name / uid and to ensure it exists.
+    If None is given, it queries the current user.
+    """
+    user: Optional[str]
 
     def handle(self, conn: Connection):
         """Resolves the requested user."""
+        user = self.user if self.user is not None else str(os.getuid())
+
         try:
-            pw = getpwnam(self.user)
+            pw = getpwnam(user)
         except KeyError:
             try:
-                uid = int(self.user)
+                uid = int(user)
                 pw = getpwuid(uid)
             except (KeyError, ValueError):
                 conn.write_packet(PacketInvalidField("user", "The user does not exist")) # pylint: disable=raise-missing-from
@@ -499,16 +517,21 @@ class PacketResolveUser(NamedTuple):
 
 @Packet(type='request')
 class PacketResolveGroup(NamedTuple):
-    """This packet is used to canonicalize a group name / gid and to ensure it exists."""
-    group: str
+    """
+    This packet is used to canonicalize a group name / gid and to ensure it exists.
+    If None is given, it queries the current group.
+    """
+    group: Optional[str]
 
     def handle(self, conn: Connection):
         """Resolves the requested group."""
+        group = self.group if self.group is not None else str(os.getgid())
+
         try:
-            gr = getgrnam(self.group)
+            gr = getgrnam(group)
         except KeyError:
             try:
-                gid = int(self.group)
+                gid = int(group)
                 gr = getgrgid(gid)
             except (KeyError, ValueError):
                 conn.write_packet(PacketInvalidField("group", "The group does not exist")) # pylint: disable=raise-missing-from
@@ -554,18 +577,11 @@ class PacketUpload(NamedTuple):
                 conn.write_packet(PacketInvalidField("group", str(e)))
                 return
 
-        try:
-            os.umask(0o22)
-            with open(self.file, 'wb') as f:
-                f.write(self.content)
-            os.chmod(self.file, mode_oct)
-            if uid is not None or gid is not None:
-                os.chown(self.file, uid or 0, gid or 0)
-        except OSError as e:
-            conn.write_packet(PacketInvalidField("file", str(e)))
-            return
-        finally:
-            os.umask(0o77)
+        with open(self.file, 'wb') as f:
+            f.write(self.content)
+        os.chmod(self.file, mode_oct)
+        if uid is not None or gid is not None:
+            os.chown(self.file, uid or 0, gid or 0)
 
         conn.write_packet(PacketOk())
 
@@ -587,12 +603,14 @@ class PacketDownload(NamedTuple):
             with open(self.file, 'rb') as f:
                 content = f.read()
         except OSError as e:
+            if e.errno != errno.ENOENT:
+                raise
             conn.write_packet(PacketInvalidField("file", str(e)))
             return
 
         conn.write_packet(PacketDownloadResult(content))
 
-def receive_packet(conn: Connection) -> Any:
+def receive_packet(conn: Connection, request: Any = None) -> Any:
     """
     Receives the next packet from the given connection.
 
@@ -600,11 +618,22 @@ def receive_packet(conn: Connection) -> Any:
     ----------
     conn
         The connection
+    request
+        The corresponding request packet, if any.
 
     Returns
     -------
     Any
         The received packet
+
+    Raises
+    ------
+    RemoteOSError
+        An OSError occurred on the remote host.
+    IOError
+        When an issue on the connection occurs.
+    ValueError
+        When an PacketInvalidField is received as the response and a corresponding request packet was given.
     """
     try:
         packet_id = cast(u32, _deserialize(conn, u32))
@@ -617,7 +646,12 @@ def receive_packet(conn: Connection) -> Any:
             packet_name = f"[unkown packet with id {packet_id}]"
 
         _log(f"got packet header for: {packet_name}")
-        return packet_deserializers[packet_id](conn)
+        packet = packet_deserializers[packet_id](conn)
+        if isinstance(packet, PacketOSError):
+            raise RemoteOSError(msg=packet.msg, errno=packet.errno, strerror=packet.strerror)
+        if isinstance(packet, PacketInvalidField):
+            raise ValueError(f"Invalid value '{getattr(request, packet.field)}' given for field '{packet.field}': {packet.error_message}")
+        return packet
     except struct.error as e:
         raise IOError("Unexpected EOF in data stream") from e
 
@@ -641,7 +675,11 @@ def _main():
             print(f"{str(e)}. Aborting.", file=sys.stderr, flush=True)
             sys.exit(3)
         _log(f"received packet {type(packet).__name__}")
-        packet.handle(conn)
+
+        try:
+            packet.handle(conn)
+        except OSError as e:
+            conn.write_packet(PacketOSError(errno=i64(e.errno), strerror=e.strerror, msg=str(e)))
 
 if __name__ == '__main__':
     _main()
