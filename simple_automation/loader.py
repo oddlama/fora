@@ -9,22 +9,24 @@ import sys
 from itertools import combinations
 from typing import cast, Any, Optional
 
-import simple_automation
 import simple_automation.host
-from simple_automation import logger
+import simple_automation.group
+import simple_automation.script
+
+from simple_automation import globals, logger
 from simple_automation.types import GroupType, HostType, InventoryType, ScriptType
 from simple_automation.utils import die_error, print_error, load_py_module, rank_sort, CycleError, set_this_group, set_this_host, set_this_script
 from simple_automation.connectors.connector import Connector
 
 script_stack: list[tuple[ScriptType, inspect.FrameInfo]] = []
-"""
-A stack of all currently executed scripts ((name, file), frame).
-"""
+"""A stack of all currently executed scripts ((name, file), frame)."""
+
+# TODO: test variable conflicts, especially from ... import host as this type style imports
+# TODO: test default host good?
+# TODO: test whether name is set correctly
 
 class DefaultGroup:
-    """
-    This class will be instanciated for the 'all' group, if it hasn't been defined externally.
-    """
+    """This class will be instanciated for the 'all' group, if it hasn't been defined externally."""
 
 class DefaultHost:
     """
@@ -33,7 +35,7 @@ class DefaultHost:
     """
 
     def __init__(self, name):
-        cast(HostType, simple_automation.host.this).url = name
+        self.url = name
 
 def load_inventory(file: str) -> InventoryType:
     """
@@ -73,17 +75,17 @@ def load_group(module_file: str) -> GroupType:
     """
 
     name = os.path.splitext(os.path.basename(module_file))[0]
-    meta = GroupType(name, module_file)
-
-    # Normal groups have a dependency on the global 'all' group.
-    if not name == 'all':
-        meta.after("all")
+    meta = GroupType(name=name, loaded_from=module_file)
 
     # Instanciate module
     with set_this_group(meta):
+        # Normal groups have a dependency on the global 'all' group.
+        if not name == 'all':
+            simple_automation.group.after("all")
+
         ret = cast(GroupType, load_py_module(module_file, pre_exec=lambda module: setattr(meta, 'module', module)))
 
-    for reserved in GroupType.reserved_vars:
+    for reserved in GroupType.__annotations__:
         if hasattr(ret, reserved):
             die_error(f"'{reserved}' is a reserved variable.", loc=meta.loaded_from)
 
@@ -107,7 +109,7 @@ def check_modules_for_conflicts(a: GroupType, b: GroupType) -> bool:
     bool
         True when at least one conflicting attribute was found
     """
-    conflicts = list(GroupType.get_variables(a) & GroupType.get_variables(b))
+    conflicts = list(simple_automation.group.get_variables(a) & simple_automation.group.get_variables(b))
     had_conflicts = False
     for conflict in conflicts:
         if not had_conflicts:
@@ -224,7 +226,7 @@ def sort_and_validate_groups(groups: dict[str, GroupType]) -> list[str]:
     # Return a topological order based on the top-rank
     return sorted(list(g for g in groups.keys()), key=lambda g: ranks_min[g])
 
-def define_special_global_variables(group_all):
+def define_special_global_variables(group_all: GroupType):
     """
     Defines special global variables on the given all group.
     Respects if the corresponding variable is already set.
@@ -256,7 +258,7 @@ def load_groups() -> tuple[dict[str, GroupType], list[str]]:
         available_groups.append(os.path.splitext(os.path.basename(file))[0])
 
     # Store available_groups so it can be accessed while groups are actually loaded.
-    simple_automation.available_groups = available_groups
+    globals.available_groups = available_groups
 
     # Load all groups defined in groups/*.py
     loaded_groups = {}
@@ -323,10 +325,11 @@ def load_host(name: str, module_file: str) -> HostType:
         The host module
     """
     module_file_exists = os.path.exists(module_file)
-    meta = HostType(name, module_file if module_file_exists else "__cmdline__")
-    meta.add_group("all")
+    meta = HostType(name=name, loaded_from=module_file if module_file_exists else "__cmdline__")
 
     with set_this_host(meta):
+        simple_automation.host.add_group("all")
+
         # Instanciate module
         if module_file_exists:
             ret = cast(HostType, load_py_module(module_file, pre_exec=lambda module: setattr(meta, 'module', module)))
@@ -336,7 +339,7 @@ def load_host(name: str, module_file: str) -> HostType:
             meta.module = ret
 
     # Check if the module did set any reserved variables
-    for reserved in HostType.reserved_vars:
+    for reserved in HostType.__annotations__:
         if hasattr(ret, reserved):
             die_error(f"'{reserved}' is a reserved variable.", loc=meta.loaded_from)
 
@@ -345,11 +348,11 @@ def load_host(name: str, module_file: str) -> HostType:
 
     # Monkeypatch the __hasattr__ and __getattr__ methods to perform hierachical lookup from now on
     if module_file_exists:
-        setattr(ret, '__getattr__', lambda attr: HostType.getattr_hierarchical(ret, attr))
-        setattr(ret, '__hasattr__', lambda attr: HostType.hasattr_hierarchical(ret, attr))
+        setattr(ret, '__getattr__', lambda attr: simple_automation.host.getattr_hierarchical(ret, attr))
+        setattr(ret, '__hasattr__', lambda attr: simple_automation.host.hasattr_hierarchical(ret, attr))
     else:
-        setattr(ret, '__getattr__', lambda _, attr: HostType.getattr_hierarchical(ret, attr))
-        setattr(ret, '__hasattr__', lambda _, attr: HostType.hasattr_hierarchical(ret, attr))
+        setattr(ret, '__getattr__', lambda _, attr: simple_automation.host.getattr_hierarchical(ret, attr))
+        setattr(ret, '__hasattr__', lambda _, attr: simple_automation.host.hasattr_hierarchical(ret, attr))
 
     return ret
 
@@ -363,7 +366,7 @@ def load_hosts() -> dict[str, HostType]:
         A mapping from name to host module
     """
     loaded_hosts = {}
-    for host in simple_automation.inventory.hosts:
+    for host in globals.inventory.hosts:
         if isinstance(host, str):
             loaded_hosts[host] = load_host(name=host, module_file=f"hosts/{host}.py")
         elif isinstance(host, tuple):
@@ -400,24 +403,24 @@ def load_site(inventories: list[str]):
     # Load inventory module
     if len(module_files) == 0:
         # Use a default empty inventory
-        simple_automation.inventory = InventoryType()
+        globals.inventory = InventoryType()
     else:
         # Load first inventory module file and append hosts from other inventory modules
-        simple_automation.inventory = load_inventory(module_files[0])
+        globals.inventory = load_inventory(module_files[0])
         # Append hosts from other inventory modules
         for inv in module_files[1:]:
-            simple_automation.inventory.hosts.extend(load_inventory(inv).hosts)
+            globals.inventory.hosts.extend(load_inventory(inv).hosts)
 
     # Append single hosts
     for shost in single_hosts:
-        simple_automation.inventory.hosts.append(shost)
+        globals.inventory.hosts.append(shost)
 
     # Load all groups from groups/*.py, then sort
     # groups respecting their declared dependencies
-    simple_automation.groups, simple_automation.group_order = load_groups()
+    globals.groups, globals.group_order = load_groups()
 
     # Load all hosts defined in the inventory
-    simple_automation.hosts = load_hosts()
+    globals.hosts = load_hosts()
 
 def run_script(script: str,
                frame: inspect.FrameInfo,
@@ -452,7 +455,7 @@ def run_script(script: str,
             with set_this_script(meta):
                 # New script instance starts with fresh set of default values.
                 # Use defaults() here to resolve them at least once.
-                with meta.defaults():
+                with simple_automation.script.defaults():
                     def _pre_exec(module):
                         setattr(meta, 'module', module)
                         setattr(module, '_params', params or {})

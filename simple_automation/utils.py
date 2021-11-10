@@ -13,15 +13,12 @@ from typing import Any, TypeVar, Callable, Iterable, Optional
 import importlib.machinery
 import importlib.util
 
-# pylint: disable=cyclic-import
-# Cyclic import is correct at this point, as this module will not access anything from simple_automation
-# when it is being loaded, but only when certain functions are used.
-import simple_automation
 import simple_automation.group
 import simple_automation.host
 import simple_automation.script
 
 from simple_automation.types import GroupType, HostType, ScriptType
+from simple_automation.logger import col
 
 T = TypeVar('T')
 
@@ -52,17 +49,6 @@ class SetVariableContextManager:
         _ = (exc_type, exc_value, trace)
         setattr(self.obj, self.var, self.old_value)
 
-def col(color_code: str) -> str:
-    """
-    Returns the given argument only if color is enabled.
-    """
-    if isinstance(simple_automation.args, simple_automation.NotYetLoaded):
-        use_color = os.getenv("NO_COLOR") is None
-    else:
-        use_color = not simple_automation.args.no_color
-
-    return color_code if use_color else ""
-
 def print_warning(msg: str):
     """
     Prints a message with a colored 'warning: ' prefix.
@@ -85,10 +71,6 @@ def die_error(msg: str, loc=None, status_code=1):
     print_error(msg, loc=loc)
     sys.exit(status_code)
 
-def set_current_host(host: HostType) -> SetVariableContextManager:
-    """A context manager to temporarily set :attr:`simple_automation.host` to the given value."""
-    return SetVariableContextManager(simple_automation, 'current_host', host)
-
 def set_this_group(value: GroupType) -> SetVariableContextManager:
     """A context manager to temporarily set :attr:`simple_automation.group.this` to the given value."""
     return SetVariableContextManager(simple_automation.group, 'this', value)
@@ -100,6 +82,10 @@ def set_this_host(value: HostType) -> SetVariableContextManager:
 def set_this_script(value: ScriptType) -> SetVariableContextManager:
     """A context manager to temporarily set :attr:`simple_automation.script.this` to the given value."""
     return SetVariableContextManager(simple_automation.script, 'this', value)
+
+def set_current_host(host: HostType) -> SetVariableContextManager:
+    """A context manager to temporarily set :attr:`simple_automation.host.current_host` to the given value."""
+    return SetVariableContextManager(simple_automation.host, 'current_host', host)
 
 def load_py_module(file: str, pre_exec: Optional[Callable[[ModuleType], None]] = None) -> ModuleType:
     """
@@ -221,7 +207,6 @@ def print_exception(exc_type, exc_info, tb):
     last dynamically loaded module, but including a script stack so the error
     location is more easily understood and printed in a cleaner way.
     """
-
     original_tb = tb
     last_dynamic_tb = None
     # Iterate over all frames in the traceback and
@@ -249,5 +234,4 @@ def install_exception_hook():
     traceback of exceptions raised from dynamically loaded modules
     so that they are printed in a cleaner and more meaningful way (for the user).
     """
-
     sys.excepthook = print_exception

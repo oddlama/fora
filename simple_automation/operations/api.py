@@ -8,10 +8,9 @@ from functools import wraps
 from typing import cast, Any, Optional
 from types import TracebackType, FrameType
 
-import simple_automation
 import simple_automation.script
-from simple_automation import logger
-from simple_automation.types import RemoteDefaultsContext, ScriptType
+from simple_automation import globals, logger
+from simple_automation.script import RemoteDefaultsContext
 
 class OperationError(Exception):
     """An exception that indicates an error while executing an operation."""
@@ -79,7 +78,7 @@ class Operation:
         Sets defaults on the current script. See :meth:`simple_automation.types.ScriptType.defaults`.
         """
         _ = (self)
-        return simple_automation.script.this.defaults(*args, **kwargs)
+        return simple_automation.script.defaults(*args, **kwargs)
 
     def initial_state(self, **kwargs):
         """
@@ -226,7 +225,7 @@ def operation(op_name):
                 if check:
                     # If we are not in debug mode, we modify the traceback such that the exception
                     # seems to originate at the calling site where the operation is called.
-                    if simple_automation.args.debug:
+                    if globals.args.debug:
                         raise
                     raise e.with_traceback(_calling_site_traceback())
             except Exception as e:
@@ -240,7 +239,7 @@ def operation(op_name):
                 error = OperationError(ret.failure_message)
                 # If we are not in debug mode, we modify the traceback such that the exception
                 # seems to originate at the calling site where the operation is called.
-                if simple_automation.args.debug:
+                if globals.args.debug:
                     raise error
                 raise error.with_traceback(_calling_site_traceback())
 

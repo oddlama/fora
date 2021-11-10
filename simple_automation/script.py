@@ -1,11 +1,13 @@
 """
-Provides api for script definitions.
+Provides API for script definitions.
 """
 
 import inspect
 from typing import Any, Optional, cast
 
-from simple_automation.types import MockupType
+import simple_automation.host
+from simple_automation.remote_settings import RemoteSettings, ResolvedRemoteSettings, base_settings
+from simple_automation.types import ScriptType
 
 class RemoteDefaultsContext:
     """A context manager to overlay remote defaults on a stack of defaults."""
@@ -14,7 +16,7 @@ class RemoteDefaultsContext:
         self.new_defaults = new_defaults
 
     def __enter__(self) -> ResolvedRemoteSettings:
-        self.new_defaults = simple_automation.current_host.connection.resolve_defaults(self.new_defaults)
+        self.new_defaults = simple_automation.host.current_host.connection.resolve_defaults(self.new_defaults)
         self.obj._defaults_stack.append(self.new_defaults)
         return cast(ResolvedRemoteSettings, base_settings.overlay(self.new_defaults))
 
@@ -22,110 +24,45 @@ class RemoteDefaultsContext:
         _ = (type_t, value, traceback)
         self.obj._defaults_stack.pop()
 
-class ScriptType(MockupType):
+def defaults(as_user: Optional[str] = None,
+             as_group: Optional[str] = None,
+             owner: Optional[str] = None,
+             group: Optional[str] = None,
+             file_mode: Optional[str] = None,
+             dir_mode: Optional[str] = None,
+             umask: Optional[str] = None,
+             cwd: Optional[str] = None) -> RemoteDefaultsContext:
     """
-    A mockup type for script modules. This is not the actual type of an instanciated
-    module, but will reflect some of it's properties better than ModuleType.
+    Returns a context manager to incrementally change the remote execution defaults.
 
-    This class also represents all meta information available to a script module when itself
-    is being loaded. It allows a module to access and modify its associated meta-information.
+    .. code-block:: python
 
-    When writing a script module, you can simply import :attr:`simple_automation.script.this`,
-    which exposes an API to access/modify this information.
+        from simple_automation.script import this
+        with this.defaults(owner="root", file_mode="644", dir_mode="755"):
+            # ...
     """
+    new_defaults = RemoteSettings(
+                as_user=as_user,
+                as_group=as_group,
+                owner=owner,
+                group=group,
+                file_mode=None if file_mode is None else oct(int(file_mode, 8))[2:],
+                dir_mode=None if dir_mode is None else oct(int(dir_mode, 8))[2:],
+                umask=None if umask is None else oct(int(umask, 8))[2:],
+                cwd=cwd)
+    new_defaults = this._defaults_stack[-1].overlay(new_defaults)
+    return RemoteDefaultsContext(this, new_defaults)
 
-    reserved_vars: set[str] = set(["module", "name", "loaded_from", "_params"])
+def current_defaults() -> RemoteSettings:
     """
-    A list of variable names that are reserved and must not be set by the module.
+    Returns the fully resolved currently active defaults.
+
+    Returns
+    -------
+    RemoteSettings
+        The currently active remote defaults.
     """
-
-    def __init__(self, host_id: str, loaded_from: str):
-        self.module: ModuleType
-        """
-        The associated dynamically loaded module (will be set before the dynamic module is executed).
-        """
-
-        self.name: str = host_id
-        """
-        The name of the script. Must not be changed.
-        """
-
-        self.loaded_from: str = loaded_from
-        """
-        The original file path of the instanciated module.
-        """
-
-        self._params: dict[str, Any]
-        """
-        Parameters passed to the script (only set if the script isn't the main script).
-        """
-
-        self._defaults_stack: list[RemoteSettings] = [RemoteSettings()]
-        """
-        The stack of remote execution defaults. The stack must only be changed by using
-        the context manager returned in :meth:`self.defaults() <simple_automation.types.ScriptType.defaults>`.
-        """
-
-    def defaults(self,
-                 as_user: Optional[str] = None,
-                 as_group: Optional[str] = None,
-                 owner: Optional[str] = None,
-                 group: Optional[str] = None,
-                 file_mode: Optional[str] = None,
-                 dir_mode: Optional[str] = None,
-                 umask: Optional[str] = None,
-                 cwd: Optional[str] = None) -> RemoteDefaultsContext:
-        """
-        Returns a context manager to incrementally change the remote execution defaults.
-
-        .. code-block:: python
-
-            from simple_automation.script import this
-            with this.defaults(owner="root", file_mode="644", dir_mode="755"):
-                # ...
-        """
-        if simple_automation.script.this is not self:
-            raise RuntimeError("Cannot set defaults on a script when it isn't the currently active script.")
-
-        new_defaults = RemoteSettings(
-                 as_user=as_user,
-                 as_group=as_group,
-                 owner=owner,
-                 group=group,
-                 file_mode=None if file_mode is None else oct(int(file_mode, 8))[2:],
-                 dir_mode=None if dir_mode is None else oct(int(dir_mode, 8))[2:],
-                 umask=None if umask is None else oct(int(umask, 8))[2:],
-                 cwd=cwd)
-        new_defaults = self._defaults_stack[-1].overlay(new_defaults)
-        return RemoteDefaultsContext(self, new_defaults)
-
-    def current_defaults(self) -> RemoteSettings:
-        """
-        Returns the fully resolved currently active defaults.
-
-        Returns
-        -------
-        RemoteSettings
-            The currently active remote defaults.
-        """
-        return base_settings.overlay(self._defaults_stack[-1])
-
-    @staticmethod
-    def get_variables(script: ScriptType) -> set[str]:
-        """
-        Returns the list of all user-defined attributes for a script.
-
-        Parameters
-        ----------
-        script : ScriptType
-            The script module
-
-        Returns
-        -------
-        set[str]
-            The user-defined attributes for the given script
-        """
-        return _get_variables(ScriptType, script)
+    return base_settings.overlay(this._defaults_stack[-1])
 
 this: ScriptType = cast(ScriptType, None) # Cast None to ease typechecking in user code.
 """

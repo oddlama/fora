@@ -10,8 +10,8 @@ from typing import Optional, Union
 from jinja2 import Template
 from jinja2.exceptions import TemplateNotFound, UndefinedError
 
-import simple_automation
-from simple_automation import logger
+import simple_automation.host
+from simple_automation import globals, logger
 from simple_automation.operations.api import Operation, OperationError, OperationResult, operation
 from simple_automation.operations.utils import check_absolute_path
 
@@ -23,7 +23,7 @@ def _render_template(templ: Template, context: Optional[dict]) -> bytes:
     if "host" in context:
         raise OperationError("'host' cannot be set in context, as it is reserved for the current host.")
 
-    context["host"] = simple_automation.current_host
+    context["host"] = simple_automation.host.current_host
     return templ.render(context).encode('utf-8')
 
 def _save_content(content: Union[bytes, str],
@@ -56,7 +56,7 @@ def _save_content(content: Union[bytes, str],
     if isinstance(content, str):
         content = content.encode('utf-8')
 
-    conn = simple_automation.current_host.connection
+    conn = simple_automation.host.current_host.connection
     with op.defaults(file_mode=mode, owner=owner, group=group) as attr:
         final_sha512sum = hashlib.sha512(content).digest()
         op.final_state(exists=True, mode=attr.file_mode, owner=attr.owner, group=attr.group, sha512=final_sha512sum)
@@ -78,10 +78,10 @@ def _save_content(content: Union[bytes, str],
             return op.success()
 
         # Apply actions to reach desired state, but only if we are not doing a dry run
-        if not simple_automation.args.dry:
+        if not globals.args.dry:
             # Create directory if it doesn't exist
             if op.changed("exists") or op.changed("sha512"):
-                if simple_automation.args.diff:
+                if globals.args.diff:
                     try:
                         old_content: Optional[bytes] = conn.download(file=dest)
                     except ValueError:
@@ -147,7 +147,7 @@ def directory(path: str,
     check_absolute_path(path)
     op.desc(path)
 
-    conn = simple_automation.current_host.connection
+    conn = simple_automation.host.current_host.connection
     with op.defaults(dir_mode=mode, owner=owner, group=group) as attr:
         op.final_state(exists=present, mode=attr.dir_mode, owner=attr.owner, group=attr.group, touched=touch)
 
@@ -168,7 +168,7 @@ def directory(path: str,
             return op.success()
 
         # Apply actions to reach desired state, but only if we are not doing a dry run
-        if not simple_automation.args.dry:
+        if not globals.args.dry:
             if present:
                 # Create directory if it doesn't exist
                 if op.changed("exists"):
@@ -233,7 +233,7 @@ def file(path: str,
     check_absolute_path(path)
     op.desc(path)
 
-    conn = simple_automation.current_host.connection
+    conn = simple_automation.host.current_host.connection
     with op.defaults(file_mode=mode, owner=owner, group=group) as attr:
         op.final_state(exists=present, mode=attr.file_mode, owner=attr.owner, group=attr.group, touched=touch)
 
@@ -254,7 +254,7 @@ def file(path: str,
             return op.success()
 
         # Apply actions to reach desired state, but only if we are not doing a dry run
-        if not simple_automation.args.dry:
+        if not globals.args.dry:
             if present:
                 # Create file if it doesn't exist
                 if op.changed("exists"):
@@ -319,7 +319,7 @@ def link(path: str,
     check_absolute_path(path)
     op.desc(path)
 
-    conn = simple_automation.current_host.connection
+    conn = simple_automation.host.current_host.connection
     with op.defaults(owner=owner, group=group) as attr:
         op.final_state(exists=present, owner=attr.owner, group=attr.group, touched=touch)
 
@@ -340,7 +340,7 @@ def link(path: str,
             return op.success()
 
         # Apply actions to reach desired state, but only if we are not doing a dry run
-        if not simple_automation.args.dry:
+        if not globals.args.dry:
             if present:
                 # Create link if it doesn't exist
                 if op.changed("exists"):
@@ -565,7 +565,7 @@ def template_content(content: str,
     """
     _ = (name, check) # Processed automatically.
     try:
-        templ = simple_automation.jinja2_env.from_string(content)
+        templ = globals.jinja2_env.from_string(content)
         rendered_content = _render_template(templ, context)
     except UndefinedError as e:
         raise OperationError(f"error while templating string: {str(e)}") from e
@@ -610,7 +610,7 @@ def template(src: str,
     """
     _ = (name, check) # Processed automatically.
     try:
-        templ = simple_automation.jinja2_env.get_template(src)
+        templ = globals.jinja2_env.get_template(src)
     except TemplateNotFound as e:
         raise OperationError("template not found: " + str(e)) from e
 

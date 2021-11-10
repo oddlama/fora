@@ -29,7 +29,7 @@ u64 = NewType('u64', int)
 is_server = False
 debug = False
 try:
-    import simple_automation
+    from simple_automation import globals
 except ModuleNotFoundError:
     pass
 
@@ -41,7 +41,7 @@ except ModuleNotFoundError:
 
 def _is_debug():
     """Returns True if debugging output should be genereated."""
-    return debug if is_server else simple_automation.args.debug
+    return debug if is_server else globals.args.debug
 
 def _log(msg: str):
     """
@@ -293,14 +293,10 @@ def Packet(type): # pylint: disable=redefined-builtin
 @Packet(type='response')
 class PacketOk(NamedTuple):
     """This packet is used by some requests as a generic successful status indicator."""
-    # Required for pyminifier! Otherwise the block will not end as the docstring is removed!
-    pass # pylint: disable=unnecessary-pass
 
 @Packet(type='response')
 class PacketAck(NamedTuple):
     """This packet is used to acknowledge a previous PacketCheckAlive packet."""
-    # Required for pyminifier! Otherwise the block will not end as the docstring is removed!
-    pass # pylint: disable=unnecessary-pass
 
 @Packet(type='request')
 class PacketCheckAlive(NamedTuple):
@@ -341,8 +337,6 @@ class PacketProcessCompleted(NamedTuple):
 @Packet(type='response')
 class PacketProcessPreexecError(NamedTuple):
     """This packet is used to indicate an error in the preexec_fn when running the process."""
-    # Required for pyminifier! Otherwise the block will not end as the docstring is removed!
-    pass # pylint: disable=unnecessary-pass
 
 @Packet(type='request')
 class PacketProcessRun(NamedTuple):

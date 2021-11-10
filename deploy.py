@@ -1,4 +1,4 @@
-from simple_automation import current_host as host
+from simple_automation.host import current_host as host
 from simple_automation.operations import local
 
 somedefault = 134

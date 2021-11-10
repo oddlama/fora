@@ -1,4 +1,4 @@
-from simple_automation.group import this
+from simple_automation import group as this
 
 this.before("servers")
 

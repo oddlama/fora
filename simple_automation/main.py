@@ -8,18 +8,15 @@ import inspect
 import os
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
-import simple_automation
-from simple_automation import logger
+from simple_automation import globals, logger
 from simple_automation.connection import open_connection
 from simple_automation.loader import load_site, run_script
-from simple_automation.utils import col, die_error, install_exception_hook, set_current_host
+from simple_automation.utils import die_error, install_exception_hook, set_current_host
 from simple_automation.version import __version__
 
 def init_runtime():
-    """
-    Initializes runtime variables needed to run scripts.
-    """
-    simple_automation.jinja2_env = Environment(
+    """Initializes runtime variables needed to run scripts."""
+    globals.jinja2_env = Environment(
             loader=FileSystemLoader('.', followlinks=True),
             autoescape=False,
             undefined=StrictUndefined)
@@ -33,14 +30,13 @@ def main_run(args: argparse.Namespace):
     args
         The parsed arguments
     """
-
     init_runtime()
     load_site(args.inventory)
 
     # Deduplicate host selection and check if every host is valid
     host_names = []
-    for h in set(args.hosts.split(',') if args.hosts is not None else simple_automation.hosts.keys()):
-        if h not in simple_automation.hosts:
+    for h in set(args.hosts.split(',') if args.hosts is not None else globals.hosts.keys()):
+        if h not in globals.hosts:
             die_error(f"Unknown host '{h}'")
         host_names.append(h)
     host_names = sorted(host_names)
@@ -54,9 +50,9 @@ def main_run(args: argparse.Namespace):
 
     # Instanciate (run) the given script for each selected host
     for h in host_names:
-        host = simple_automation.hosts[h]
+        host = globals.hosts[h]
 
-        logger.print(f"{col('[1;34m')}host{col('[m')} {host.name}")
+        logger.print_indented(f"{logger.col('[1;34m')}host{logger.col('[m')} {host.name}")
         with open_connection(host):
             with set_current_host(host):
                 run_script(args.script, inspect.getouterframes(inspect.currentframe())[0], name="Commandline argument")
@@ -131,5 +127,5 @@ def main():
         # Fallback to --help.
         parser.print_help()
     else:
-        simple_automation.args = args
+        globals.args = args
         args.func(args)

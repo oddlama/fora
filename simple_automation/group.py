@@ -1,141 +1,96 @@
-"""
-Provides api for group definitions.
-"""
+"""Provides API for group definitions."""
 
+from __future__ import annotations
+from types import ModuleType
 from typing import cast
 
-# TODO get rid of HostType except for mockup!!!!!
+from simple_automation import globals
+from simple_automation.types import GroupType
+
+# TODO: get rid of HostType except for mockup!!!!!
 # -> functions go to module level
 # -> mockup type becomes dataclass effectively
-aaaaaa
-# TODO make Example a section in the sphinx documentation
-class GroupType(MockupType):
+
+# TODO: add Raises to methods that raise errors
+# TODO: replace ..code-block with smth else for pdoc3
+# TODO: check all doc links and refactor them for pdoc3 (also maybe wrong links now)
+
+def before(group: str):
     """
-    A mockup type for group modules. This is not the actual type of an instanciated
-    module, but will reflect some of it's properties better than ModuleType.
+    Adds a reverse-dependency on the given group.
 
-    This class also represents all meta information available to a group module when itself
-    is being loaded. It allows a module to access and modify its associated meta-information.
-    After the module has been loaded, the meta information will be transferred directly to the module.
-
-    When writing a group module, you can simply import :attr:`simple_automation.group.this`,
-    which exposes an API to access/modify this information.
-
-    Example: Using meta information (groups/webserver.py)
-
-    .. code-block:: python
-
-        from simple_automation.group import this
-
-        # Require that the 'servers' groups is processed before this group when resolving
-        # variables for a host at execution time. This is important to avoid variable
-        # definition ambiguity (which would be detected and reported as an error).
-        this.after("server")
+    Parameters
+    ----------
+    group
+        The group that must be loaded before this group.
     """
+    if group not in globals.available_groups:
+        raise ValueError(f"Referenced invalid group '{group}'!")
+    if group == this.name:
+        raise ValueError("Cannot add reverse-dependency to self!")
 
-    reserved_vars: set[str] = set(["module", "name", "loaded_from", "groups_before", "groups_after"])
+    this.groups_before.add(group)
+
+def before_all(groups: list[str]):
     """
-    A list of variable names that are reserved and must not be set by the module.
+    Adds a reverse-dependency on all given groups.
+
+    Parameters
+    ----------
+    groups
+        The groups
     """
+    for g in groups:
+        before(g)
 
-    def __init__(self, name: str, loaded_from: str):
-        self.module: ModuleType
-        """
-        The associated dynamically loaded module (will be set before the dynamic module is executed).
-        """
+def after(group: str):
+    """
+    Adds a dependency on the given group.
 
-        self.name: str = name
-        """
-        The name of the group. Must not be changed.
-        """
+    Parameters
+    ----------
+    group
+        The group that must be loaded after this group.
+    """
+    if group not in globals.available_groups:
+        raise ValueError(f"Referenced invalid group '{group}'!")
+    if group == this.name:
+        raise ValueError("Cannot add dependency to self!")
 
-        self.loaded_from: str = loaded_from
-        """
-        The original file path of the instanciated module.
-        """
+    this.groups_after.add(group)
 
-        self.groups_before: set[str] = set()
-        """
-        This group will be loaded before this set of other groups.
-        """
+def after_all(groups: list[str]):
+    """
+    Adds a dependency on all given groups.
 
-        self.groups_after: set[str] = set()
-        """
-        This group will be loaded after this set of other groups.
-        """
+    Parameters
+    ----------
+    groups
+        The groups
+    """
+    for g in groups:
+        after(g)
 
-    def before(self, group: str):
-        """
-        Adds a reverse-dependency on the given group.
+def get_variables(group: GroupType) -> set[str]:
+    """
+    Returns the list of all user-defined attributes for a group.
 
-        Parameters
-        ----------
-        group : str
-            The group that must be loaded before this group.
-        """
-        if group not in simple_automation.available_groups:
-            raise ValueError(f"Referenced invalid group '{group}'!")
-        if group == self.name:
-            raise ValueError("Cannot add reverse-dependency to self!")
+    Parameters
+    ----------
+    group
+        The group module
 
-        self.groups_before.add(group)
-
-    def before_all(self, groups: list[str]):
-        """
-        Adds a reverse-dependency on all given groups.
-
-        Parameters
-        ----------
-        groups : list[str]
-            The groups
-        """
-        for g in groups:
-            self.before(g)
-
-    def after(self, group: str):
-        """
-        Adds a dependency on the given group.
-
-        Parameters
-        ----------
-        group : str
-            The group that must be loaded after this group.
-        """
-        if group not in simple_automation.available_groups:
-            raise ValueError(f"Referenced invalid group '{group}'!")
-        if group == self.name:
-            raise ValueError("Cannot add dependency to self!")
-
-        self.groups_after.add(group)
-
-    def after_all(self, groups: list[str]):
-        """
-        Adds a dependency on all given groups.
-
-        Parameters
-        ----------
-        groups : list[str]
-            The groups
-        """
-        for g in groups:
-            self.after(g)
-
-    @staticmethod
-    def get_variables(group: GroupType) -> set[str]:
-        """
-        Returns the list of all user-defined attributes for a group.
-
-        Parameters
-        ----------
-        group : GroupType
-            The group module
-
-        Returns
-        -------
-        set[str]
-            The user-defined attributes for the given group
-        """
-        return _get_variables(GroupType, group)
+    Returns
+    -------
+    set[str]
+        The user-defined attributes for the given group
+    """
+    module_vars = set(attr for attr in dir(group) if
+                         not callable(getattr(group, attr)) and
+                         not attr.startswith("_") and
+                         not isinstance(getattr(group, attr), ModuleType))
+    module_vars -= set(GroupType.__annotations__)
+    return module_vars
 
 this: GroupType = cast(GroupType, None) # Cast None to ease typechecking in user code.
 """
