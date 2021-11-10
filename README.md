@@ -1,11 +1,14 @@
 - declarative.
-- minify the dispatcher before packaging in setup.py
+
+## Why
+
+- Ansible uses yaml, which is not very well suited for more complex workflows and not easily readble and has many pitfalls.
+  I know python, so no need for new DSL. Often very surprising things happen, which I don't like. Give me an API and I'm happy.
+- Ansible is slow. This is fast. I want a serverless system that acts over ssh.
+- Because I could.
 
 
-TODO remove all type hints from docstrings when they
-can be inferred from the real types. Basically very redundant currently.
-
-
+## Features
 
 Trivia
 ------
