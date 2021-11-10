@@ -55,15 +55,11 @@ class SetVariableContextManager:
         setattr(self.obj, self.var, self.value)
 
 def print_warning(msg: str):
-    """
-    Prints a message with a colored 'warning: ' prefix.
-    """
+    """Prints a message with a (possibly colored) 'warning: ' prefix."""
     print(f"{col('[1;33m')}warning:{col('[m')} {msg}")
 
 def print_error(msg: str, loc=None):
-    """
-    Prints a message with a colored 'error: ' prefix.
-    """
+    """Prints a message with a (possibly colored) 'error: ' prefix."""
     if loc is None:
         print(f"{col('[1;31m')}error:{col('[m')} {msg}")
     else:
@@ -77,19 +73,19 @@ def die_error(msg: str, loc=None, status_code=1):
     sys.exit(status_code)
 
 def set_this_group(value: GroupType) -> SetVariableContextManager:
-    """A context manager to temporarily set :attr:`simple_automation.group._this` to the given value."""
+    """A context manager to temporarily set `simple_automation.group._this` to the given value."""
     return SetVariableContextManager(simple_automation.group, '_this', value)
 
 def set_this_host(value: HostType) -> SetVariableContextManager:
-    """A context manager to temporarily set :attr:`simple_automation.host._this` to the given value."""
+    """A context manager to temporarily set `simple_automation.host._this` to the given value."""
     return SetVariableContextManager(simple_automation.host, '_this', value)
 
 def set_this_script(value: ScriptType) -> SetVariableContextManager:
-    """A context manager to temporarily set :attr:`simple_automation.script._this` to the given value."""
+    """A context manager to temporarily set `simple_automation.script._this` to the given value."""
     return SetVariableContextManager(simple_automation.script, '_this', value)
 
 def set_current_host(host: HostType) -> SetVariableContextManager:
-    """A context manager to temporarily set :attr:`simple_automation.host.current_host` to the given value."""
+    """A context manager to temporarily set `simple_automation.host.current_host` to the given value."""
     return SetVariableContextManager(simple_automation.host, 'current_host', host)
 
 def load_py_module(file: str, pre_exec: Optional[Callable[[ModuleType], None]] = None) -> ModuleType:

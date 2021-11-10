@@ -107,7 +107,7 @@ class Connection:
             group: Optional[str] = None,
             umask: Optional[str] = None,
             cwd: Optional[str] = None) -> CompletedRemoteCommand:
-        """See :func:`simple_automation.connectors.connector.run`."""
+        """See `simple_automation.connectors.connector.Connector.run`."""
         defaults = simple_automation.script.current_defaults()
         return self.connector.run(
             command=command,
@@ -120,15 +120,15 @@ class Connection:
             cwd=cwd if cwd is not None else defaults.cwd)
 
     def resolve_user(self, user: Optional[str]) -> Optional[str]:
-        """See :func:`simple_automation.connectors.connector.resolve_user`."""
+        """See `simple_automation.connectors.connector.Connector.resolve_user`."""
         return self.connector.resolve_user(user)
 
     def resolve_group(self, group: Optional[str]) -> Optional[str]:
-        """See :func:`simple_automation.connectors.connector.resolve_group`."""
+        """See `simple_automation.connectors.connector.Connector.resolve_group`."""
         return self.connector.resolve_group(group)
 
     def stat(self, path: str, follow_links: bool = False, sha512sum: bool = False) -> Optional[StatResult]:
-        """See :func:`simple_automation.connectors.connector.stat`."""
+        """See `simple_automation.connectors.connector.Connector.stat`."""
         return self.connector.stat(
             path=path,
             follow_links=follow_links,
@@ -140,7 +140,7 @@ class Connection:
             mode: Optional[str] = None,
             owner: Optional[str] = None,
             group: Optional[str] = None):
-        """See :func:`simple_automation.connectors.connector.upload`."""
+        """See `simple_automation.connectors.connector.Connector.upload`."""
         return self.connector.upload(
             file=file,
             content=content,
@@ -149,7 +149,7 @@ class Connection:
             group=group)
 
     def download(self, file: str) -> bytes:
-        """See :func:`simple_automation.connectors.connector.download`."""
+        """See `simple_automation.connectors.connector.Connector.download`."""
         return self.connector.download(file=file)
 
 def open_connection(host: HostType) -> Connection:

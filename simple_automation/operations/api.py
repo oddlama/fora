@@ -75,7 +75,7 @@ class Operation:
 
     def defaults(self, *args, **kwargs) -> RemoteDefaultsContext:
         """
-        Sets defaults on the current script. See :meth:`simple_automation.types.ScriptType.defaults`.
+        Sets defaults on the current script. See `simple_automation.types.ScriptType.defaults`.
         """
         _ = (self)
         return simple_automation.script.defaults(*args, **kwargs)

@@ -42,7 +42,7 @@ class GroupType(MockupType):
     class is mainly used to aid type-checking, its properties are transferred to the
     actual instanciated module before the module is executed.
 
-    When writing a group module, you can use the API exposed in :attr:`simple_automation.group`
+    When writing a group module, you can use the API exposed in `simple_automation.group`
     to access/change meta information about your module.
 
     Example: Using meta information (groups/webserver.py)
@@ -78,7 +78,7 @@ class HostType(MockupType):
     class is mainly used to aid type-checking, its properties are transferred to the
     actual instanciated module before the module is executed.
 
-    When writing a host module, you can use the API exposed in :attr:`simple_automation.host`
+    When writing a host module, you can use the API exposed in `simple_automation.host`
     to access/change meta information about your module.
 
     Example: Using meta information (hosts/myhost.py)
@@ -139,7 +139,7 @@ class ScriptType(MockupType):
     class is mainly used to aid type-checking, its properties are transferred to the
     actual instanciated module before the module is executed.
 
-    When writing a script module, you can use the API exposed in :attr:`simple_automation.script`
+    When writing a script module, you can use the API exposed in `simple_automation.script`
     to access/change meta information about your module.
     """
 
@@ -155,5 +155,5 @@ class ScriptType(MockupType):
     _defaults_stack: list[RemoteSettings] = field(default_factory=lambda: [RemoteSettings()])
     """
     The stack of remote execution defaults. The stack must only be changed by using
-    the context manager returned in :meth:`defaults() <simple_automation.script.defaults>`.
+    the context manager returned in `simple_automation.script.defaults`.
     """

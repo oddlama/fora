@@ -3,18 +3,17 @@ Defines the connector interface.
 """
 
 from __future__ import annotations
+from dataclasses import dataclass
 from typing import Callable, Optional, Union
 
 from simple_automation.types import HostType
 
+@dataclass
 class CompletedRemoteCommand:
-    """
-    The return value of run(), representing a finished remote process.
-    """
-    def __init__(self, stdout: Optional[bytes], stderr: Optional[bytes], returncode: int):
-        self.stdout = stdout
-        self.stderr = stderr
-        self.returncode = returncode
+    """The return value of `Connector.run()`, representing a finished remote process."""
+    stdout: Optional[bytes]
+    stderr: Optional[bytes]
+    returncode: int
 
 class StatResult:
     """
@@ -48,9 +47,7 @@ class Connector:
     schema: str
     """
     The schema of the connector. Must match the schema used in urls of this connector,
-    such as `ssh` for `ssh://...`. May also be shown in messages like:
-
-        "Establishing connecting to {host} via {schema}"
+    such as `ssh` for `ssh://...`. May also appear in log messages.
 
     Overwrite this in your connector subclass. Must be unique among all connectors.
     """
@@ -119,9 +116,11 @@ class Connector:
 
         Raises
         ------
+        subprocess.CalledProcessError
+            If check is True and the process returned a non-zero exit status.
         ValueError
             A parameter was invalid.
-        RemoteOSError
+        simple_automation.connectors.tunnel_dispatcher.RemoteOSError
             If the remote command fails because of an remote OSError.
         IOError
             An error occurred with the connection.
@@ -149,7 +148,7 @@ class Connector:
         ------
         ValueError
             If the user could not be resolved.
-        RemoteOSError
+        simple_automation.connectors.tunnel_dispatcher.RemoteOSError
             If the remote command fails because of an remote OSError.
         IOError
             An error occurred with the connection.
@@ -177,7 +176,7 @@ class Connector:
         ------
         ValueError
             If the group could not be resolved.
-        RemoteOSError
+        simple_automation.connectors.tunnel_dispatcher.RemoteOSError
             If the remote command fails because of an remote OSError.
         IOError
             An error occurred with the connection.
@@ -208,7 +207,7 @@ class Connector:
 
         Raises
         ------
-        RemoteOSError
+        simple_automation.connectors.tunnel_dispatcher.RemoteOSError
             If the remote command fails for any reason other than file not found.
         IOError
             An error occurred with the connection.
@@ -243,7 +242,7 @@ class Connector:
         ------
         ValueError
             A parameter was invalid.
-        RemoteOSError
+        simple_automation.connectors.tunnel_dispatcher.RemoteOSError
             If the remote command fails because of an remote OSError.
         IOError
             An error occurred with the connection.
@@ -264,7 +263,7 @@ class Connector:
         ------
         ValueError
             If the file was not found.
-        RemoteOSError
+        simple_automation.connectors.tunnel_dispatcher.RemoteOSError
             If the remote command fails for any reason other than file not found.
         IOError
             An error occurred with the connection.
@@ -272,12 +271,18 @@ class Connector:
         _ = (self, file)
         raise NotImplementedError("Must be overwritten by subclass.")
 
-def connector(cls):
+def connector(schema):
     """
     The @connector class decorator used to register the connector
     to the global registry.
+
+    Parameters
+    ----------
+    schema
+        The schema for the connector, for example 'ssh'.
     """
-    if not hasattr(cls, 'schema'):
-        raise RuntimeError(f"{cls.__name__} was decorated with @connector but is not exposing a '{cls.__name__}.schema' attribute.")
-    Connector.registered_connectors[cls.schema] = cls
-    return cls
+    def wrapper(cls):
+        cls.schema = schema
+        Connector.registered_connectors[cls.schema] = cls
+        return cls
+    return wrapper

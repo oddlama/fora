@@ -1,6 +1,4 @@
-"""
-Contains a connector which handles connections to hosts via SSH.
-"""
+"""Contains a connector which handles connections to hosts via SSH."""
 
 import sys
 import base64
@@ -27,10 +25,9 @@ def _expect_response_packet(packet: Any, expected_type: Type):
     if not isinstance(packet, expected_type):
         raise IOError(f"Invalid response '{type(packet)}' from remote dispatcher. This is a bug.")
 
-@connector
+@connector(schema='ssh')
 class SshConnector(Connector):
     """A connector that provides remote access via SSH."""
-    schema = "ssh"
 
     def __init__(self, url: Optional[str], host: HostType):
         super().__init__(url, host)
