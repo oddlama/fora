@@ -78,18 +78,15 @@ def load_group(module_file: str) -> GroupType:
     meta = GroupType(name=name, loaded_from=module_file)
 
     # Instanciate module
-    with set_this_group(meta):
+    with set_this_group(meta) as ctx:
         # Normal groups have a dependency on the global 'all' group.
         if not name == 'all':
             simple_automation.group.after("all")
 
-        ret = cast(GroupType, load_py_module(module_file, pre_exec=lambda module: setattr(meta, 'module', module)))
-
-    for reserved in GroupType.__annotations__:
-        if hasattr(ret, reserved):
-            die_error(f"'{reserved}' is a reserved variable.", loc=meta.loaded_from)
-
-    meta.transfer(ret)
+        def _pre_exec(module):
+            meta.transfer(module)
+            ctx.update(module)
+        ret = cast(GroupType, load_py_module(module_file, pre_exec=_pre_exec))
     return ret
 
 def check_modules_for_conflicts(a: GroupType, b: GroupType) -> bool:
@@ -221,6 +218,8 @@ def sort_and_validate_groups(groups: dict[str, GroupType]) -> list[str]:
         has_conflicts |= check_modules_for_conflicts(groups[a], groups[b])
 
     if has_conflicts:
+        if globals.args.debug:
+            raise RuntimeError("Exiting because of group module conflicts.")
         sys.exit(1)
 
     # Return a topological order based on the top-rank
@@ -293,7 +292,7 @@ def resolve_connector(host: HostType):
 
     Parameters
     ----------
-    host: HostType
+    host
         The host
     """
     if host.connector is None:
@@ -314,9 +313,9 @@ def load_host(name: str, module_file: str) -> HostType:
 
     Parameters
     ----------
-    name: str
+    name
         The host name of the host to be loaded
-    module_file: str
+    module_file
         The path to the host module file that will be instanciated
 
     Returns
@@ -327,23 +326,20 @@ def load_host(name: str, module_file: str) -> HostType:
     module_file_exists = os.path.exists(module_file)
     meta = HostType(name=name, loaded_from=module_file if module_file_exists else "__cmdline__")
 
-    with set_this_host(meta):
+    with set_this_host(meta) as ctx:
         simple_automation.host.add_group("all")
 
         # Instanciate module
         if module_file_exists:
-            ret = cast(HostType, load_py_module(module_file, pre_exec=lambda module: setattr(meta, 'module', module)))
+            def _pre_exec(module):
+                meta.transfer(module)
+                ctx.update(module)
+            ret = cast(HostType, load_py_module(module_file, pre_exec=_pre_exec))
         else:
             # Instanciate default module and set ssh_host to the name
             ret = cast(HostType, DefaultHost(name))
-            meta.module = ret
+            meta.transfer(ret)
 
-    # Check if the module did set any reserved variables
-    for reserved in HostType.__annotations__:
-        if hasattr(ret, reserved):
-            die_error(f"'{reserved}' is a reserved variable.", loc=meta.loaded_from)
-
-    meta.transfer(ret)
     resolve_connector(ret)
 
     # Monkeypatch the __hasattr__ and __getattr__ methods to perform hierachical lookup from now on
@@ -452,12 +448,12 @@ def run_script(script: str,
         meta = ScriptType(name, script)
         script_stack.append((meta, frame))
         try:
-            with set_this_script(meta):
+            with set_this_script(meta) as ctx:
                 # New script instance starts with fresh set of default values.
                 # Use defaults() here to resolve them at least once.
                 with simple_automation.script.defaults():
                     def _pre_exec(module):
-                        setattr(meta, 'module', module)
+                        ctx.update(module)
                         setattr(module, '_params', params or {})
                     load_py_module(script, pre_exec=_pre_exec)
         except Exception as e:

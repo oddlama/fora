@@ -6,13 +6,14 @@ of the expected contents of the dynamically loaded modules.
 """
 
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import ModuleType
-from typing import Any, Callable, Optional, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, Optional, Union, cast
 
-from simple_automation.connection import Connection
-from simple_automation.connectors.connector import Connector
 from simple_automation.remote_settings import RemoteSettings
+if TYPE_CHECKING:
+    from simple_automation.connection import Connection
+    from simple_automation.connectors.connector import Connector
 
 class MockupType(ModuleType):
     """
@@ -20,18 +21,15 @@ class MockupType(ModuleType):
     transfer of variables to a real dynamically loaded module.
     """
 
-    reserved_vars: set[str] = set()
-    """A set of reserved variables. Defined by the subclass."""
+    __annotations__: dict[str, Any]
+    """Provided by the dataclass decorator."""
 
     def __str__(self):
         return f"<'{getattr(self, 'name')}' from '{getattr(self, 'loaded_from')}'>"
 
     def transfer(self, module: ModuleType):
-        """
-        Transfers all reserved variables from this object to the given module,
-        as well as any functions tagged with @transfer.
-        """
-        for var in self.reserved_vars:
+        """Transfers all annotated variables from this object to the given module."""
+        for var in self.__annotations__:
             if hasattr(self, var):
                 setattr(module, var, getattr(self, var))
 
@@ -40,20 +38,18 @@ class MockupType(ModuleType):
 class GroupType(MockupType):
     """
     A mockup type for group modules. This is not the actual type of an instanciated
-    module, but will reflect some of it's properties better than ModuleType.
+    module, but will reflect some of it's properties better than ModuleType. While this
+    class is mainly used to aid type-checking, its properties are transferred to the
+    actual instanciated module before the module is executed.
 
-    This class also represents all meta information available to a group module when itself
-    is being loaded. It allows a module to access and modify its associated meta-information.
-    After the module has been loaded, the meta information will be transferred directly to the module.
-
-    When writing a group module, you can simply import :attr:`simple_automation.group.this`,
-    which exposes an API to access/modify this information.
+    When writing a group module, you can use the API exposed in :attr:`simple_automation.group`
+    to access/change meta information about your module.
 
     Example: Using meta information (groups/webserver.py)
 
     .. code-block:: python
 
-        from simple_automation.group import this
+        from simple_automation import group as this
 
         # Require that the 'servers' groups is processed before this group when resolving
         # variables for a host at execution time. This is important to avoid variable
@@ -67,13 +63,10 @@ class GroupType(MockupType):
     loaded_from: str
     """The original file path of the instanciated module."""
 
-    module: ModuleType = cast(ModuleType, None)
-    """The associated dynamically loaded module (will be set before the dynamic module is executed). """
-
-    groups_before: set[str] = set()
+    groups_before: set[str] = field(default_factory=set)
     """This group will be loaded before this set of other groups."""
 
-    groups_after: set[str] = set()
+    groups_after: set[str] = field(default_factory=set)
     """This group will be loaded after this set of other groups."""
 
 # TODO: make Example a section in the sphinx documentation
@@ -81,26 +74,26 @@ class GroupType(MockupType):
 class HostType(MockupType):
     """
     A mockup type for host modules. This is not the actual type of an instanciated
-    module, but will reflect some of it's properties better than ModuleType.
+    module, but will reflect some of it's properties better than ModuleType. While this
+    class is mainly used to aid type-checking, its properties are transferred to the
+    actual instanciated module before the module is executed.
 
-    This class also represents all meta information available to a host module when itself is being loaded.
-    It allows a module to access and modify its associated meta-information. After the module
-    has been loaded, the meta information will be transferred directly to the module.
-
-    When writing a host module, you can simply import :attr:`simple_automation.host.this`,
-    which exposes an API to access/modify this information.
+    When writing a host module, you can use the API exposed in :attr:`simple_automation.host`
+    to access/change meta information about your module.
 
     Example: Using meta information (hosts/myhost.py)
 
     .. code-block:: python
 
-        from simple_automation.host import this
-
-        # The host name used for instanciation as defined in the inventory
-        print(this.name)
+        from simple_automation import host as this
 
         # Set the ssh host (useful if it differs from the name)
-        this.ssh_host = "root@localhost"
+        ssh_host = "root@localhost"
+        # Alternatively define a url, which allows to select a specific connection mechanism.
+        url = "ssh://root@localhost"
+
+        # The host's name used for instanciation as defined in the inventory
+        print(this.name())
 
         # Add the host to a group
         this.add_group("desktops")
@@ -112,10 +105,7 @@ class HostType(MockupType):
     loaded_from: str
     """The original file path of the instanciated module."""
 
-    module: ModuleType = cast(ModuleType, None)
-    """The associated dynamically loaded module (will be set before the dynamic module is executed). """
-
-    groups: set[str] = set()
+    groups: set[str] = field(default_factory=set)
     """The set of groups this host belongs to."""
 
     url: str = "ssh:"
@@ -128,7 +118,7 @@ class HostType(MockupType):
     connector: Optional[Callable[[str, HostType], Connector]] = None
     """The connector class to use. If unset the connector will be determined by the url."""
 
-    connection: Connection = cast(Connection, None) # Cast None to ease typechecking in user code.
+    connection: Connection = cast("Connection", None) # Cast None to ease typechecking in user code.
     """The connection to this host, if it is opened."""
 
 @dataclass
@@ -138,20 +128,19 @@ class InventoryType(MockupType):
     module, but will reflect some of it's properties better than ModuleType.
     """
 
-    hosts: list[Union[str, tuple[str, str]]] = []
+    hosts: list[Union[str, tuple[str, str]]] = field(default_factory=list)
     """The list of hosts that belong to this inventory and have to be loaded."""
 
 @dataclass
 class ScriptType(MockupType):
     """
     A mockup type for script modules. This is not the actual type of an instanciated
-    module, but will reflect some of it's properties better than ModuleType.
+    module, but will reflect some of it's properties better than ModuleType. While this
+    class is mainly used to aid type-checking, its properties are transferred to the
+    actual instanciated module before the module is executed.
 
-    This class also represents all meta information available to a script module when itself
-    is being loaded. It allows a module to access and modify its associated meta-information.
-
-    When writing a script module, you can simply import :attr:`simple_automation.script.this`,
-    which exposes an API to access/modify this information.
+    When writing a script module, you can use the API exposed in :attr:`simple_automation.script`
+    to access/change meta information about your module.
     """
 
     name: str
@@ -160,13 +149,10 @@ class ScriptType(MockupType):
     loaded_from: str
     """The original file path of the instanciated module."""
 
-    module: ModuleType = cast(ModuleType, None)
-    """The associated dynamically loaded module (will be set before the dynamic module is executed). """
-
-    _params: dict[str, Any] = {}
+    _params: dict[str, Any] = field(default_factory=dict)
     """Parameters passed to the script (only set if the script isn't the main script)."""
 
-    _defaults_stack: list[RemoteSettings] = [RemoteSettings()]
+    _defaults_stack: list[RemoteSettings] = field(default_factory=lambda: [RemoteSettings()])
     """
     The stack of remote execution defaults. The stack must only be changed by using
     the context manager returned in :meth:`defaults() <simple_automation.script.defaults>`.

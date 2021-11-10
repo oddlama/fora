@@ -44,10 +44,16 @@ class SetVariableContextManager:
 
     def __enter__(self):
         setattr(self.obj, self.var, self.value)
+        return self
 
     def __exit__(self, exc_type, exc_value, trace):
         _ = (exc_type, exc_value, trace)
         setattr(self.obj, self.var, self.old_value)
+
+    def update(self, value: Any):
+        """Updates the stored variable while the context manager is active."""
+        self.value = value
+        setattr(self.obj, self.var, self.value)
 
 def print_warning(msg: str):
     """
@@ -72,16 +78,16 @@ def die_error(msg: str, loc=None, status_code=1):
     sys.exit(status_code)
 
 def set_this_group(value: GroupType) -> SetVariableContextManager:
-    """A context manager to temporarily set :attr:`simple_automation.group.this` to the given value."""
-    return SetVariableContextManager(simple_automation.group, 'this', value)
+    """A context manager to temporarily set :attr:`simple_automation.group._this` to the given value."""
+    return SetVariableContextManager(simple_automation.group, '_this', value)
 
 def set_this_host(value: HostType) -> SetVariableContextManager:
-    """A context manager to temporarily set :attr:`simple_automation.host.this` to the given value."""
-    return SetVariableContextManager(simple_automation.host, 'this', value)
+    """A context manager to temporarily set :attr:`simple_automation.host._this` to the given value."""
+    return SetVariableContextManager(simple_automation.host, '_this', value)
 
 def set_this_script(value: ScriptType) -> SetVariableContextManager:
-    """A context manager to temporarily set :attr:`simple_automation.script.this` to the given value."""
-    return SetVariableContextManager(simple_automation.script, 'this', value)
+    """A context manager to temporarily set :attr:`simple_automation.script._this` to the given value."""
+    return SetVariableContextManager(simple_automation.script, '_this', value)
 
 def set_current_host(host: HostType) -> SetVariableContextManager:
     """A context manager to temporarily set :attr:`simple_automation.host.current_host` to the given value."""

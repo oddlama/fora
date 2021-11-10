@@ -5,7 +5,7 @@ import argparse
 from typing import cast
 from jinja2 import Environment
 
-from .types import InventoryType, GroupType, HostType
+from simple_automation.types import InventoryType, GroupType, HostType
 
 class NotYetLoaded:
     """

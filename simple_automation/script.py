@@ -5,7 +5,6 @@ Provides API for script definitions.
 import inspect
 from typing import Any, Optional, cast
 
-import simple_automation.host
 from simple_automation.remote_settings import RemoteSettings, ResolvedRemoteSettings, base_settings
 from simple_automation.types import ScriptType
 
@@ -16,6 +15,9 @@ class RemoteDefaultsContext:
         self.new_defaults = new_defaults
 
     def __enter__(self) -> ResolvedRemoteSettings:
+    # pylint: disable=import-outside-toplevel,cyclic-import
+        import simple_automation.host
+
         self.new_defaults = simple_automation.host.current_host.connection.resolve_defaults(self.new_defaults)
         self.obj._defaults_stack.append(self.new_defaults)
         return cast(ResolvedRemoteSettings, base_settings.overlay(self.new_defaults))
@@ -50,8 +52,9 @@ def defaults(as_user: Optional[str] = None,
                 dir_mode=None if dir_mode is None else oct(int(dir_mode, 8))[2:],
                 umask=None if umask is None else oct(int(umask, 8))[2:],
                 cwd=cwd)
-    new_defaults = this._defaults_stack[-1].overlay(new_defaults)
-    return RemoteDefaultsContext(this, new_defaults)
+    # pylint: disable=protected-access
+    new_defaults = _this._defaults_stack[-1].overlay(new_defaults)
+    return RemoteDefaultsContext(_this, new_defaults)
 
 def current_defaults() -> RemoteSettings:
     """
@@ -62,16 +65,8 @@ def current_defaults() -> RemoteSettings:
     RemoteSettings
         The currently active remote defaults.
     """
-    return base_settings.overlay(this._defaults_stack[-1])
-
-this: ScriptType = cast(ScriptType, None) # Cast None to ease typechecking in user code.
-"""
-This variable holds all meta information available to a script module when
-it is being loaded. It must not be used anywhere else but inside the
-definition (source) of the actual module.
-"""
-
-# TODO make defaults a module level method
+    # pylint: disable=protected-access
+    return base_settings.overlay(_this._defaults_stack[-1])
 
 def script_params(params_cls):
     """
@@ -104,3 +99,10 @@ def script_params(params_cls):
         setattr(params_cls, param, value)
 
     return params_cls
+
+_this: ScriptType = cast(ScriptType, None) # Cast None to ease typechecking in user code.
+"""
+This variable holds all meta information available to a script module when
+it is being loaded. It must not be used anywhere else but inside the
+definition (source) of the actual module.
+"""

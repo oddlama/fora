@@ -50,7 +50,8 @@ class Connection:
         RemoteSettings
             The resolved settings
         """
-        if not isinstance(simple_automation.script.this, ScriptType):
+        # pylint: disable=protected-access
+        if not isinstance(simple_automation.script._this, ScriptType):
             raise RuntimeError("Cannot resolve defaults, when no script is currently running.")
 
         # Overlay settings on top of defaults

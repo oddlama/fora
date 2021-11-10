@@ -1,6 +1,6 @@
 """
 Provides the top-level logic of simple_automation such as
-the CLI interface and coordination of submodule loading.
+the CLI interface and main script dispatching.
 """
 
 import argparse
@@ -67,9 +67,7 @@ class ThrowingArgumentParser(argparse.ArgumentParser):
     """An argument parser that throws when invalid argument types are passed."""
 
     def error(self, message):
-        """
-        Raises an exception on error.
-        """
+        """Raises an exception on error."""
         raise ArgumentParserError(message)
 
 def main():

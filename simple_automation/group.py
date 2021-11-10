@@ -15,6 +15,19 @@ from simple_automation.types import GroupType
 # TODO: replace ..code-block with smth else for pdoc3
 # TODO: check all doc links and refactor them for pdoc3 (also maybe wrong links now)
 
+def name() -> str:
+    """
+    Returns the name of the group that is currently being defined.
+
+    Return
+    ----------
+    str
+        The name of the group.
+    """
+    if _this is None:
+        raise RuntimeError("This function may only be called inside a group module definition.")
+    return _this.name
+
 def before(group: str):
     """
     Adds a reverse-dependency on the given group.
@@ -24,12 +37,14 @@ def before(group: str):
     group
         The group that must be loaded before this group.
     """
+    if _this is None:
+        raise RuntimeError("This function may only be called inside a group module definition.")
     if group not in globals.available_groups:
         raise ValueError(f"Referenced invalid group '{group}'!")
-    if group == this.name:
+    if group == _this.name:
         raise ValueError("Cannot add reverse-dependency to self!")
 
-    this.groups_before.add(group)
+    _this.groups_before.add(group)
 
 def before_all(groups: list[str]):
     """
@@ -40,6 +55,8 @@ def before_all(groups: list[str]):
     groups
         The groups
     """
+    if _this is None:
+        raise RuntimeError("This function may only be called inside a group module definition.")
     for g in groups:
         before(g)
 
@@ -52,12 +69,14 @@ def after(group: str):
     group
         The group that must be loaded after this group.
     """
+    if _this is None:
+        raise RuntimeError("This function may only be called inside a group module definition.")
     if group not in globals.available_groups:
         raise ValueError(f"Referenced invalid group '{group}'!")
-    if group == this.name:
+    if group == _this.name:
         raise ValueError("Cannot add dependency to self!")
 
-    this.groups_after.add(group)
+    _this.groups_after.add(group)
 
 def after_all(groups: list[str]):
     """
@@ -68,6 +87,8 @@ def after_all(groups: list[str]):
     groups
         The groups
     """
+    if _this is None:
+        raise RuntimeError("This function may only be called inside a group module definition.")
     for g in groups:
         after(g)
 
@@ -92,7 +113,7 @@ def get_variables(group: GroupType) -> set[str]:
     module_vars -= set(GroupType.__annotations__)
     return module_vars
 
-this: GroupType = cast(GroupType, None) # Cast None to ease typechecking in user code.
+_this: GroupType = cast(GroupType, None) # Cast None to ease typechecking in user code.
 """
 This variable holds all meta information available to a group module when
 it is being loaded. It must not be used anywhere else but inside the
