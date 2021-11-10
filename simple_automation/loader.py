@@ -7,12 +7,13 @@ import inspect
 import os
 import sys
 from itertools import combinations
-from typing import cast, Optional
+from typing import cast, Any, Optional
 
 import simple_automation
+import simple_automation.host
 from simple_automation import logger
 from simple_automation.types import GroupType, HostType, InventoryType, ScriptType
-from simple_automation.utils import die_error, print_error, load_py_module, rank_sort, CycleError
+from simple_automation.utils import die_error, print_error, load_py_module, rank_sort, CycleError, set_this_group, set_this_host, set_this_script
 from simple_automation.connectors.connector import Connector
 
 script_stack: list[tuple[ScriptType, inspect.FrameInfo]] = []
@@ -32,8 +33,7 @@ class DefaultHost:
     """
 
     def __init__(self, name):
-        from simple_automation import this # pylint: disable=import-outside-toplevel
-        cast(HostType, this).url = name
+        cast(HostType, simple_automation.host.this).url = name
 
 def load_inventory(file: str) -> InventoryType:
     """
@@ -80,7 +80,7 @@ def load_group(module_file: str) -> GroupType:
         meta.after("all")
 
     # Instanciate module
-    with simple_automation.set_this(meta):
+    with set_this_group(meta):
         ret = cast(GroupType, load_py_module(module_file, pre_exec=lambda module: setattr(meta, 'module', module)))
 
     for reserved in GroupType.reserved_vars:
@@ -229,6 +229,7 @@ def define_special_global_variables(group_all):
     Defines special global variables on the given all group.
     Respects if the corresponding variable is already set.
     """
+    # TODO: rename this.
     if not hasattr(group_all, 'simple_automation_managed'):
         setattr(group_all, 'simple_automation_managed', "This file is managed by simple automation.")
 
@@ -325,7 +326,7 @@ def load_host(name: str, module_file: str) -> HostType:
     meta = HostType(name, module_file if module_file_exists else "__cmdline__")
     meta.add_group("all")
 
-    with simple_automation.set_this(meta):
+    with set_this_host(meta):
         # Instanciate module
         if module_file_exists:
             ret = cast(HostType, load_py_module(module_file, pre_exec=lambda module: setattr(meta, 'module', module)))
@@ -418,7 +419,10 @@ def load_site(inventories: list[str]):
     # Load all hosts defined in the inventory
     simple_automation.hosts = load_hosts()
 
-def run_script(script: str, frame: inspect.FrameInfo, name: Optional[str] = None):
+def run_script(script: str,
+               frame: inspect.FrameInfo,
+               params: dict[str, Any] = None,
+               name: Optional[str] = None):
     """
     Loads and implicitly runs the given script by creating a new instance.
 
@@ -445,11 +449,14 @@ def run_script(script: str, frame: inspect.FrameInfo, name: Optional[str] = None
         meta = ScriptType(name, script)
         script_stack.append((meta, frame))
         try:
-            with simple_automation.set_this(meta):
+            with set_this_script(meta):
                 # New script instance starts with fresh set of default values.
                 # Use defaults() here to resolve them at least once.
                 with meta.defaults():
-                    load_py_module(script, pre_exec=lambda module: setattr(meta, 'module', module))
+                    def _pre_exec(module):
+                        setattr(meta, 'module', module)
+                        setattr(module, '_params', params or {})
+                    load_py_module(script, pre_exec=_pre_exec)
         except Exception as e:
             # Save the current script_stack in any exception thrown from this context
             # for later use in any exception handler.

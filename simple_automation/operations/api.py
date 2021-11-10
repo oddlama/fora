@@ -9,6 +9,7 @@ from typing import cast, Any, Optional
 from types import TracebackType, FrameType
 
 import simple_automation
+import simple_automation.script
 from simple_automation import logger
 from simple_automation.types import RemoteDefaultsContext, ScriptType
 
@@ -78,7 +79,7 @@ class Operation:
         Sets defaults on the current script. See :meth:`simple_automation.types.ScriptType.defaults`.
         """
         _ = (self)
-        return cast(ScriptType, simple_automation.this).defaults(*args, **kwargs)
+        return simple_automation.script.this.defaults(*args, **kwargs)
 
     def initial_state(self, **kwargs):
         """
@@ -193,6 +194,7 @@ class Operation:
 
 def operation(op_name):
     """Operation function decorator."""
+
     def _calling_site_traceback() -> TracebackType:
         """
         Returns a modified traceback object which can be used in Exception.with_traceback() to make
@@ -235,12 +237,12 @@ def operation(op_name):
                 raise OperationError("The operation failed to return a status. THIS IS A BUG! Please report it to the package maintainer of the package which the operation belongs to.")
 
             if check and not ret.success:
-                e = OperationError(ret.failure_message)
+                error = OperationError(ret.failure_message)
                 # If we are not in debug mode, we modify the traceback such that the exception
                 # seems to originate at the calling site where the operation is called.
                 if simple_automation.args.debug:
-                    raise e
-                raise e.with_traceback(_calling_site_traceback())
+                    raise error
+                raise error.with_traceback(_calling_site_traceback())
 
             return ret
         return wrapper

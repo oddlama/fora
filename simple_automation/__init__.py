@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import argparse
 
-from typing import Optional, Union, Any, cast
+from typing import Union, cast
 from jinja2 import Environment
 
 from .log import Logger
@@ -69,7 +69,7 @@ This variable must not be used anywhere else but inside the primary definition o
 aforementioned modules, otherwise it will be None.
 """
 
-host: HostType = cast(HostType, None) # Cast None to ease typechecking in user code.
+current_host: HostType = cast(HostType, None) # Cast None to ease typechecking in user code.
 """
 The currently active host. Only set when a script is currently being executed on a host.
 """
@@ -79,34 +79,3 @@ jinja2_env: Environment = cast(Environment, NotYetLoaded())
 """
 The jinja2 environment used for templating
 """
-
-
-class SetVariableContextManager:
-    """
-    A context manager that sets a variable on enter and resets
-    it to the previous value on exit.
-    """
-    def __init__(self, obj: object, var: str, value: Any):
-        self.obj: object = obj
-        self.var: str = var
-        self.value: Any = value
-        self.old_value: Any = getattr(self.obj, self.var)
-
-    def __enter__(self):
-        setattr(self.obj, self.var, self.value)
-
-    def __exit__(self, exc_type, exc_value, trace):
-        _ = (exc_type, exc_value, trace)
-        setattr(self.obj, self.var, self.old_value)
-
-def current_host(active_host: HostType):
-    """
-    A context manager to temporarily set :attr:`simple_automation.host` to the given value.
-    """
-    return SetVariableContextManager(__import__(__name__), 'host', active_host)
-
-def set_this(value: Optional[Union[GroupType, HostType, ScriptType]]):
-    """
-    A context manager to temporarily set :attr:`simple_automation.this` to the given value.
-    """
-    return SetVariableContextManager(__import__(__name__), 'this', value)

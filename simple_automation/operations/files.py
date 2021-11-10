@@ -23,7 +23,7 @@ def _render_template(templ: Template, context: Optional[dict]) -> bytes:
     if "host" in context:
         raise OperationError("'host' cannot be set in context, as it is reserved for the current host.")
 
-    context["host"] = simple_automation.host
+    context["host"] = simple_automation.current_host
     return templ.render(context).encode('utf-8')
 
 def _save_content(content: Union[bytes, str],
@@ -56,7 +56,7 @@ def _save_content(content: Union[bytes, str],
     if isinstance(content, str):
         content = content.encode('utf-8')
 
-    conn = simple_automation.host.connection
+    conn = simple_automation.current_host.connection
     with op.defaults(file_mode=mode, owner=owner, group=group) as attr:
         final_sha512sum = hashlib.sha512(content).digest()
         op.final_state(exists=True, mode=attr.file_mode, owner=attr.owner, group=attr.group, sha512=final_sha512sum)
@@ -147,7 +147,7 @@ def directory(path: str,
     check_absolute_path(path)
     op.desc(path)
 
-    conn = simple_automation.host.connection
+    conn = simple_automation.current_host.connection
     with op.defaults(dir_mode=mode, owner=owner, group=group) as attr:
         op.final_state(exists=present, mode=attr.dir_mode, owner=attr.owner, group=attr.group, touched=touch)
 
@@ -158,7 +158,7 @@ def directory(path: str,
             op.initial_state(exists=False, mode=None, owner=None, group=None, touched=False)
         else:
             if stat.type != "dir":
-                raise OperationError(f"path '{path}' exists but is not a link!")
+                raise OperationError(f"path '{path}' exists but is not a directory!")
 
             # The directory exists but may have different attributes
             op.initial_state(exists=True, mode=stat.mode, owner=stat.owner, group=stat.group, touched=False)
@@ -233,7 +233,7 @@ def file(path: str,
     check_absolute_path(path)
     op.desc(path)
 
-    conn = simple_automation.host.connection
+    conn = simple_automation.current_host.connection
     with op.defaults(file_mode=mode, owner=owner, group=group) as attr:
         op.final_state(exists=present, mode=attr.file_mode, owner=attr.owner, group=attr.group, touched=touch)
 
@@ -319,7 +319,7 @@ def link(path: str,
     check_absolute_path(path)
     op.desc(path)
 
-    conn = simple_automation.host.connection
+    conn = simple_automation.current_host.connection
     with op.defaults(owner=owner, group=group) as attr:
         op.final_state(exists=present, owner=attr.owner, group=attr.group, touched=touch)
 
@@ -491,7 +491,6 @@ def upload_dir(src: str,
     group
         The group for all files and directories. Uses the remote execution defaults if None.
     """
-    # TODO: "recursive operation". The beginning headline cant be updated afterwards.
     # TODO: clean=True operation? i.e. ensure that nothing else is in the specified folder.
     _ = (name, check) # Processed automatically.
     op.nested(True)

@@ -6,14 +6,13 @@ the CLI interface and coordination of submodule loading.
 import argparse
 import inspect
 import os
-import sys
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 import simple_automation
 from simple_automation import logger
 from simple_automation.connection import open_connection
 from simple_automation.loader import load_site, run_script
-from simple_automation.utils import AbortExecutionSignal, col, die_error, install_exception_hook, print_exception
+from simple_automation.utils import col, die_error, install_exception_hook, set_current_host
 from simple_automation.version import __version__
 
 def init_runtime():
@@ -47,32 +46,29 @@ def main_run(args: argparse.Namespace):
     host_names = sorted(host_names)
 
     # TODO: multiprocessing?
+    # - displaying must then be handled by ncurses which makes things a lot more complex.
+    # - would open the door to a more interactive experience, e.g. allow to select past operations
+    #   and view information about them, scroll through diffs, ...
+    # - we need to save some kind of log file as the output won't persist in the terminal
+    # - fatal errors must be delayed until all executions are fininshed.
+
     # Instanciate (run) the given script for each selected host
     for h in host_names:
         host = simple_automation.hosts[h]
 
-        try:
-            logger.print(f"{col('[1;34m')}host{col('[m')} {host.name}")
-            with open_connection(host):
-                with simple_automation.current_host(host):
-                    run_script(args.script, inspect.getouterframes(inspect.currentframe())[0], name="Commandline argument")
-            print()
-        except AbortExecutionSignal as e:
-            _ = (e)
-            # TODO --> Abort because of errors, unless --continue, --ignore-errors or smth
-            print("EXEC ABORT REQUESTED, pls log beforehand, TODO check if we should continue on other hosts")
-            print_exception(*sys.exc_info())
-            sys.exit(1)
+        logger.print(f"{col('[1;34m')}host{col('[m')} {host.name}")
+        with open_connection(host):
+            with set_current_host(host):
+                run_script(args.script, inspect.getouterframes(inspect.currentframe())[0], name="Commandline argument")
+
+        # Separate hosts by a newline for better visibility
+        print()
 
 class ArgumentParserError(Exception):
-    """
-    Error class for argument parsing errors.
-    """
+    """Error class for argument parsing errors."""
 
 class ThrowingArgumentParser(argparse.ArgumentParser):
-    """                                                                                                                                                                                           mple_automation/connection.html#simple_automation.connection.Connection
-    An argument parser that throws when invalid argument types are passed.
-    """
+    """An argument parser that throws when invalid argument types are passed."""
 
     def error(self, message):
         """
@@ -97,7 +93,7 @@ def main():
     parser.add_argument('--dry', '--dry-run', '--pretend', dest='dry', action='store_true',
             help="Print what would be done instead of performing any actions. Probing commands will still be executed to determine the current state of the systems.")
     parser.add_argument('-v', '--verbose', dest='verbose', action='count', default=0,
-            help="Increase output verbosity. Can be given multiple times. ")
+            help="Increase output verbosity. Can be given multiple times.")
     parser.add_argument('--no-changes', dest='changes', action='store_false',
             help="Don't display changes for each operation in a short diff-like format.")
     parser.add_argument('--diff', dest='diff', action='store_true',
@@ -118,7 +114,6 @@ def main():
         die_error(str(e))
 
     # Force max verbosity with --debug
-    # TODO define max verbosity = 2 or 3?
     if args.debug:
         args.verbose = 99
 

@@ -11,9 +11,7 @@ import simple_automation
 from simple_automation.utils import col
 
 class IndentationContext:
-    """
-    A context manager to modify the indentation level.
-    """
+    """A context manager to modify the indentation level."""
     def __init__(self, logger):
         self.logger = logger
 
@@ -24,36 +22,21 @@ class IndentationContext:
         _ = (type_t, value, traceback)
         self.logger.indentation_level -= 1
 
-class ConnectionLogger:
-    def __init__(self, host, connector):
-        self.host = host
-        self.connector = connector
-
-    def init(self):
-        print(f"{col('[1;34m')}{self.connector.schema}{col('[m')} connecting... ", end="", flush=True)
-
-    def established(self):
-        print(col("[1;32m") + "OK" + col("[m"))
-
-    def requested_close(self):
-        pass
-        #print(f"[ CONN ] Requesting to close connection to {self.host.name}")
-
-    def closed(self):
-        pass
-        #print(f"[ CONN ] Connection to {self.host.name} closed")
-
-    def failed(self, msg):
-        pass
-        #print(f"[ CONN ] Connection to {self.host.name} failed: {msg}")
-
-    def error(self, msg):
-        pass
-        #print(f"[ CONN ] Connection error on {self.host.name}: {msg}")
-
-def ellipsis(s, width):
+def ellipsis(s: str, width: int) -> str:
     """
     Shrinks the given string to width (including an ellipsis character).
+
+    Parameters
+    ----------
+    s
+        The string.
+    width
+        The maximum width.
+
+    Returns
+    -------
+    str
+        A modified string with at most `width` characters.
     """
     if len(s) > width:
         s = s[:width - 1] + "…"
@@ -61,16 +44,20 @@ def ellipsis(s, width):
 
 class Logger:
     def __init__(self):
-        self.connections = {}
         self.indentation_level = 0
 
     def indent(self):
         return IndentationContext(self)
 
-    def new_connection(self, host, connector):
-        cl = ConnectionLogger(host, connector)
-        self.connections[host] = cl
-        return cl
+    def connection_init(self, connector):
+        print(f"{col('[1;34m')}{connector.schema}{col('[m')} connecting... ", end="", flush=True)
+
+    def connection_failed(self, error_msg: str):
+        print(col("[1;31m") + "ERR" + col("[m"))
+        self.print(f" {col('[37m')}└{col('[m')} " + f"{col('[31m')}{error_msg}{col('[m')}")
+
+    def connection_established(self):
+        print(col("[1;32m") + "OK" + col("[m"))
 
     def indent_prefix(self):
         ret = ""
@@ -114,7 +101,7 @@ class Logger:
         """
         Prints the operation summary
         """
-        # TODO make inventory.py able to set verbose=3 without needing to do -v everytime
+        # TODO: make inventory.py able to set verbose=3 without needing to do -v everytime
         if result.success:
             if result.changed:
                 title_color = col("[1;32m")

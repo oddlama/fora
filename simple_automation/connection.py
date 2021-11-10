@@ -5,7 +5,7 @@ Stores state along with the connection.
 
 from typing import cast, Optional
 
-import simple_automation
+import simple_automation.script
 from simple_automation.connectors.connector import Connector, CompletedRemoteCommand, StatResult
 from simple_automation.remote_settings import RemoteSettings
 from simple_automation.types import HostType, ScriptType
@@ -51,11 +51,11 @@ class Connection:
         RemoteSettings
             The resolved settings
         """
-        if not isinstance(simple_automation.this, ScriptType):
+        if not isinstance(simple_automation.script.this, ScriptType):
             raise RuntimeError("Cannot resolve defaults, when no script is currently running.")
 
         # Overlay settings on top of defaults
-        settings = simple_automation.this.current_defaults().overlay(settings)
+        settings = simple_automation.script.this.current_defaults().overlay(settings)
 
         # A function to check whether a mask is octal
         def check_mask(mask: Optional[str], name: str):
@@ -94,7 +94,7 @@ class Connection:
         """
         See :func:`simple_automation.connectors.connector.run`.
         """
-        defaults = cast(ScriptType, simple_automation.this).current_defaults()
+        defaults = simple_automation.script.this.current_defaults()
         return self.connector.run(
             command=command,
             input=input,

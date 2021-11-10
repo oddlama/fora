@@ -8,7 +8,7 @@ import sys
 import traceback
 import uuid
 from types import ModuleType
-from typing import TypeVar, Callable, Iterable, Optional
+from typing import Any, TypeVar, Callable, Iterable, Optional
 
 import importlib.machinery
 import importlib.util
@@ -17,7 +17,11 @@ import importlib.util
 # Cyclic import is correct at this point, as this module will not access anything from simple_automation
 # when it is being loaded, but only when certain functions are used.
 import simple_automation
-from simple_automation.types import ScriptType
+import simple_automation.group
+import simple_automation.host
+import simple_automation.script
+
+from simple_automation.types import GroupType, HostType, ScriptType
 
 T = TypeVar('T')
 
@@ -25,6 +29,28 @@ T = TypeVar('T')
 # These are guaranteed to be unique across all possible modules,
 # as a random uuid will be generated at load-time for each module.
 dynamically_loaded_modules: set[str] = set()
+
+class CycleError(ValueError):
+    """An error that is throw to report a cycle in a graph that must be cycle free."""
+
+    def __init__(self, msg, cycle):
+        super().__init__(msg)
+        self.cycle = cycle
+
+class SetVariableContextManager:
+    """A context manager that sets a variable on enter and resets it to the previous value on exit."""
+    def __init__(self, obj: object, var: str, value: Any):
+        self.obj: object = obj
+        self.var: str = var
+        self.value: Any = value
+        self.old_value: Any = getattr(self.obj, self.var)
+
+    def __enter__(self):
+        setattr(self.obj, self.var, self.value)
+
+    def __exit__(self, exc_type, exc_value, trace):
+        _ = (exc_type, exc_value, trace)
+        setattr(self.obj, self.var, self.old_value)
 
 def col(color_code: str) -> str:
     """
@@ -36,13 +62,6 @@ def col(color_code: str) -> str:
         use_color = not simple_automation.args.no_color
 
     return color_code if use_color else ""
-
-class AbortExecutionSignal(Exception):
-    """
-    An exception used to indicate an error condition that requires the execution to
-    be stopped for the current host. The exception stack will not be printed and should
-    be logged before raising this exception.
-    """
 
 def print_warning(msg: str):
     """
@@ -66,18 +85,21 @@ def die_error(msg: str, loc=None, status_code=1):
     print_error(msg, loc=loc)
     sys.exit(status_code)
 
-class CycleError(ValueError):
-    """
-    An error that is throw to report a cycle in a graph that must be cycle free.
-    """
+def set_current_host(host: HostType) -> SetVariableContextManager:
+    """A context manager to temporarily set :attr:`simple_automation.host` to the given value."""
+    return SetVariableContextManager(simple_automation, 'current_host', host)
 
-    def __init__(self, msg, cycle):
-        """
-        This error is thrown when a cycle is detected in a graph, and
-        the throwing function can't deal with cyclic graphs.
-        """
-        super().__init__(msg)
-        self.cycle = cycle
+def set_this_group(value: GroupType) -> SetVariableContextManager:
+    """A context manager to temporarily set :attr:`simple_automation.group.this` to the given value."""
+    return SetVariableContextManager(simple_automation.group, 'this', value)
+
+def set_this_host(value: HostType) -> SetVariableContextManager:
+    """A context manager to temporarily set :attr:`simple_automation.host.this` to the given value."""
+    return SetVariableContextManager(simple_automation.host, 'this', value)
+
+def set_this_script(value: ScriptType) -> SetVariableContextManager:
+    """A context manager to temporarily set :attr:`simple_automation.script.this` to the given value."""
+    return SetVariableContextManager(simple_automation.script, 'this', value)
 
 def load_py_module(file: str, pre_exec: Optional[Callable[[ModuleType], None]] = None) -> ModuleType:
     """
@@ -109,11 +131,11 @@ def rank_sort(vertices: Iterable[T], preds_of: Callable[[T], Iterable[T]], child
 
     Parameters
     ----------
-    vertices : Iterable[T]
+    vertices
         A list of vertices
-    preds_of : Callable[[T], Iterable[T]]
+    preds_of
         A function that returns a list of predecessors given a vertex
-    childs_of : Callable[[T], Iterable[T]]
+    childs_of
         A function that returns a list of successors given a vertex
 
     Returns

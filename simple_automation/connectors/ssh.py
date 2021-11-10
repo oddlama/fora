@@ -7,15 +7,28 @@ import base64
 import zlib
 import subprocess
 
-from typing import Optional
+from typing import Any, Optional, Type
 
 import simple_automation
 import simple_automation.connectors.tunnel_dispatcher as td
 
 from simple_automation import logger
 from simple_automation.connectors.connector import Connector, connector, CompletedRemoteCommand, StatResult
-from simple_automation.log import ConnectionLogger
 from simple_automation.types import HostType
+
+def _expect_response_packet(packet: Any, expected_type: Type):
+    """
+    Check if the given packet is of the expected type, otherwise raise a RuntimeError.
+
+    Parameters
+    ----------
+    packet
+        The packet to check.
+    expected_type
+        The expected type.
+    """
+    if not isinstance(packet, expected_type):
+        raise RuntimeError(f"Invalid response '{type(packet)}' from remote dispatcher. This is a bug.")
 
 @connector
 class SshConnector(Connector):
@@ -31,24 +44,21 @@ class SshConnector(Connector):
         else:
             self.url: str = f"{self.schema}://{getattr(host, 'ssh_host')}:{getattr(host, 'ssh_port')}"
 
-        self.log: ConnectionLogger = logger.new_connection(host, self)
         self.process: Optional[subprocess.Popen] = None
         self.conn: td.Connection
         self.is_open: bool = False
 
-    def _expect_response_packet(self, packet, expected_type):
-        if not isinstance(packet, expected_type):
-            self.log.error(f"Invalid response '{type(packet)}'")
-            raise RuntimeError(f"Invalid response '{type(packet)}' from remote dispatcher. This is a bug.")
-
     def open(self):
-        self.log.init()
+        logger.connection_init(self)
         with open(td.__file__, 'rb') as f:
             tunnel_dispatcher_gz_b64 = base64.b64encode(zlib.compress(f.read(), 9)).decode('ascii')
 
         # Start the remote dispatcher by uploading it inline as base64
         param_debug = "--debug" if simple_automation.args.debug else ""
         command = self._ssh_command(f"env python3 -c \"$(echo '{tunnel_dispatcher_gz_b64}' | base64 -d | openssl zlib -d)\" {param_debug}")
+
+        # pylint: disable=consider-using-with
+        # The process must outlive this function.
         self.process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=sys.stderr)
         self.conn = td.Connection(self.process.stdout, self.process.stdin)
 
@@ -64,9 +74,9 @@ class SshConnector(Connector):
         except IOError as e:
             returncode = self.process.poll()
             if returncode is None:
-                self.log.failed(f"Dispatcher handshake failed: {str(e)}")
+                logger.connection_failed(str(e))
             else:
-                self.log.failed(f"Dispatcher handshake failed: ssh exited with code {returncode}")
+                logger.connection_failed(f"ssh exited with code {returncode}")
             raise
         finally:
             # If the connection failed for any reason, be sure to kill the background process.
@@ -74,16 +84,14 @@ class SshConnector(Connector):
                 self.process.terminate()
                 self.process = None
 
-        self.log.established()
+        logger.connection_established()
 
-        # TODO assert Popen proccess is killed atexit
+        # TODO: check that we are root.
         #self._check_capabilities()
-        # TODO check that we are root.
 
     def close(self):
         if self.is_open:
             self.conn.write_packet(td.PacketExit())
-            self.log.requested_close()
 
         if self.process is not None:
             if self.process.stdin is not None:
@@ -92,7 +100,6 @@ class SshConnector(Connector):
             if self.process.stdout is not None:
                 self.process.stdout.close()
             self.process = None
-            self.log.closed()
 
     def run(self,
             command: list[str],
@@ -103,30 +110,25 @@ class SshConnector(Connector):
             group: Optional[str] = None,
             umask: Optional[str] = None,
             cwd: Optional[str] = None) -> CompletedRemoteCommand:
-        try:
-            # Construct and send packet with process information
-            packet_run = td.PacketProcessRun(
-                command=command,
-                stdin=input,
-                capture_output=capture_output,
-                user=user,
-                group=group,
-                umask=umask,
-                cwd=cwd)
-            self.conn.write_packet(packet_run)
+        # Construct and send packet with process information
+        packet_run = td.PacketProcessRun(
+            command=command,
+            stdin=input,
+            capture_output=capture_output,
+            user=user,
+            group=group,
+            umask=umask,
+            cwd=cwd)
+        self.conn.write_packet(packet_run)
 
-            # Wait for result packet
-            packet = td.receive_packet(self.conn)
-        except IOError as e:
-            self.log.error(f"Remote host disconnected unexpectedly: {str(e)}")
-            raise
+        # Wait for result packet
+        packet = td.receive_packet(self.conn)
 
         # Check type of incoming packet to handle errors differently
         if isinstance(packet, td.PacketInvalidField):
             raise ValueError(f"Invalid value '{getattr(packet_run, packet.field)}' given for field '{packet.field}': {packet.error_message}")
 
         if not isinstance(packet, td.PacketProcessCompleted):
-            self.log.error(f"Invalid response '{type(packet)}'")
             raise RuntimeError(f"Invalid response '{type(packet)}' from remote dispatcher. This is a bug.")
 
         result = CompletedRemoteCommand(stdout=packet.stdout,
@@ -143,25 +145,21 @@ class SshConnector(Connector):
         return result
 
     def stat(self, path: str, follow_links: bool = False, sha512sum: bool = False) -> Optional[StatResult]:
-        try:
-            # Construct and send packet with process information
-            packet_stat = td.PacketStat(
-                path=path,
-                follow_links=follow_links,
-                sha512sum=sha512sum)
-            self.conn.write_packet(packet_stat)
+        # Construct and send packet with process information
+        packet_stat = td.PacketStat(
+            path=path,
+            follow_links=follow_links,
+            sha512sum=sha512sum)
+        self.conn.write_packet(packet_stat)
 
-            # Wait for result packet
-            packet = td.receive_packet(self.conn)
-        except IOError as e:
-            self.log.error(f"Remote host disconnected unexpectedly: {str(e)}")
-            raise
+        # Wait for result packet
+        packet = td.receive_packet(self.conn)
 
         # Check type of incoming packet to handle errors
         if isinstance(packet, td.PacketInvalidField):
             return None
 
-        self._expect_response_packet(packet, td.PacketStatResult)
+        _expect_response_packet(packet, td.PacketStatResult)
         return StatResult(
             type=packet.type,
             mode=packet.mode,
@@ -176,42 +174,34 @@ class SshConnector(Connector):
         if user is None:
             return None
 
-        try:
-            packet_resolve = td.PacketResolveUser(user=user)
-            self.conn.write_packet(packet_resolve)
+        packet_resolve = td.PacketResolveUser(user=user)
+        self.conn.write_packet(packet_resolve)
 
-            # Wait for result packet
-            packet = td.receive_packet(self.conn)
-        except IOError as e:
-            self.log.error(f"Remote host disconnected unexpectedly: {str(e)}")
-            raise
+        # Wait for result packet
+        packet = td.receive_packet(self.conn)
 
         # Check type of incoming packet to handle errors differently
         if isinstance(packet, td.PacketInvalidField):
             raise ValueError(f"User '{user}' doesn't exist")
 
-        self._expect_response_packet(packet, td.PacketResolveResult)
+        _expect_response_packet(packet, td.PacketResolveResult)
         return packet.value
 
     def resolve_group(self, group: Optional[str]) -> Optional[str]:
         if group is None:
             return None
 
-        try:
-            packet_resolve = td.PacketResolveGroup(group=group)
-            self.conn.write_packet(packet_resolve)
+        packet_resolve = td.PacketResolveGroup(group=group)
+        self.conn.write_packet(packet_resolve)
 
-            # Wait for result packet
-            packet = td.receive_packet(self.conn)
-        except IOError as e:
-            self.log.error(f"Remote host disconnected unexpectedly: {str(e)}")
-            raise
+        # Wait for result packet
+        packet = td.receive_packet(self.conn)
 
         # Check type of incoming packet to handle errors differently
         if isinstance(packet, td.PacketInvalidField):
             raise ValueError(f"Group '{group}' doesn't exist")
 
-        self._expect_response_packet(packet, td.PacketResolveResult)
+        _expect_response_packet(packet, td.PacketResolveResult)
         return packet.value
 
     def upload(self,
@@ -220,43 +210,35 @@ class SshConnector(Connector):
             mode: Optional[str] = None,
             owner: Optional[str] = None,
             group: Optional[str] = None):
-        try:
-            packet_upload = td.PacketUpload(
-                    file=file,
-                    content=content,
-                    mode=mode,
-                    owner=owner,
-                    group=group)
-            self.conn.write_packet(packet_upload)
+        packet_upload = td.PacketUpload(
+                file=file,
+                content=content,
+                mode=mode,
+                owner=owner,
+                group=group)
+        self.conn.write_packet(packet_upload)
 
-            # Wait for result packet
-            packet = td.receive_packet(self.conn)
-        except IOError as e:
-            self.log.error(f"Remote host disconnected unexpectedly: {str(e)}")
-            raise
+        # Wait for result packet
+        packet = td.receive_packet(self.conn)
 
         # Check type of incoming packet to handle errors differently
         if isinstance(packet, td.PacketInvalidField):
             raise ValueError(f"Invalid value '{getattr(packet_upload, packet.field)}' given for field '{packet.field}': {packet.error_message}")
 
-        self._expect_response_packet(packet, td.PacketOk)
+        _expect_response_packet(packet, td.PacketOk)
 
     def download(self, file: str) -> bytes:
-        try:
-            packet_download = td.PacketDownload(file=file)
-            self.conn.write_packet(packet_download)
+        packet_download = td.PacketDownload(file=file)
+        self.conn.write_packet(packet_download)
 
-            # Wait for result packet
-            packet = td.receive_packet(self.conn)
-        except IOError as e:
-            self.log.error(f"Remote host disconnected unexpectedly: {str(e)}")
-            raise
+        # Wait for result packet
+        packet = td.receive_packet(self.conn)
 
         # Check type of incoming packet to handle errors differently
         if isinstance(packet, td.PacketInvalidField):
             raise ValueError(f"Invalid value '{getattr(packet_download, packet.field)}' given for field '{packet.field}': {packet.error_message}")
 
-        self._expect_response_packet(packet, td.PacketDownloadResult)
+        _expect_response_packet(packet, td.PacketDownloadResult)
         return packet.content
 
     def _ssh_command(self, remote_command_escaped: str) -> list[str]:
