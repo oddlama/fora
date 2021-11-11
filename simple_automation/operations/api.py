@@ -74,16 +74,12 @@ class Operation:
             print()
 
     def defaults(self, *args, **kwargs) -> RemoteDefaultsContext:
-        """
-        Sets defaults on the current script. See `simple_automation.types.ScriptType.defaults`.
-        """
+        """Sets defaults on the current script. See `simple_automation.types.ScriptType.defaults`."""
         _ = (self)
         return simple_automation.script.defaults(*args, **kwargs)
 
     def initial_state(self, **kwargs):
-        """
-        Sets the initial state.
-        """
+        """Sets the initial state."""
         if self.has_nested:
             raise OperationError("An operation that nests other operations cannot have state on its own.")
         if self.initial_state_dict is not None:
@@ -91,9 +87,7 @@ class Operation:
         self.initial_state_dict = dict(kwargs)
 
     def final_state(self, **kwargs):
-        """
-        Sets the final state.
-        """
+        """Sets the final state."""
         if self.has_nested:
             raise OperationError("An operation that nests other operations cannot have state on its own.")
         if self.final_state_dict is not None:

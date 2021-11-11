@@ -152,6 +152,34 @@ class Connection:
         """See `simple_automation.connectors.connector.Connector.download`."""
         return self.connector.download(file=file)
 
+    def download_or(self, file: str, default: Optional[bytes] = None) -> Optional[bytes]:
+        """
+        Same as `Connection.download`, but returns the given default in case the file doesn't exist.
+
+        Parameters
+        ----------
+        file
+            The file to download.
+        default
+            The alternative to return if the file doesn't exist.
+
+        Returns
+        -------
+        Optional[bytes]
+            The downloaded file or the default if the file didn't exist.
+
+        Raises
+        ------
+        simple_automation.connectors.tunnel_dispatcher.RemoteOSError
+            If the remote command fails for any reason other than file not found.
+        IOError
+            An error occurred with the connection.
+        """
+        try:
+            return self.download(file=file)
+        except ValueError:
+            return default
+
 def open_connection(host: HostType) -> Connection:
     """
     Returns a connection (context manager) that opens the connection when it is entered and

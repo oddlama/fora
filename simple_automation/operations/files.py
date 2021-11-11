@@ -2,7 +2,6 @@
 Provides operations related to creating and modifying files and directories.
 """
 
-import hashlib
 import os
 from os.path import join, relpath, normpath
 from typing import Optional, Union
@@ -13,9 +12,8 @@ from jinja2.exceptions import TemplateNotFound, UndefinedError
 import simple_automation.host
 from simple_automation import globals as G, logger
 from simple_automation.operations.api import Operation, OperationError, OperationResult, operation
-from simple_automation.operations.utils import check_absolute_path
+from simple_automation.operations.utils import check_absolute_path, save_content
 
-# TODO: note in doctring of template and template_content that context will be added on top and can shadow variables.
 def _render_template(templ: Template, context: Optional[dict]) -> bytes:
     """
     Renders the given template with the additional variables provided context (if any).
@@ -45,82 +43,6 @@ def _render_template(templ: Template, context: Optional[dict]) -> bytes:
     dvars.update(context)
 
     return templ.render(dvars).encode('utf-8')
-
-def _save_content(content: Union[bytes, str],
-                  dest: str,
-                  mode: Optional[str] = None,
-                  owner: Optional[str] = None,
-                  group: Optional[str] = None,
-                  op: Operation = Operation.internal_use_only) -> OperationResult:
-    """
-    Saves the given content as dest on the remote host.
-
-    Parameters
-    ----------
-    content
-        The file content.
-    dest
-        The remote destination path.
-    mode
-        The file mode. Uses the remote execution defaults if None.
-    owner
-        The file owner. Uses the remote execution defaults if None.
-    group
-        The file group. Uses the remote execution defaults if None.
-    op
-        The operation wrapper. Must not be supplied by the user.
-    """
-    if isinstance(content, str):
-        content = content.encode('utf-8')
-
-    conn = simple_automation.host.current_host.connection
-    with op.defaults(file_mode=mode, owner=owner, group=group) as attr:
-        final_sha512sum = hashlib.sha512(content).digest()
-        op.final_state(exists=True, mode=attr.file_mode, owner=attr.owner, group=attr.group, sha512=final_sha512sum)
-
-        # Examine current state
-        stat = conn.stat(dest, sha512sum=True)
-        if stat is None:
-            # The directory doesn't exist
-            op.initial_state(exists=False, mode=None, owner=None, group=None, sha512=None)
-        else:
-            if stat.type != "file":
-                raise OperationError(f"path '{dest}' exists but is not a file!")
-
-            # The file exists but may have different attributes or content
-            op.initial_state(exists=True, mode=stat.mode, owner=stat.owner, group=stat.group, sha512=stat.sha512sum)
-
-        # Return success if nothing needs to be changed
-        if op.unchanged():
-            return op.success()
-
-        # Apply actions to reach desired state, but only if we are not doing a dry run
-        if not G.args.dry:
-            # Create directory if it doesn't exist
-            if op.changed("exists") or op.changed("sha512"):
-                if G.args.diff:
-                    try:
-                        old_content: Optional[bytes] = conn.download(file=dest)
-                    except ValueError:
-                        old_content = None
-                    op.diff(file=dest, old=old_content, new=content)
-
-                conn.upload(
-                        file=dest,
-                        content=content,
-                        mode=attr.file_mode,
-                        owner=attr.owner,
-                        group=attr.group)
-            else:
-                # Set correct mode, if needed
-                if op.changed("mode"):
-                    conn.run(["chmod", attr.file_mode, "--", dest])
-
-                # Set correct owner and group, if needed
-                if op.changed("owner") or op.changed("group"):
-                    conn.run(["chown", f"{attr.owner}:{attr.group}", "--", dest])
-
-        return op.success()
 
 @operation("dir")
 def directory(path: str,
@@ -413,7 +335,7 @@ def upload_content(content: Union[str, bytes],
     _ = (name, check) # Processed automatically.
     check_absolute_path(dest)
     op.desc(dest)
-    return _save_content(content, dest, mode, owner, group, op=op)
+    return save_content(op, content, dest, mode, owner, group)
 
 @operation("upload")
 def upload(src: str,
@@ -452,7 +374,7 @@ def upload(src: str,
     check_absolute_path(dest)
     op.desc(dest)
     with open(src, 'rb') as f:
-        return _save_content(f.read(), dest, mode, owner, group, op=op)
+        return save_content(op, f.read(), dest, mode, owner, group)
 
 @operation("upload_dir")
 def upload_dir(src: str,
@@ -555,6 +477,7 @@ def template_content(content: str,
                      op: Operation = Operation.internal_use_only) -> OperationResult:
     """
     Templates the given content and uploads the result to the remote host.
+    See `simple_automation.operations.files.template` for more information about the available variables in the template.
 
     Parameters
     ----------
@@ -589,7 +512,7 @@ def template_content(content: str,
     except UndefinedError as e:
         raise OperationError(f"error while templating string: {str(e)}") from None
 
-    return _save_content(rendered_content, dest, mode, owner, group, op=op)
+    return save_content(op, rendered_content, dest, mode, owner, group)
 
 @operation("template")
 def template(src: str,
@@ -603,6 +526,9 @@ def template(src: str,
              op: Operation = Operation.internal_use_only) -> OperationResult:
     """
     Templates the given file and uploads the result to the remote host.
+    All host variables, including inherited variables will be available by default.
+    The current host will additionally be added under the key `'host'`.
+    Any variable provided via the context will shadow existing variables.
 
     Parameters
     ----------
@@ -641,6 +567,6 @@ def template(src: str,
     except UndefinedError as e:
         raise OperationError(f"error while templating '{src}': {str(e)}") from None
 
-    return _save_content(rendered_content, dest, mode, owner, group, op=op)
+    return save_content(op, rendered_content, dest, mode, owner, group)
 
 # TODO: unix user, group, user_supplementary_group

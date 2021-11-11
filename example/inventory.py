@@ -8,3 +8,8 @@ hosts = [ "localhost"
 #        , ("mail1", "hosts/mail.py")
 #        , ("mail2", "hosts/mail.py")
         ]
+
+# The inventory is loaded early, so you may modify the parsed options of
+# simple_automation here, to enforce certain settings for your inventory.
+# from simple_automation import globals as G
+# G.args.diff = True

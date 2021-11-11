@@ -104,7 +104,6 @@ def print_operation_early(op):
 
 def print_operation(op, result):
     """Prints the operation summary after it has finished execution."""
-    # TODO: make inventory.py able to set verbose=3 without needing to do -v everytime
     if result.success:
         title_color = col("[1;32m") if result.changed else col("[1m")
     else:
