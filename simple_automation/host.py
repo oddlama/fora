@@ -3,7 +3,7 @@ Provides API for host definitions.
 """
 
 from __future__ import annotations
-from typing import Any, cast
+from typing import Any, Mapping, cast
 
 from simple_automation import globals as G
 from simple_automation.types import HostType
@@ -60,8 +60,8 @@ def getattr_hierarchical(host: HostType, attr: str) -> Any:
       3. Script variables
       4. raises AttributeError
 
-    If the attribute start with an underscore, the lookup will always be from the host object
-    itself, and won't be propagated.
+    If the attribute starts with an underscore, the lookup will always be from the host object
+    itself, and won't be propagated hierarchically.
 
     Parameters
     ----------
@@ -81,18 +81,18 @@ def getattr_hierarchical(host: HostType, attr: str) -> Any:
         The given attribute was not found.
     """
     if attr.startswith("_") or attr in HostType.__annotations__:
-        if attr not in host.__dict__:
+        if attr not in vars(host):
             raise AttributeError(attr)
-        return host.__dict__[attr]
+        return vars(host)[attr]
 
     # Look up variable on host module
-    if attr in host.__dict__:
-        return host.__dict__[attr]
+    if attr in vars(host):
+        return vars(host)[attr]
 
     # Look up variable on groups
     for g in G.group_order:
         # Only consider a group if the host is in that group
-        if g not in host.__dict__["groups"]:
+        if g not in vars(host)["groups"]:
             continue
 
         # Return the attribute if it is set on the group
@@ -111,17 +111,9 @@ def getattr_hierarchical(host: HostType, attr: str) -> Any:
 
 def hasattr_hierarchical(host: HostType, attr: str) -> Any:
     """
-    Checks whether the given attribute exists in the host's hierarchy.
-    Checks are done in the following order:
-
-      1. Host variables
-      2. Group variables (respecting topological order), the global "all" group
-         implicitly will be the last in the chain
-      3. Script variables
-      4. False
-
-    If the attribute start with an underscore, the lookup will always be from the host object
-    itself, and won't be propagated.
+    Functions exactly similar to `getattr_hierarchical` but checks whether the given
+    attribute exists in the host's hierarchy instead of returning its value.
+    The same constraints as for `getattr_hierarchical` apply.
 
     Parameters
     ----------
@@ -136,16 +128,16 @@ def hasattr_hierarchical(host: HostType, attr: str) -> Any:
         True if the attribute exists
     """
     if attr.startswith("_") or attr in HostType.__annotations__:
-        return attr in host.__dict__
+        return attr in vars(host)
 
     # Look up variable on host module
-    if attr in host.__dict__:
+    if attr in vars(host):
         return True
 
     # Look up variable on groups
     for g in G.group_order:
         # Only consider a group if the host is in that group
-        if g not in host.__dict__["groups"]:
+        if g not in vars(host)["groups"]:
             continue
 
         # Return the attribute if it is set on the group
@@ -161,6 +153,65 @@ def hasattr_hierarchical(host: HostType, attr: str) -> Any:
             return True
 
     return False
+
+#def vars_hierarchical(host: HostType) -> dict[str, Any]:
+#    """
+#    Functions similarly to a hierarchical equivalent of `vars()`, like
+#    `getattr_hierarchical` is the hierarchical equivalent of `getattr`.
+#    The same constraints as for `getattr_hierarchical` apply.
+#    AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA TODO
+#
+#    Parameters
+#    ----------
+#    host
+#        The host on which we operate
+#
+#    Returns
+#    -------
+#    dict[str, Any]
+#        A dictionary AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAaaa
+#    """
+#    aaaaaaa
+#    class LazyDict(Mapping):
+#        def __init__(self):
+#            self._raw_dict = {}
+#
+#        def __getitem__(self, key):
+#            func, arg = self._raw_dict.__getitem__(key)
+#            return func(arg)
+#
+#        def __iter__(self):
+#            return iter(self._raw_dict)
+#
+#        def __len__(self):
+#            return len(self._raw_dict)
+#
+#    if attr.startswith("_") or attr in HostType.__annotations__:
+#        return attr in vars(host)
+#
+#    # Look up variable on host module
+#    if attr in vars(host):
+#        return True
+#
+#    # Look up variable on groups
+#    for g in G.group_order:
+#        # Only consider a group if the host is in that group
+#        if g not in vars(host)["groups"]:
+#            continue
+#
+#        # Return the attribute if it is set on the group
+#        group = G.groups[g]
+#        if hasattr(group, attr):
+#            return True
+#
+#    # Look up variable on current script
+#    # pylint: disable=protected-access,import-outside-toplevel,cyclic-import
+#    import simple_automation.script
+#    if simple_automation.script._this is not None:
+#        if hasattr(simple_automation.script._this, attr):
+#            return True
+#
+#    return False
 
 _this: HostType = cast(HostType, None) # Cast None to ease typechecking in user code.
 """

@@ -5,7 +5,7 @@ Provides operations related to creating and modifying files and directories.
 import hashlib
 import os
 from os.path import join, relpath, normpath
-from typing import Optional, Union
+from typing import Mapping, Optional, Union
 
 from jinja2 import Template
 from jinja2.exceptions import TemplateNotFound, UndefinedError
@@ -14,9 +14,43 @@ import simple_automation.host
 from simple_automation import globals as G, logger
 from simple_automation.operations.api import Operation, OperationError, OperationResult, operation
 from simple_automation.operations.utils import check_absolute_path
+from simple_automation.types import GroupType, HostType, ScriptType
 
+# TODO: note in doctring of template and template_content that context will be added on top and can shadow variables.
 def _render_template(templ: Template, context: Optional[dict]) -> bytes:
     """Renders the given template with the provided context, but adds the current host to the context before rendering."""
+    d = {}
+
+    import simple_automation
+    import simple_automation.host
+    for attr in simple_automation.host.current_host.__dict__:
+        if attr.startswith("_") or attr in HostType.__annotations__:
+            continue
+        # TODO as own func and there do it directly
+        d[attr] = getattr(simple_automation.host.current_host, attr)
+
+    # Look up variable on groups
+    for g in G.group_order:
+        # Only consider a group if the host is in that group
+        if g not in vars(simple_automation.host.current_host)["groups"]:
+            continue
+
+        # Return the attribute if it is set on the group
+        group = G.groups[g]
+        for attr in vars(group):
+            # TODO: check if grouptype.__annotations__ is exempted from getattr_hierarchical!!!!!!!!
+            if attr.startswith("_") or attr in HostType.__annotations__ or attr in GroupType.__annotations__:
+                continue
+            d[attr] = getattr(group, attr)
+
+    import simple_automation.script
+    if simple_automation.script._this is not None:
+        for attr in vars(simple_automation.script._this):
+            if attr.startswith("_") or attr in ScriptType.__annotations__:
+                continue
+            d[attr] = getattr(simple_automation.script._this, attr)
+    d["host"] = simple_automation.host.current_host
+
     if context is None:
         context = {}
 
@@ -24,7 +58,7 @@ def _render_template(templ: Template, context: Optional[dict]) -> bytes:
         raise OperationError("'host' cannot be set in context, as it is reserved for the current host.")
 
     context["host"] = simple_automation.host.current_host
-    return templ.render(context).encode('utf-8')
+    return templ.render(d).encode('utf-8')
 
 def _save_content(content: Union[bytes, str],
                   dest: str,
@@ -50,9 +84,6 @@ def _save_content(content: Union[bytes, str],
     op
         The operation wrapper. Must not be supplied by the user.
     """
-    check_absolute_path(dest)
-    op.desc(dest)
-
     if isinstance(content, str):
         content = content.encode('utf-8')
 
@@ -394,6 +425,8 @@ def upload_content(content: Union[str, bytes],
         The operation wrapper. Must not be supplied by the user.
     """
     _ = (name, check) # Processed automatically.
+    check_absolute_path(dest)
+    op.desc(dest)
     return _save_content(content, dest, mode, owner, group, op=op)
 
 @operation("upload")
@@ -430,6 +463,8 @@ def upload(src: str,
         The operation wrapper. Must not be supplied by the user.
     """
     _ = (name, check) # Processed automatically.
+    check_absolute_path(dest)
+    op.desc(dest)
     with open(src, 'rb') as f:
         return _save_content(f.read(), dest, mode, owner, group, op=op)
 
@@ -564,11 +599,15 @@ def template_content(content: str,
         The operation wrapper. Must not be supplied by the user.
     """
     _ = (name, check) # Processed automatically.
+    check_absolute_path(dest)
+    op.desc(dest)
+
     try:
         templ = G.jinja2_env.from_string(content)
         rendered_content = _render_template(templ, context)
     except UndefinedError as e:
-        raise OperationError(f"error while templating string: {str(e)}") from e
+        # TODO replace exception! not "during exeption another expctzop eocot"
+        raise OperationError(f"error while templating string: {str(e)}")
 
     return _save_content(rendered_content, dest, mode, owner, group, op=op)
 
@@ -609,6 +648,9 @@ def template(src: str,
         The operation wrapper. Must not be supplied by the user.
     """
     _ = (name, check) # Processed automatically.
+    check_absolute_path(dest)
+    op.desc(dest)
+
     try:
         templ = G.jinja2_env.get_template(src)
     except TemplateNotFound as e:
@@ -617,7 +659,7 @@ def template(src: str,
     try:
         rendered_content = _render_template(templ, context)
     except UndefinedError as e:
-        raise OperationError(f"error while templating '{src}': {str(e)}") from e
+        raise OperationError(f"error while templating '{src}': {str(e)}")
 
     return _save_content(rendered_content, dest, mode, owner, group, op=op)
 

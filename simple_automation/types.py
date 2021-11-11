@@ -33,7 +33,6 @@ class MockupType(ModuleType):
             if hasattr(self, var):
                 setattr(module, var, getattr(self, var))
 
-# TODO make Example a section in the sphinx documentation
 @dataclass
 class GroupType(MockupType):
     """
@@ -45,9 +44,8 @@ class GroupType(MockupType):
     When writing a group module, you can use the API exposed in `simple_automation.group`
     to access/change meta information about your module.
 
-    Example: Using meta information (groups/webserver.py)
-
-    .. code-block:: python
+    Example: Using meta information `(groups/webserver.py)`
+    ----
 
         from simple_automation import group as this
 
@@ -69,7 +67,6 @@ class GroupType(MockupType):
     groups_after: set[str] = field(default_factory=set)
     """This group will be loaded after this set of other groups."""
 
-# TODO: make Example a section in the sphinx documentation
 @dataclass
 class HostType(MockupType):
     """
@@ -81,9 +78,8 @@ class HostType(MockupType):
     When writing a host module, you can use the API exposed in `simple_automation.host`
     to access/change meta information about your module.
 
-    Example: Using meta information (hosts/myhost.py)
-
-    .. code-block:: python
+    Example: Using meta information `(hosts/myhost.py)`
+    ----
 
         from simple_automation import host as this
 

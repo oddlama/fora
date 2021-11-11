@@ -7,10 +7,6 @@ from typing import cast
 from simple_automation import globals as G
 from simple_automation.types import GroupType
 
-# TODO: get rid of HostType except for mockup!!!!!
-# -> functions go to module level
-# -> mockup type becomes dataclass effectively
-
 # TODO: add Raises to methods that raise errors
 # TODO: replace ..code-block with smth else for pdoc3
 # TODO: check all doc links and refactor them for pdoc3 (also maybe wrong links now)
@@ -107,9 +103,9 @@ def get_variables(group: GroupType) -> set[str]:
         The user-defined attributes for the given group
     """
     module_vars = set(attr for attr in dir(group) if
-                         not callable(getattr(group, attr)) and
-                         not attr.startswith("_") and
-                         not isinstance(getattr(group, attr), ModuleType))
+                        not callable(getattr(group, attr)) and
+                        not attr.startswith("_") and
+                        not isinstance(getattr(group, attr), ModuleType))
     module_vars -= set(GroupType.__annotations__)
     return module_vars
 
