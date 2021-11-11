@@ -7,7 +7,7 @@ results over any connection that forwards both stdin/stdout, as well as some oth
 needed remote system related utilities.
 """
 
-import errno
+import errno as sys_errno
 import hashlib
 import os
 import stat
@@ -389,7 +389,7 @@ class PacketProcessRun(NamedTuple):
 
         if self.cwd is not None:
             if not os.path.isdir(self.cwd):
-                conn.write_packet(PacketInvalidField("cwd", f"The directory does not exist"))
+                conn.write_packet(PacketInvalidField("cwd", "The directory does not exist"))
                 return
 
         def child_preexec():
@@ -443,7 +443,7 @@ class PacketStat(NamedTuple):
         try:
             s = os.stat(self.path, follow_symlinks=self.follow_links)
         except OSError as e:
-            if e.errno != errno.ENOENT:
+            if e.errno != sys_errno.ENOENT:
                 raise
             conn.write_packet(PacketInvalidField("path", str(e)))
             return
@@ -603,7 +603,7 @@ class PacketDownload(NamedTuple):
             with open(self.file, 'rb') as f:
                 content = f.read()
         except OSError as e:
-            if e.errno != errno.ENOENT:
+            if e.errno != sys_errno.ENOENT:
                 raise
             conn.write_packet(PacketInvalidField("file", str(e)))
             return

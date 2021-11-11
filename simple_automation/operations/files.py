@@ -5,7 +5,7 @@ Provides operations related to creating and modifying files and directories.
 import hashlib
 import os
 from os.path import join, relpath, normpath
-from typing import Mapping, Optional, Union
+from typing import Optional, Union
 
 from jinja2 import Template
 from jinja2.exceptions import TemplateNotFound, UndefinedError
@@ -14,51 +14,37 @@ import simple_automation.host
 from simple_automation import globals as G, logger
 from simple_automation.operations.api import Operation, OperationError, OperationResult, operation
 from simple_automation.operations.utils import check_absolute_path
-from simple_automation.types import GroupType, HostType, ScriptType
 
 # TODO: note in doctring of template and template_content that context will be added on top and can shadow variables.
 def _render_template(templ: Template, context: Optional[dict]) -> bytes:
-    """Renders the given template with the provided context, but adds the current host to the context before rendering."""
-    d = {}
+    """
+    Renders the given template with the additional variables provided context (if any).
+    The current host will be added under the key 'host', except when this key is already
+    set explicitly in the given context.
 
-    import simple_automation
-    import simple_automation.host
-    for attr in simple_automation.host.current_host.__dict__:
-        if attr.startswith("_") or attr in HostType.__annotations__:
-            continue
-        # TODO as own func and there do it directly
-        d[attr] = getattr(simple_automation.host.current_host, attr)
+    Parameters
+    ----------
+    templ
+        The template to render.
+    context
+        The additional rendering context. Overwrites any implicit templating variables from the host.
 
-    # Look up variable on groups
-    for g in G.group_order:
-        # Only consider a group if the host is in that group
-        if g not in vars(simple_automation.host.current_host)["groups"]:
-            continue
+    Returns
+    -------
+    bytes
+        The utf-8 encoded rendered template.
+    """
 
-        # Return the attribute if it is set on the group
-        group = G.groups[g]
-        for attr in vars(group):
-            # TODO: check if grouptype.__annotations__ is exempted from getattr_hierarchical!!!!!!!!
-            if attr.startswith("_") or attr in HostType.__annotations__ or attr in GroupType.__annotations__:
-                continue
-            d[attr] = getattr(group, attr)
+    dvars = simple_automation.host.vars_hierarchical(simple_automation.host.current_host)
 
-    import simple_automation.script
-    if simple_automation.script._this is not None:
-        for attr in vars(simple_automation.script._this):
-            if attr.startswith("_") or attr in ScriptType.__annotations__:
-                continue
-            d[attr] = getattr(simple_automation.script._this, attr)
-    d["host"] = simple_automation.host.current_host
-
+    # Add context and 'host'
     if context is None:
         context = {}
+    if 'host' not in context:
+        context['host'] = simple_automation.host.current_host
+    dvars.update(context)
 
-    if "host" in context:
-        raise OperationError("'host' cannot be set in context, as it is reserved for the current host.")
-
-    context["host"] = simple_automation.host.current_host
-    return templ.render(d).encode('utf-8')
+    return templ.render(dvars).encode('utf-8')
 
 def _save_content(content: Union[bytes, str],
                   dest: str,
@@ -484,26 +470,21 @@ def upload_dir(src: str,
 
     Given the following source directory:
 
-    .. code-block:: bash
          example/
         └ something.conf
 
     A trailing slash will cause the folder to become a child of the destination directory.
 
-    .. code-block:: python
         upload_dir("example", "/var/")
 
-    .. code-block:: bash
          /var/
         └  example/
           └ something.conf
 
     No trailing slash will cause the folder to become the specified folder.
 
-    .. code-block:: python
         upload_dir("example", "/var/myexample")
 
-    .. code-block:: bash
          /var/
         └  myexample/
           └ something.conf
@@ -606,8 +587,7 @@ def template_content(content: str,
         templ = G.jinja2_env.from_string(content)
         rendered_content = _render_template(templ, context)
     except UndefinedError as e:
-        # TODO replace exception! not "during exeption another expctzop eocot"
-        raise OperationError(f"error while templating string: {str(e)}")
+        raise OperationError(f"error while templating string: {str(e)}") from None
 
     return _save_content(rendered_content, dest, mode, owner, group, op=op)
 
@@ -654,15 +634,13 @@ def template(src: str,
     try:
         templ = G.jinja2_env.get_template(src)
     except TemplateNotFound as e:
-        raise OperationError("template not found: " + str(e)) from e
+        raise OperationError(f"template '{str(e)}' not found") from None
 
     try:
         rendered_content = _render_template(templ, context)
     except UndefinedError as e:
-        raise OperationError(f"error while templating '{src}': {str(e)}")
+        raise OperationError(f"error while templating '{src}': {str(e)}") from None
 
     return _save_content(rendered_content, dest, mode, owner, group, op=op)
 
 # TODO: unix user, group, user_supplementary_group
-#       (maybe indent automatically at begin of each operation.
-#       nesting could lead to possible problem/complication with state checking, dry run, etc.

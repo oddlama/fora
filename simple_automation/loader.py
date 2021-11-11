@@ -1,6 +1,4 @@
-"""
-Provides the submodule loading functions.
-"""
+"""Provides the dynamic module loading utilities."""
 
 import glob
 import inspect
@@ -68,7 +66,7 @@ def load_group(module_file: str) -> GroupType:
     """
 
     name = os.path.splitext(os.path.basename(module_file))[0]
-    meta = GroupType(name=name, loaded_from=module_file)
+    meta = GroupType(name=name, _loaded_from=module_file)
 
     # Instanciate module
     with set_this_group(meta) as ctx:
@@ -99,13 +97,14 @@ def check_modules_for_conflicts(a: GroupType, b: GroupType) -> bool:
     bool
         True when at least one conflicting attribute was found
     """
+    # pylint: disable=protected-access
     conflicts = list(simple_automation.group.get_variables(a) & simple_automation.group.get_variables(b))
     had_conflicts = False
     for conflict in conflicts:
         if not had_conflicts:
             print_error("Found group variables with ambiguous evaluation order, insert group dependency or remove one definition.")
             had_conflicts = True
-        print_error(f"Definition of '{conflict}' is in conflict with definition at '{b.loaded_from}", loc=a.loaded_from)
+        print_error(f"Definition of '{conflict}' is in conflict with definition at '{b._loaded_from}", loc=a._loaded_from)
     return had_conflicts
 
 def merge_group_dependencies(groups: dict[str, GroupType]):
@@ -120,24 +119,25 @@ def merge_group_dependencies(groups: dict[str, GroupType]):
     groups
         The dictionary of groups
     """
+    # pylint: disable=protected-access
     # Unify _before and _after dependencies
     for g in groups:
-        for before in groups[g].groups_before:
-            groups[before].groups_after.add(g)
+        for before in groups[g]._groups_before:
+            groups[before]._groups_after.add(g)
 
     # Deduplicate _after, clear before
     for _,group in groups.items():
-        group.groups_before = set()
-        group.groups_after = set(group.groups_after)
+        group._groups_before = set()
+        group._groups_after = set(group._groups_after)
 
     # Recalculate _before from _after
     for g in groups:
-        for after in groups[g].groups_after:
-            groups[after].groups_before.add(g)
+        for after in groups[g]._groups_after:
+            groups[after]._groups_before.add(g)
 
     # Deduplicate before
     for _,group in groups.items():
-        group.groups_before = set(group.groups_before)
+        group._groups_before = set(group._groups_before)
 
 def sort_and_validate_groups(groups: dict[str, GroupType]) -> list[str]:
     """
@@ -154,6 +154,7 @@ def sort_and_validate_groups(groups: dict[str, GroupType]) -> list[str]:
     list[GroupType]
         The topologically sorted list of groups
     """
+    # pylint: disable=protected-access
 
     # Rank sort from bottom-up and top-down to calculate minimum rank and maximum rank.
     # This is basically the earliest time a group might be applied (exactly after all dependencies
@@ -161,22 +162,22 @@ def sort_and_validate_groups(groups: dict[str, GroupType]) -> list[str]:
     #
     # Rank numbers are already 0-based. This means in the top-down view, the root node
     # has top-rank 0 and a high bottom-rank, and all leaves have bottom_rank 0 a high top-rank.
-    l_before = lambda g: groups[g].groups_before
-    l_after = lambda g: groups[g].groups_after
+    l_before = lambda g: groups[g]._groups_before
+    l_after = lambda g: groups[g]._groups_after
 
     try:
         gkeys = list(groups.keys())
         ranks_t = rank_sort(gkeys, l_before, l_after) # Top-down
         ranks_b = rank_sort(gkeys, l_after, l_before) # Bottom-up
     except CycleError as e:
-        die_error(f"Dependency cycle detected! The cycle includes {[groups[g].loaded_from for g in e.cycle]}.")
+        die_error(f"Dependency cycle detected! The cycle includes {[groups[g]._loaded_from for g in e.cycle]}.")
 
     # Find cycles in dependencies by checking for the existence of any edge that doesn't increase the rank.
     # This is an error.
     for g in groups:
-        for c in groups[g].groups_after:
+        for c in groups[g]._groups_after:
             if ranks_t[c] <= ranks_t[g]:
-                die_error(f"Dependency cycle detected! The cycle includes '{groups[g].loaded_from}' and '{groups[c].loaded_from}'.")
+                die_error(f"Dependency cycle detected! The cycle includes '{groups[g]._loaded_from}' and '{groups[c]._loaded_from}'.")
 
     # Find the maximum rank. Both ranking systems have the same number of ranks. This is
     # true because the longest dependency chain determines the amount of ranks, and all dependencies
@@ -288,17 +289,18 @@ def resolve_connector(host: HostType):
     host
         The host
     """
+    # pylint: disable=protected-access
     if host.connector is None:
         schema = host.url.split(':')[0]
         if schema in Connector.registered_connectors:
             host.connector = Connector.registered_connectors[schema]
         else:
-            die_error(f"No connector found for schema {schema}", loc=host.loaded_from)
+            die_error(f"No connector found for schema {schema}", loc=host._loaded_from)
     elif callable(host.connector):
         # The connector was explicitly given
         pass
     else:
-        die_error("Invalid connector was specified", loc=host.loaded_from)
+        die_error("Invalid connector was specified", loc=host._loaded_from)
 
 def load_host(name: str, module_file: str) -> HostType:
     """
@@ -317,7 +319,7 @@ def load_host(name: str, module_file: str) -> HostType:
         The host module
     """
     module_file_exists = os.path.exists(module_file)
-    meta = HostType(name=name, loaded_from=module_file if module_file_exists else "__cmdline__")
+    meta = HostType(name=name, _loaded_from=module_file if module_file_exists else "__cmdline__")
 
     with set_this_host(meta) as ctx:
         simple_automation.host.add_group("all")

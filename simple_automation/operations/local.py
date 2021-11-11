@@ -45,7 +45,8 @@ def script(script: str, # pylint: disable=redefined-outer-name
     # Asserts that the call is not recursive, if not explicitly allowed
     if not recursive:
         for meta, _ in script_stack:
-            if os.path.samefile(script, meta.loaded_from):
+            # pylint: disable=protected-access
+            if os.path.samefile(script, meta._loaded_from):
                 raise ValueError(f"Invalid recursive call to script '{script}'. Use recursive=True to allow this.")
 
     outer_frame = inspect.getouterframes(inspect.currentframe())[1]

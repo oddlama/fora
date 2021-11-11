@@ -40,7 +40,8 @@ def before(group: str):
     if group == _this.name:
         raise ValueError("Cannot add reverse-dependency to self!")
 
-    _this.groups_before.add(group)
+    # pylint: disable=protected-access
+    _this._groups_before.add(group)
 
 def before_all(groups: list[str]):
     """
@@ -72,7 +73,8 @@ def after(group: str):
     if group == _this.name:
         raise ValueError("Cannot add dependency to self!")
 
-    _this.groups_after.add(group)
+    # pylint: disable=protected-access
+    _this._groups_after.add(group)
 
 def after_all(groups: list[str]):
     """
@@ -95,7 +97,7 @@ def get_variables(group: GroupType) -> set[str]:
     Parameters
     ----------
     group
-        The group module
+        The group module.
 
     Returns
     -------

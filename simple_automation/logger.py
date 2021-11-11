@@ -94,7 +94,8 @@ def run_script(script, name=None):
 def print_operation_title(op, title_color, end="\n"):
     """Prints the operation title and description."""
     name_if_given = (" " + col('[37m') + f"({op.name})" + col('[m')) if op.name is not None else ""
-    print_indented(f"{title_color}{op.op_name}{col('[m')} {op.description}{name_if_given}", end=end, flush=True)
+    dry_run_info = f" {col('[37m')}(dry){col('[m')}" if G.args.dry else ""
+    print_indented(f"{title_color}{op.op_name}{col('[m')}{dry_run_info} {op.description}{name_if_given}", end=end, flush=True)
 
 def print_operation_early(op):
     """Prints the operation title and description before the final status is known."""

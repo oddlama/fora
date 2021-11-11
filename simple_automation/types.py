@@ -58,13 +58,13 @@ class GroupType(MockupType):
     name: str
     """The name of the group. Must not be changed."""
 
-    loaded_from: str
+    _loaded_from: str
     """The original file path of the instanciated module."""
 
-    groups_before: set[str] = field(default_factory=set)
+    _groups_before: set[str] = field(default_factory=set)
     """This group will be loaded before this set of other groups."""
 
-    groups_after: set[str] = field(default_factory=set)
+    _groups_after: set[str] = field(default_factory=set)
     """This group will be loaded after this set of other groups."""
 
 @dataclass
@@ -98,7 +98,7 @@ class HostType(MockupType):
     name: str
     """The corresponding host name as defined in the inventory. Must not be changed."""
 
-    loaded_from: str
+    _loaded_from: str
     """The original file path of the instanciated module."""
 
     groups: set[str] = field(default_factory=set)
@@ -142,7 +142,7 @@ class ScriptType(MockupType):
     name: str
     """The name of the script. Must not be changed."""
 
-    loaded_from: str
+    _loaded_from: str
     """The original file path of the instanciated module."""
 
     _params: dict[str, Any] = field(default_factory=dict)
