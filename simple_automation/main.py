@@ -57,8 +57,9 @@ def main_run(args: argparse.Namespace):
             with set_current_host(host):
                 run_script(args.script, inspect.getouterframes(inspect.currentframe())[0], name="Commandline argument")
 
-        # Separate hosts by a newline for better visibility
-        print()
+        if h != host_names[-1]:
+            # Separate hosts by a newline for better visibility
+            print()
 
 class ArgumentParserError(Exception):
     """Error class for argument parsing errors."""

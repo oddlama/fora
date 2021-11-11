@@ -101,13 +101,19 @@ def print_operation_title(op, title_color, end="\n"):
 def print_operation_early(op):
     """Prints the operation title and description before the final status is known."""
     title_color = col("[1;33m")
-    print_operation_title(op, title_color, end="")
+    # Only overwrite status later if debugging is not enabled.
+    print_operation_title(op, title_color, end=" (early status)\n" if G.args.debug else "")
 
 
 def decode_escape(data: bytes, encoding: str = 'utf-8') -> str:
     """
     Tries to decode the given data with the given encoding, but replaces all non-decodeable
     and non-printable characters with backslash escape sequences.
+
+    Example:
+
+        >>> decode_escape(b'It is Wednesday\\nmy dudes\\r\\n🐸\\xff\\0')
+        'It is Wednesday\\\\nMy Dudes\\\\r\\\\n🐸\\\\xff\\\\0'
 
     Parameters
     ----------
@@ -123,6 +129,10 @@ def decode_escape(data: bytes, encoding: str = 'utf-8') -> str:
         The decoded and escaped string.
     """
     def escape_char(c: str) -> str:
+        special = {'\x00': '\\0', '\n': '\\n', '\r': '\\r', '\t': '\\t'}
+        if c in special:
+            return special[c]
+
         num = ord(c)
         if not c.isprintable() and num <= 0xff:
             return f"\\x{num:02x}"
@@ -146,11 +156,11 @@ def diff(filename: str, old: Optional[bytes], new: Optional[bytes], color: bool 
 
     Your diffing function should still be able to work on the raw bytes
     representation, after you aquire the diff and before you apply colors,
-    your output should be made printable with a function such as `logger.decode_escape`:
+    your output should be made printable with a function such as `simple_automation.logger.decode_escape`:
 
         # First decode and escape
         line = logger.decode_escape(byteline)
-        # Add coloring afterwards so ANSI escape sequences aren't escaped
+        # Add coloring afterwards so ANSI escape sequences are not escaped
 
     Parameters
     ----------
