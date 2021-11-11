@@ -3,9 +3,10 @@ Provides logging utilities.
 """
 
 import argparse
-from dataclasses import dataclass
+import difflib
 import os
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Optional
 
 from simple_automation import globals as G
 
@@ -84,7 +85,7 @@ def connection_established():
     print(col("[1;32m") + "OK" + col("[m"))
 
 
-def run_script(script, name=None):
+def run_script(script: str, name: Optional[str] = None):
     """Prints the script file and name that is being executed next."""
     if name is not None:
         print_indented(f"{col('[33;1m')}script{col('[m')} {script} {col('[37m')}({name}){col('[m')}")
@@ -101,6 +102,101 @@ def print_operation_early(op):
     """Prints the operation title and description before the final status is known."""
     title_color = col("[1;33m")
     print_operation_title(op, title_color, end="")
+
+
+def decode_escape(data: bytes, encoding: str = 'utf-8') -> str:
+    """
+    Tries to decode the given data with the given encoding, but replaces all non-decodeable
+    and non-printable characters with backslash escape sequences.
+
+    Parameters
+    ----------
+    content
+        The content that should be decoded and escaped.
+    encoding
+        The encoding that should be tried. To preserve utf-8 symbols, use 'utf-8',
+        to replace any non-ascii character with an escape sequence use 'ascii'.
+
+    Returns
+    -------
+    str
+        The decoded and escaped string.
+    """
+    def escape_char(c: str) -> str:
+        num = ord(c)
+        if not c.isprintable() and num <= 0xff:
+            return f"\\x{num:02x}"
+        return c
+    return ''.join([escape_char(c) for c in data.decode(encoding, 'backslashreplace')])
+
+def diff(filename: str, old: Optional[bytes], new: Optional[bytes], color: bool = True) -> list[str]:
+    """
+    Creates a diff between the old and new content of the given filename,
+    that can be printed to the console. This function returns the diff
+    output as an array of lines. The lines in the output array are not
+    terminated by newlines.
+
+    If color is True, the diff is colored using ANSI escape sequences.
+
+    If you want to provide an alternative diffing function, beware that
+    the input can theoretically contain any bytes and therefore should
+    be decoded as utf-8 if possible, but non-decodeable
+    or non-printable charaters should be replaced with human readable
+    variants such as `\\x00`, `^@` or similar represenations.
+
+    Your diffing function should still be able to work on the raw bytes
+    representation, after you aquire the diff and before you apply colors,
+    your output should be made printable with a function such as `logger.decode_escape`:
+
+        # First decode and escape
+        line = logger.decode_escape(byteline)
+        # Add coloring afterwards so ANSI escape sequences aren't escaped
+
+    Parameters
+    ----------
+    filename
+        The filename of the file that is being diffed.
+    old
+        The old content, or None if the file didn't exist before.
+    new
+        The new content, or None if the file was deleted.
+    color
+        Whether the output should be colored (with ANSI color sequences).
+
+    Returns
+    -------
+    list[str]
+        The lines of the diff output. The individual lines will not have a terminating newline.
+    """
+    difflines = list(difflib.diff_bytes(difflib.unified_diff,
+                        a=[] if old is None else old.split(b'\n'),
+                        b=[] if new is None else new.split(b'\n'),
+                        lineterm=b''))
+    # Strip file name header and decode diff to be human readable.
+    difflines = difflines[2:]
+    diff = map(decode_escape, difflines)
+
+    # Create custom file name header
+    action = 'created' if old is None else 'deleted' if new is None else 'modified'
+    title = f"{action}: {filename}"
+    N = len(title)
+    header = ['─' * N, title, '─' * N]
+
+    # Apply coloring if desired
+    if color:
+        def apply_color(line: str):
+            linecolor = {
+                '+': '[32m',
+                '-': '[31m',
+                '@': '[34m',
+            }
+            return linecolor.get(line[0], '[37m') + line + '[m'
+        # Apply color to diff
+        diff = map(apply_color, diff)
+        # Apply color to header
+        header = list(map(lambda line: f"[33m{line}[m", header))
+
+    return header + list(diff)
 
 def print_operation(op, result):
     """Prints the operation summary after it has finished execution."""
@@ -120,7 +216,11 @@ def print_operation(op, result):
     if not G.args.changes:
         return
 
-    # Print key: value pairs with changes
+    # Cache number of upcoming diffs to determine what box character to print
+    n_diffs = len(op.diffs) if G.args.diff else 0
+    box_char = '└' if n_diffs == 0 else '├'
+
+    # Print "key: value" pairs with changes
     state_infos = []
     for k,final_v in result.final.items():
         initial_v = result.initial[k]
@@ -146,4 +246,15 @@ def print_operation(op, result):
             state_infos.append(entry_str)
 
     if len(state_infos) > 0:
-        print_indented(f" {col('[37m')}└{col('[m')} " + f"{col('[37m')},{col('[m')} ".join(state_infos))
+        print_indented(f" {col('[37m')}{box_char}{col('[m')} " + f"{col('[37m')},{col('[m')} ".join(state_infos))
+
+    if G.args.diff:
+        diff_lines = []
+        # Generate diffs
+        for file, old, new in op.diffs:
+            diff_lines.extend(diff(file, old, new))
+        # Print diffs with block character line
+        if len(diff_lines) > 0:
+            for l in diff_lines[:-1]:
+                print_indented(" │ " + l)
+            print_indented(" └ " + diff_lines[-1])

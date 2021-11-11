@@ -1,6 +1,4 @@
-"""
-Provides necessary components to define operations.
-"""
+"""Provides API to define operations."""
 
 import sys
 
@@ -144,6 +142,8 @@ class Operation:
         """
         if self.has_nested:
             raise OperationError("An operation that nests other operations cannot have state on its own.")
+        if old == new:
+            return
         self.diffs.append((file, old, new))
 
     def failure(self, msg: str) -> OperationResult:
