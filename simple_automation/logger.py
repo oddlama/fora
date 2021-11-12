@@ -259,7 +259,7 @@ def print_operation(op, result):
     # Print "key: value" pairs with changes
     state_infos = _operation_state_infos(result)
     if len(state_infos) > 0:
-        print_indented(f" {col('[37m')}{box_char}{col('[m')} " + f"{col('[37m')},{col('[m')} ".join(state_infos))
+        print_indented(f"{col('[37m')}{box_char}{col('[m')} " + f"{col('[37m')},{col('[m')} ".join(state_infos))
 
     if G.args.diff:
         diff_lines = []
@@ -269,5 +269,5 @@ def print_operation(op, result):
         # Print diffs with block character line
         if len(diff_lines) > 0:
             for l in diff_lines[:-1]:
-                print_indented(" │ " + l)
-            print_indented(" └ " + diff_lines[-1])
+                print_indented("│ " + l)
+            print_indented("└ " + diff_lines[-1])
