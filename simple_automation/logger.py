@@ -178,13 +178,12 @@ def diff(filename: str, old: Optional[bytes], new: Optional[bytes], color: bool 
     list[str]
         The lines of the diff output. The individual lines will not have a terminating newline.
     """
-    difflines = list(difflib.diff_bytes(difflib.unified_diff,
+    bdiff = list(difflib.diff_bytes(difflib.unified_diff,
                         a=[] if old is None else old.split(b'\n'),
                         b=[] if new is None else new.split(b'\n'),
                         lineterm=b''))
     # Strip file name header and decode diff to be human readable.
-    difflines = difflines[2:]
-    diff = map(decode_escape, difflines)
+    difflines = map(decode_escape, bdiff[2:])
 
     # Create custom file name header
     action = 'created' if old is None else 'deleted' if new is None else 'modified'
@@ -202,34 +201,13 @@ def diff(filename: str, old: Optional[bytes], new: Optional[bytes], color: bool 
             }
             return linecolor.get(line[0], '[37m') + line + '[m'
         # Apply color to diff
-        diff = map(apply_color, diff)
+        difflines = map(apply_color, difflines)
         # Apply color to header
         header = list(map(lambda line: f"[33m{line}[m", header))
 
-    return header + list(diff)
+    return header + list(difflines)
 
-def print_operation(op, result):
-    """Prints the operation summary after it has finished execution."""
-    if result.success:
-        title_color = col("[1;32m") if result.changed else col("[1m")
-    else:
-        title_color = col("[1;31m")
-
-    # Print title and name, overwriting the transitive status
-    print("\r", end="")
-    print_operation_title(op, title_color)
-
-    if not result.success:
-        print_indented(f" {col('[37m')}└{col('[m')} " + f"{col('[31m')}{result.failure_message}{col('[m')}")
-        return
-
-    if not G.args.changes:
-        return
-
-    # Cache number of upcoming diffs to determine what box character to print
-    n_diffs = len(op.diffs) if G.args.diff else 0
-    box_char = '└' if n_diffs == 0 else '├'
-
+def _operation_state_infos(result):
     # Print "key: value" pairs with changes
     state_infos = []
     for k,final_v in result.final.items():
@@ -254,7 +232,32 @@ def print_operation(op, result):
             else:
                 entry_str = f"{col('[33m')}{str_k}: {col('[31m')}{str_initial_v}{col('[33m')} → {col('[32m')}{str_final_v}{col('[m')}"
             state_infos.append(entry_str)
+    return state_infos
 
+def print_operation(op, result):
+    """Prints the operation summary after it has finished execution."""
+    if result.success:
+        title_color = col("[1;32m") if result.changed else col("[1m")
+    else:
+        title_color = col("[1;31m")
+
+    # Print title and name, overwriting the transitive status
+    print("\r", end="")
+    print_operation_title(op, title_color)
+
+    if not result.success:
+        print_indented(f" {col('[37m')}└{col('[m')} " + f"{col('[31m')}{result.failure_message}{col('[m')}")
+        return
+
+    if not G.args.changes:
+        return
+
+    # Cache number of upcoming diffs to determine what box character to print
+    n_diffs = len(op.diffs) if G.args.diff else 0
+    box_char = '└' if n_diffs == 0 else '├'
+
+    # Print "key: value" pairs with changes
+    state_infos = _operation_state_infos(result)
     if len(state_infos) > 0:
         print_indented(f" {col('[37m')}{box_char}{col('[m')} " + f"{col('[37m')},{col('[m')} ".join(state_infos))
 

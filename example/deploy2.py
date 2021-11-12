@@ -34,7 +34,7 @@ files.template(name="temaefaef",
     src="test.j2",
     dest="/tmp/tmpl2")
 files.template_content(name="templ content",
-    content="{{simple_automation_managed}}\nbefore {{host.groups_before}}\nhost.name = {{host.name}}\n{{onlyhost}}\n{{onlydesktops}}\n",
+    content="{{simple_automation_managed}}\nhost.name = {{host.name}}\n{{onlyhost}}\n{{onlydesktops}}\n",
     dest="/tmp/tmpl")
 files.directory(name="Create a temporary directory",
     path="/tmp/abc_755",
