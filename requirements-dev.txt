@@ -1,8 +1,7 @@
+mypy
 pbr
+pdoc
 pylint
 setuptools
-sphinx
-#sphinx_rtd_theme
-sphinx-press-theme
 twine
 wheel
