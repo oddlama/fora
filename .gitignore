@@ -10,4 +10,4 @@ dist/
 
 AUTHORS
 ChangeLog
-fora/version.py
+src/fora/version.py
