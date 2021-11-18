@@ -1,6 +1,6 @@
 __pycache__
 .mypy_cache
-old
+.tox
 .vim
 
 venv/
@@ -10,3 +10,4 @@ dist/
 
 AUTHORS
 ChangeLog
+fora/version.py

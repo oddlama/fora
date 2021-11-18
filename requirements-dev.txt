@@ -1,6 +1,7 @@
+-e .
 mypy
-pbr
 pdoc
+tox
 pylint
 setuptools
 twine
