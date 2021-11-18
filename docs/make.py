@@ -15,4 +15,4 @@ if __name__ == "__main__":
 
     # Render main docs
     pdoc.render.configure(docformat='numpy', template_directory=docs / "pdoc-theme-bulma")
-    pdoc.pdoc(root / "simple_automation", output_directory=build)
+    pdoc.pdoc(root / "fora", output_directory=build)

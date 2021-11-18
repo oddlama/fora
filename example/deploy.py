@@ -1,5 +1,5 @@
-from simple_automation.host import current_host as host
-from simple_automation.operations import local
+from fora.host import current_host as host
+from fora.operations import local
 
 somedefault = 134
 

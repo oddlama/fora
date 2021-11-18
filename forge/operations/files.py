@@ -9,10 +9,10 @@ from typing import Optional, Union
 from jinja2 import Template
 from jinja2.exceptions import TemplateNotFound, UndefinedError
 
-import simple_automation.host
-from simple_automation import globals as G, logger
-from simple_automation.operations.api import Operation, OperationError, OperationResult, operation
-from simple_automation.operations.utils import check_absolute_path, save_content
+import fora.host
+from fora import globals as G, logger
+from fora.operations.api import Operation, OperationError, OperationResult, operation
+from fora.operations.utils import check_absolute_path, save_content
 
 def _render_template(templ: Template, context: Optional[dict]) -> bytes:
     """
@@ -33,13 +33,13 @@ def _render_template(templ: Template, context: Optional[dict]) -> bytes:
         The utf-8 encoded rendered template.
     """
 
-    dvars = simple_automation.host.vars_hierarchical(simple_automation.host.current_host)
+    dvars = fora.host.vars_hierarchical(fora.host.current_host)
 
     # Add context and 'host'
     if context is None:
         context = {}
     if 'host' not in context:
-        context['host'] = simple_automation.host.current_host
+        context['host'] = fora.host.current_host
     dvars.update(context)
 
     return templ.render(dvars).encode('utf-8')
@@ -86,7 +86,7 @@ def directory(path: str,
     check_absolute_path(path)
     op.desc(path)
 
-    conn = simple_automation.host.current_host.connection
+    conn = fora.host.current_host.connection
     with op.defaults(dir_mode=mode, owner=owner, group=group) as attr:
         op.final_state(exists=present, mode=attr.dir_mode, owner=attr.owner, group=attr.group, touched=touch)
 
@@ -172,7 +172,7 @@ def file(path: str,
     check_absolute_path(path)
     op.desc(path)
 
-    conn = simple_automation.host.current_host.connection
+    conn = fora.host.current_host.connection
     with op.defaults(file_mode=mode, owner=owner, group=group) as attr:
         op.final_state(exists=present, mode=attr.file_mode, owner=attr.owner, group=attr.group, touched=touch)
 
@@ -258,7 +258,7 @@ def link(path: str,
     check_absolute_path(path)
     op.desc(path)
 
-    conn = simple_automation.host.current_host.connection
+    conn = fora.host.current_host.connection
     with op.defaults(owner=owner, group=group) as attr:
         op.final_state(exists=present, owner=attr.owner, group=attr.group, touched=touch)
 
@@ -477,7 +477,7 @@ def template_content(content: str,
                      op: Operation = Operation.internal_use_only) -> OperationResult:
     """
     Templates the given content and uploads the result to the remote host.
-    See `simple_automation.operations.files.template` for more information about the available variables in the template.
+    See `fora.operations.files.template` for more information about the available variables in the template.
 
     Parameters
     ----------

@@ -1,5 +1,5 @@
-from simple_automation.operations import files
-from simple_automation.script import defaults, script_params
+from fora.operations import files
+from fora.script import defaults, script_params
 
 @script_params
 class params:
@@ -34,7 +34,7 @@ files.template(name="temaefaef",
     src="test.j2",
     dest="/tmp/tmpl2")
 files.template_content(name="templ content",
-    content="{{simple_automation_managed}}\nhost.name = {{host.name}}\n{{onlyhost}}\n{{onlydesktops}}\n",
+    content="{{fora_managed}}\nhost.name = {{host.name}}\n{{onlyhost}}\n{{onlydesktops}}\n",
     dest="/tmp/tmpl")
 files.directory(name="Create a temporary directory",
     path="/tmp/abc_755",

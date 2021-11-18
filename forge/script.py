@@ -5,8 +5,8 @@ Provides API for script definitions.
 import inspect
 from typing import Any, Optional, cast
 
-from simple_automation.remote_settings import RemoteSettings, ResolvedRemoteSettings
-from simple_automation.types import ScriptType
+from fora.remote_settings import RemoteSettings, ResolvedRemoteSettings
+from fora.types import ScriptType
 
 class RemoteDefaultsContext:
     """A context manager to overlay remote defaults on a stack of defaults."""
@@ -16,10 +16,10 @@ class RemoteDefaultsContext:
 
     def __enter__(self) -> ResolvedRemoteSettings:
         # pylint: disable=import-outside-toplevel,cyclic-import
-        import simple_automation.host
-        self.new_defaults = simple_automation.host.current_host.connection.resolve_defaults(self.new_defaults)
+        import fora.host
+        self.new_defaults = fora.host.current_host.connection.resolve_defaults(self.new_defaults)
         self.obj._defaults_stack.append(self.new_defaults)
-        return cast(ResolvedRemoteSettings, simple_automation.host.current_host.connection.base_settings.overlay(self.new_defaults))
+        return cast(ResolvedRemoteSettings, fora.host.current_host.connection.base_settings.overlay(self.new_defaults))
 
     def __exit__(self, type_t, value, traceback):
         _ = (type_t, value, traceback)
@@ -38,7 +38,7 @@ def defaults(as_user: Optional[str] = None,
 
     .. code-block:: python
 
-        from simple_automation.script import defaults
+        from fora.script import defaults
         with defaults(owner="root", file_mode="644", dir_mode="755"):
             # ...
     """
@@ -56,9 +56,9 @@ def defaults(as_user: Optional[str] = None,
             cwd=cwd)
 
     # pylint: disable=import-outside-toplevel,cyclic-import
-    import simple_automation.host
+    import fora.host
 
-    new_defaults = simple_automation.host.current_host.connection.base_settings
+    new_defaults = fora.host.current_host.connection.base_settings
     new_defaults = new_defaults.overlay(current_defaults())
     new_defaults = new_defaults.overlay(new_defaults)
     return RemoteDefaultsContext(_this, new_defaults)
@@ -81,7 +81,7 @@ def script_params(params_cls):
 
     Example: script.py
 
-        from simple_automation.script import script_params
+        from fora.script import script_params
 
         @script_params
         class params:

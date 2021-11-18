@@ -4,13 +4,13 @@ import argparse
 from typing import cast
 from jinja2 import Environment
 
-from simple_automation.remote_settings import RemoteSettings
-from simple_automation.types import InventoryType, GroupType, HostType
+from fora.remote_settings import RemoteSettings
+from fora.types import InventoryType, GroupType, HostType
 
 class NotYetLoaded:
     """
     A dummy class which instances are used to provoke runtime-errors when
-    using a part of simple_automation that hasn't been initialized yet.
+    using a part of fora that hasn't been initialized yet.
     """
 
 args: argparse.Namespace = cast(argparse.Namespace, NotYetLoaded())

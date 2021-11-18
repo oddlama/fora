@@ -3,7 +3,7 @@
 import sys
 sys.path.append("..")
 
-from simple_automation.main import main
+from fora.main import main
 
 if __name__ == '__main__':
     main()

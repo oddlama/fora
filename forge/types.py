@@ -10,10 +10,10 @@ from dataclasses import dataclass, field
 from types import ModuleType
 from typing import TYPE_CHECKING, Any, Callable, Optional, Union, cast
 
-from simple_automation.remote_settings import RemoteSettings
+from fora.remote_settings import RemoteSettings
 if TYPE_CHECKING:
-    from simple_automation.connection import Connection
-    from simple_automation.connectors.connector import Connector
+    from fora.connection import Connection
+    from fora.connectors.connector import Connector
 
 class MockupType(ModuleType):
     """
@@ -41,13 +41,13 @@ class GroupType(MockupType):
     class is mainly used to aid type-checking, its properties are transferred to the
     actual instanciated module before the module is executed.
 
-    When writing a group module, you can use the API exposed in `simple_automation.group`
+    When writing a group module, you can use the API exposed in `fora.group`
     to access/change meta information about your module.
 
     Example: Using meta information `(groups/webserver.py)`
     ----
 
-        from simple_automation import group as this
+        from fora import group as this
 
         # Require that the 'servers' groups is processed before this group when resolving
         # variables for a host at execution time. This is important to avoid variable
@@ -75,13 +75,13 @@ class HostType(MockupType):
     class is mainly used to aid type-checking, its properties are transferred to the
     actual instanciated module before the module is executed.
 
-    When writing a host module, you can use the API exposed in `simple_automation.host`
+    When writing a host module, you can use the API exposed in `fora.host`
     to access/change meta information about your module.
 
     Example: Using meta information `(hosts/myhost.py)`
     ----
 
-        from simple_automation import host as this
+        from fora import host as this
 
         # Set the ssh host (useful if it differs from the name)
         ssh_host = "root@localhost"
@@ -135,7 +135,7 @@ class ScriptType(MockupType):
     class is mainly used to aid type-checking, its properties are transferred to the
     actual instanciated module before the module is executed.
 
-    When writing a script module, you can use the API exposed in `simple_automation.script`
+    When writing a script module, you can use the API exposed in `fora.script`
     to access/change meta information about your module.
     """
 
@@ -151,5 +151,5 @@ class ScriptType(MockupType):
     _defaults_stack: list[RemoteSettings] = field(default_factory=lambda: [RemoteSettings()])
     """
     The stack of remote execution defaults. The stack must only be changed by using
-    the context manager returned in `simple_automation.script.defaults`.
+    the context manager returned in `fora.script.defaults`.
     """

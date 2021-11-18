@@ -6,10 +6,10 @@ import zlib
 import subprocess
 from typing import Any, Optional, Type
 
-from simple_automation import globals as G, logger
-from simple_automation.connectors import tunnel_dispatcher as td
-from simple_automation.connectors.connector import CompletedRemoteCommand, Connector, StatResult, connector
-from simple_automation.types import HostType
+from fora import globals as G, logger
+from fora.connectors import tunnel_dispatcher as td
+from fora.connectors.connector import CompletedRemoteCommand, Connector, StatResult, connector
+from fora.types import HostType
 
 def _expect_response_packet(packet: Any, expected_type: Type):
     """

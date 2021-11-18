@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Optional, Union
 
-from simple_automation.types import HostType
+from fora.types import HostType
 
 @dataclass
 class CompletedRemoteCommand:
@@ -120,7 +120,7 @@ class Connector:
             If check is True and the process returned a non-zero exit status.
         ValueError
             A parameter was invalid.
-        simple_automation.connectors.tunnel_dispatcher.RemoteOSError
+        fora.connectors.tunnel_dispatcher.RemoteOSError
             If the remote command fails because of an remote OSError.
         IOError
             An error occurred with the connection.
@@ -148,7 +148,7 @@ class Connector:
         ------
         ValueError
             If the user could not be resolved.
-        simple_automation.connectors.tunnel_dispatcher.RemoteOSError
+        fora.connectors.tunnel_dispatcher.RemoteOSError
             If the remote command fails because of an remote OSError.
         IOError
             An error occurred with the connection.
@@ -176,7 +176,7 @@ class Connector:
         ------
         ValueError
             If the group could not be resolved.
-        simple_automation.connectors.tunnel_dispatcher.RemoteOSError
+        fora.connectors.tunnel_dispatcher.RemoteOSError
             If the remote command fails because of an remote OSError.
         IOError
             An error occurred with the connection.
@@ -207,7 +207,7 @@ class Connector:
 
         Raises
         ------
-        simple_automation.connectors.tunnel_dispatcher.RemoteOSError
+        fora.connectors.tunnel_dispatcher.RemoteOSError
             If the remote command fails for any reason other than file not found.
         IOError
             An error occurred with the connection.
@@ -242,7 +242,7 @@ class Connector:
         ------
         ValueError
             A parameter was invalid.
-        simple_automation.connectors.tunnel_dispatcher.RemoteOSError
+        fora.connectors.tunnel_dispatcher.RemoteOSError
             If the remote command fails because of an remote OSError.
         IOError
             An error occurred with the connection.
@@ -263,7 +263,7 @@ class Connector:
         ------
         ValueError
             If the file was not found.
-        simple_automation.connectors.tunnel_dispatcher.RemoteOSError
+        fora.connectors.tunnel_dispatcher.RemoteOSError
             If the remote command fails for any reason other than file not found.
         IOError
             An error occurred with the connection.

@@ -4,8 +4,8 @@ from __future__ import annotations
 from types import ModuleType
 from typing import cast
 
-from simple_automation import globals as G
-from simple_automation.types import GroupType
+from fora import globals as G
+from fora.types import GroupType
 
 # TODO: add Raises to methods that raise errors
 # TODO: replace ..code-block with smth else for pdoc3

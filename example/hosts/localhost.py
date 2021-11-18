@@ -1,4 +1,4 @@
-from simple_automation import host as this
+from fora import host as this
 
 url = "ssh://root@localhost"
 this.add_group("desktops")

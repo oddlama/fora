@@ -6,9 +6,9 @@ from functools import wraps
 from typing import cast, Any, Optional
 from types import TracebackType, FrameType
 
-import simple_automation.script
-from simple_automation import globals as G, logger
-from simple_automation.script import RemoteDefaultsContext
+import fora.script
+from fora import globals as G, logger
+from fora.script import RemoteDefaultsContext
 
 class OperationError(Exception):
     """An exception that indicates an error while executing an operation."""
@@ -72,9 +72,9 @@ class Operation:
             print()
 
     def defaults(self, *args, **kwargs) -> RemoteDefaultsContext:
-        """Sets defaults on the current script. See `simple_automation.types.ScriptType.defaults`."""
+        """Sets defaults on the current script. See `fora.types.ScriptType.defaults`."""
         _ = (self)
-        return simple_automation.script.defaults(*args, **kwargs)
+        return fora.script.defaults(*args, **kwargs)
 
     def initial_state(self, **kwargs):
         """Sets the initial state."""

@@ -30,7 +30,7 @@ u64 = NewType('u64', int)
 is_server = False
 debug = False
 try:
-    from simple_automation import globals as G
+    from fora import globals as G
 except ModuleNotFoundError:
     pass
 

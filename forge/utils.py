@@ -12,12 +12,12 @@ import uuid
 from types import ModuleType
 from typing import Any, TypeVar, Callable, Iterable, Optional
 
-import simple_automation.group
-import simple_automation.host
-import simple_automation.script
+import fora.group
+import fora.host
+import fora.script
 
-from simple_automation.types import GroupType, HostType, ScriptType
-from simple_automation.logger import col
+from fora.types import GroupType, HostType, ScriptType
+from fora.logger import col
 
 T = TypeVar('T')
 
@@ -73,20 +73,20 @@ def die_error(msg: str, loc=None, status_code=1):
     sys.exit(status_code)
 
 def set_this_group(value: GroupType) -> SetVariableContextManager:
-    """A context manager to temporarily set `simple_automation.group._this` to the given value."""
-    return SetVariableContextManager(simple_automation.group, '_this', value)
+    """A context manager to temporarily set `fora.group._this` to the given value."""
+    return SetVariableContextManager(fora.group, '_this', value)
 
 def set_this_host(value: HostType) -> SetVariableContextManager:
-    """A context manager to temporarily set `simple_automation.host._this` to the given value."""
-    return SetVariableContextManager(simple_automation.host, '_this', value)
+    """A context manager to temporarily set `fora.host._this` to the given value."""
+    return SetVariableContextManager(fora.host, '_this', value)
 
 def set_this_script(value: ScriptType) -> SetVariableContextManager:
-    """A context manager to temporarily set `simple_automation.script._this` to the given value."""
-    return SetVariableContextManager(simple_automation.script, '_this', value)
+    """A context manager to temporarily set `fora.script._this` to the given value."""
+    return SetVariableContextManager(fora.script, '_this', value)
 
 def set_current_host(host: HostType) -> SetVariableContextManager:
-    """A context manager to temporarily set `simple_automation.host.current_host` to the given value."""
-    return SetVariableContextManager(simple_automation.host, 'current_host', host)
+    """A context manager to temporarily set `fora.host.current_host` to the given value."""
+    return SetVariableContextManager(fora.host, 'current_host', host)
 
 def load_py_module(file: str, pre_exec: Optional[Callable[[ModuleType], None]] = None) -> ModuleType:
     """

@@ -1,12 +1,12 @@
 """ Provides operations that are related to the local system on which the
-simple_automation scripts are executed.
+fora scripts are executed.
 """
 
 import inspect
 import os
 from typing import Any, Optional
 
-from simple_automation.loader import script_stack, run_script
+from fora.loader import script_stack, run_script
 
 def script(script: str, # pylint: disable=redefined-outer-name
            recursive: bool = False,
@@ -21,7 +21,7 @@ def script(script: str, # pylint: disable=redefined-outer-name
     by annotating them. (The annotation then transparently extracts the
     value from a separately passed global variable).
 
-        from simple_automation.script import params
+        from fora.script import params
 
         @params
         class params:

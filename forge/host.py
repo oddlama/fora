@@ -6,8 +6,8 @@ from __future__ import annotations
 from types import ModuleType
 from typing import Any, cast
 
-from simple_automation import globals as G
-from simple_automation.types import GroupType, HostType, ScriptType
+from fora import globals as G
+from fora.types import GroupType, HostType, ScriptType
 
 def name() -> str:
     """
@@ -113,10 +113,10 @@ def getattr_hierarchical(host: HostType, attr: str) -> Any:
     if attr not in ScriptType.__annotations__:
         # Look up variable on current script
         # pylint: disable=protected-access,import-outside-toplevel,cyclic-import
-        import simple_automation.script
-        if simple_automation.script._this is not None:
-            if hasattr(simple_automation.script._this, attr):
-                value = getattr(simple_automation.script._this, attr)
+        import fora.script
+        if fora.script._this is not None:
+            if hasattr(fora.script._this, attr):
+                value = getattr(fora.script._this, attr)
                 if _is_normal_var(attr, value):
                     return value
 
@@ -164,10 +164,10 @@ def hasattr_hierarchical(host: HostType, attr: str) -> Any:
     if attr not in ScriptType.__annotations__:
         # Look up variable on current script
         # pylint: disable=protected-access,import-outside-toplevel,cyclic-import
-        import simple_automation.script
-        if simple_automation.script._this is not None:
-            if hasattr(simple_automation.script._this, attr):
-                value = getattr(simple_automation.script._this, attr)
+        import fora.script
+        if fora.script._this is not None:
+            if hasattr(fora.script._this, attr):
+                value = getattr(fora.script._this, attr)
                 if _is_normal_var(attr, value):
                     return True
 
@@ -198,11 +198,11 @@ def vars_hierarchical(host: HostType, include_all_host_variables: bool = False) 
 
     # First, add all variable from the current script
     # pylint: disable=protected-access,import-outside-toplevel,cyclic-import
-    import simple_automation.script
-    if simple_automation.script._this is not None:
+    import fora.script
+    if fora.script._this is not None:
         # Add variables from the script that are neither private
         # nor part of a script's standard variables (ScriptType.__annotations__)
-        dvars.update({attr: v for attr,v in vars(simple_automation.script._this).items() if _is_normal_var(attr, v) and attr not in ScriptType.__annotations__})
+        dvars.update({attr: v for attr,v in vars(fora.script._this).items() if _is_normal_var(attr, v) and attr not in ScriptType.__annotations__})
 
     # Add variable from groups (reverse order so that the highest-priority
     # group overwrites variables from lower priorities.

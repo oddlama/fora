@@ -7,14 +7,14 @@ import sys
 from itertools import combinations
 from typing import cast, Any, Optional
 
-import simple_automation.host
-import simple_automation.group
-import simple_automation.script
+import fora.host
+import fora.group
+import fora.script
 
-from simple_automation import globals as G, logger
-from simple_automation.types import GroupType, HostType, InventoryType, ScriptType
-from simple_automation.utils import die_error, print_error, load_py_module, rank_sort, CycleError, set_this_group, set_this_host, set_this_script
-from simple_automation.connectors.connector import Connector
+from fora import globals as G, logger
+from fora.types import GroupType, HostType, InventoryType, ScriptType
+from fora.utils import die_error, print_error, load_py_module, rank_sort, CycleError, set_this_group, set_this_host, set_this_script
+from fora.connectors.connector import Connector
 
 script_stack: list[tuple[ScriptType, inspect.FrameInfo]] = []
 """A stack of all currently executed scripts ((name, file), frame)."""
@@ -72,7 +72,7 @@ def load_group(module_file: str) -> GroupType:
     with set_this_group(meta) as ctx:
         # Normal groups have a dependency on the global 'all' group.
         if not name == 'all':
-            simple_automation.group.after("all")
+            fora.group.after("all")
 
         def _pre_exec(module):
             meta.transfer(module)
@@ -98,7 +98,7 @@ def check_modules_for_conflicts(a: GroupType, b: GroupType) -> bool:
         True when at least one conflicting attribute was found
     """
     # pylint: disable=protected-access
-    conflicts = list(simple_automation.group.get_variables(a) & simple_automation.group.get_variables(b))
+    conflicts = list(fora.group.get_variables(a) & fora.group.get_variables(b))
     had_conflicts = False
     for conflict in conflicts:
         if not had_conflicts:
@@ -224,9 +224,8 @@ def define_special_global_variables(group_all: GroupType):
     Defines special global variables on the given all group.
     Respects if the corresponding variable is already set.
     """
-    # TODO: rename this.
-    if not hasattr(group_all, 'simple_automation_managed'):
-        setattr(group_all, 'simple_automation_managed', "This file is managed by simple automation.")
+    if not hasattr(group_all, 'fora_managed'):
+        setattr(group_all, 'fora_managed', "This file is managed by fora.")
 
 def load_groups() -> tuple[dict[str, GroupType], list[str]]:
     """
@@ -322,7 +321,7 @@ def load_host(name: str, module_file: str) -> HostType:
     meta = HostType(name=name, _loaded_from=module_file if module_file_exists else "__cmdline__")
 
     with set_this_host(meta) as ctx:
-        simple_automation.host.add_group("all")
+        fora.host.add_group("all")
 
         # Instanciate module
         if module_file_exists:
@@ -340,11 +339,11 @@ def load_host(name: str, module_file: str) -> HostType:
 
     # Monkeypatch the __hasattr__ and __getattr__ methods to perform hierachical lookup from now on
     if module_file_exists:
-        setattr(ret, '__getattr__', lambda attr: simple_automation.host.getattr_hierarchical(ret, attr))
-        setattr(ret, '__hasattr__', lambda attr: simple_automation.host.hasattr_hierarchical(ret, attr))
+        setattr(ret, '__getattr__', lambda attr: fora.host.getattr_hierarchical(ret, attr))
+        setattr(ret, '__hasattr__', lambda attr: fora.host.hasattr_hierarchical(ret, attr))
     else:
-        setattr(ret, '__getattr__', lambda _, attr: simple_automation.host.getattr_hierarchical(ret, attr))
-        setattr(ret, '__hasattr__', lambda _, attr: simple_automation.host.hasattr_hierarchical(ret, attr))
+        setattr(ret, '__getattr__', lambda _, attr: fora.host.getattr_hierarchical(ret, attr))
+        setattr(ret, '__hasattr__', lambda _, attr: fora.host.hasattr_hierarchical(ret, attr))
 
     return ret
 
@@ -371,7 +370,7 @@ def load_hosts() -> dict[str, HostType]:
 def load_site(inventories: list[str]):
     """
     Loads the whole site and exposes it globally via the corresponding variables
-    in the simple_automation module.
+    in the fora module.
 
     Parameters
     ----------
@@ -379,7 +378,7 @@ def load_site(inventories: list[str]):
         A possibly mixed list of inventory definition files (e.g. inventory.py) and single
         host definitions in any ssh accepted syntax. The .py extension is used to disscern
         between these cases. If multiple python inventory modules are given, the first will
-        become the main module stored in simple_automation.inventory, and the others will
+        become the main module stored in fora.inventory, and the others will
         just have their hosts appended to the first module.
     """
 
@@ -447,7 +446,7 @@ def run_script(script: str,
             with set_this_script(meta) as ctx:
                 # New script instance starts with fresh set of default values.
                 # Use defaults() here to start with the connections base settings.
-                with simple_automation.script.defaults():
+                with fora.script.defaults():
                     def _pre_exec(module):
                         meta.transfer(module)
                         ctx.update(module)

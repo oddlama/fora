@@ -1,5 +1,5 @@
 """
-Provides the top-level logic of simple_automation such as
+Provides the top-level logic of fora such as
 the CLI interface and main script dispatching.
 """
 
@@ -8,11 +8,11 @@ import inspect
 import os
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
-from simple_automation import globals as G, logger
-from simple_automation.connection import open_connection
-from simple_automation.loader import load_site, run_script
-from simple_automation.utils import die_error, install_exception_hook, set_current_host
-from simple_automation.version import __version__
+from fora import globals as G, logger
+from fora.connection import open_connection
+from fora.loader import load_site, run_script
+from fora.utils import die_error, install_exception_hook, set_current_host
+from fora.version import __version__
 
 def init_runtime():
     """Initializes runtime variables needed to run scripts."""
@@ -76,7 +76,7 @@ def main():
     The main program entry point. This will parse arguments, load inventory and task
     definitions and run the given user script.
     """
-    parser = ThrowingArgumentParser(description="Runs a simple automation script.")
+    parser = ThrowingArgumentParser(description="Runs a fora script.")
 
     # General options
     parser.add_argument('--version', action='version',

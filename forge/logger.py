@@ -8,7 +8,7 @@ import os
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from simple_automation import globals as G
+from fora import globals as G
 
 @dataclass
 class State:
@@ -156,7 +156,7 @@ def diff(filename: str, old: Optional[bytes], new: Optional[bytes], color: bool 
 
     Your diffing function should still be able to work on the raw bytes
     representation, after you aquire the diff and before you apply colors,
-    your output should be made printable with a function such as `simple_automation.logger.decode_escape`:
+    your output should be made printable with a function such as `fora.logger.decode_escape`:
 
         # First decode and escape
         line = logger.decode_escape(byteline)

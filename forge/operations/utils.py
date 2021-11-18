@@ -4,10 +4,10 @@ Provides utiliy functions for operations.
 
 import hashlib
 from typing import Optional, Union
-import simple_automation.host
+import fora.host
 
-from simple_automation import globals as G
-from simple_automation.operations.api import Operation, OperationError, OperationResult
+from fora import globals as G
+from fora.operations.api import Operation, OperationError, OperationResult
 
 def save_content(op: Operation,
                  content: Union[bytes, str],
@@ -37,7 +37,7 @@ def save_content(op: Operation,
     if isinstance(content, str):
         content = content.encode('utf-8')
 
-    conn = simple_automation.host.current_host.connection
+    conn = fora.host.current_host.connection
     with op.defaults(file_mode=mode, owner=owner, group=group) as attr:
         final_sha512sum = hashlib.sha512(content).digest()
         op.final_state(exists=True, mode=attr.file_mode, owner=attr.owner, group=attr.group, sha512=final_sha512sum)

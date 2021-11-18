@@ -5,11 +5,11 @@ Stores state along with the connection.
 
 from typing import cast, Optional
 
-import simple_automation.script
-from simple_automation import globals as G
-from simple_automation.connectors.connector import Connector, CompletedRemoteCommand, StatResult
-from simple_automation.remote_settings import RemoteSettings
-from simple_automation.types import HostType
+import fora.script
+from fora import globals as G
+from fora.connectors.connector import Connector, CompletedRemoteCommand, StatResult
+from fora.remote_settings import RemoteSettings
+from fora.types import HostType
 
 class Connection:
     """
@@ -67,11 +67,11 @@ class Connection:
             The resolved settings
         """
         # pylint: disable=protected-access
-        if simple_automation.script._this is None:
+        if fora.script._this is None:
             raise RuntimeError("Cannot resolve defaults, when no script is currently running.")
 
         # Overlay settings on top of defaults
-        settings = simple_automation.script.current_defaults().overlay(settings)
+        settings = fora.script.current_defaults().overlay(settings)
 
         # A function to check whether a mask is octal
         def check_mask(mask: Optional[str], name: str):
@@ -107,8 +107,8 @@ class Connection:
             group: Optional[str] = None,
             umask: Optional[str] = None,
             cwd: Optional[str] = None) -> CompletedRemoteCommand:
-        """See `simple_automation.connectors.connector.Connector.run`."""
-        defaults = simple_automation.script.current_defaults()
+        """See `fora.connectors.connector.Connector.run`."""
+        defaults = fora.script.current_defaults()
         return self.connector.run(
             command=command,
             input=input,
@@ -120,15 +120,15 @@ class Connection:
             cwd=cwd if cwd is not None else defaults.cwd)
 
     def resolve_user(self, user: Optional[str]) -> Optional[str]:
-        """See `simple_automation.connectors.connector.Connector.resolve_user`."""
+        """See `fora.connectors.connector.Connector.resolve_user`."""
         return self.connector.resolve_user(user)
 
     def resolve_group(self, group: Optional[str]) -> Optional[str]:
-        """See `simple_automation.connectors.connector.Connector.resolve_group`."""
+        """See `fora.connectors.connector.Connector.resolve_group`."""
         return self.connector.resolve_group(group)
 
     def stat(self, path: str, follow_links: bool = False, sha512sum: bool = False) -> Optional[StatResult]:
-        """See `simple_automation.connectors.connector.Connector.stat`."""
+        """See `fora.connectors.connector.Connector.stat`."""
         return self.connector.stat(
             path=path,
             follow_links=follow_links,
@@ -140,7 +140,7 @@ class Connection:
             mode: Optional[str] = None,
             owner: Optional[str] = None,
             group: Optional[str] = None):
-        """See `simple_automation.connectors.connector.Connector.upload`."""
+        """See `fora.connectors.connector.Connector.upload`."""
         return self.connector.upload(
             file=file,
             content=content,
@@ -149,7 +149,7 @@ class Connection:
             group=group)
 
     def download(self, file: str) -> bytes:
-        """See `simple_automation.connectors.connector.Connector.download`."""
+        """See `fora.connectors.connector.Connector.download`."""
         return self.connector.download(file=file)
 
     def download_or(self, file: str, default: Optional[bytes] = None) -> Optional[bytes]:
@@ -170,7 +170,7 @@ class Connection:
 
         Raises
         ------
-        simple_automation.connectors.tunnel_dispatcher.RemoteOSError
+        fora.connectors.tunnel_dispatcher.RemoteOSError
             If the remote command fails for any reason other than file not found.
         IOError
             An error occurred with the connection.
