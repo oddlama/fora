@@ -2,6 +2,7 @@ __pycache__
 .mypy_cache
 .tox
 .vim
+.coverage
 
 venv/
 build/

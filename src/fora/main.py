@@ -15,13 +15,6 @@ from fora.loader import load_site, run_script
 from fora.utils import die_error, install_exception_hook, set_current_host
 from fora.version import version
 
-def init_runtime() -> None:
-    """Initializes runtime variables needed to run scripts."""
-    G.jinja2_env = Environment(
-            loader=FileSystemLoader('.', followlinks=True),
-            autoescape=False,
-            undefined=StrictUndefined)
-
 def main_run(args: argparse.Namespace) -> None:
     """
     Main method used to run a script on an inventory.
@@ -31,7 +24,6 @@ def main_run(args: argparse.Namespace) -> None:
     args
         The parsed arguments
     """
-    init_runtime()
     load_site(args.inventory)
 
     # Deduplicate host selection and check if every host is valid

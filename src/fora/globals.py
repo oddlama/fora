@@ -2,7 +2,7 @@
 
 import argparse
 from typing import cast
-from jinja2 import Environment
+from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from fora.remote_settings import RemoteSettings
 from fora.types import InventoryType, GroupType, HostType
@@ -33,25 +33,20 @@ errors early when referencing undefined groups.
 """
 
 groups: dict[str, GroupType] = cast(dict[str, GroupType], NotYetLoaded())
-"""
-A dict containing all group modules loaded from `groups/*.py`, mapped by name.
-"""
+"""A dict containing all group modules loaded from `groups/*.py`, mapped by name."""
 
 group_order: list[str] = cast(list[str], NotYetLoaded())
-"""
-A topological order of all groups, with highest precedence first.
-"""
+"""A topological order of all groups, with highest precedence first."""
 
 hosts: dict[str, HostType] = cast(dict[str, HostType], NotYetLoaded())
-"""
-A dict containing all host definitions, mapped by host_id.
-"""
+"""A dict containing all host definitions, mapped by host_id."""
 
 
-jinja2_env: Environment = cast(Environment, NotYetLoaded())
-"""
-The jinja2 environment used for templating
-"""
+jinja2_env: Environment = Environment(
+    loader=FileSystemLoader('.', followlinks=True),
+    autoescape=False,
+    undefined=StrictUndefined)
+"""The jinja2 environment used for templating."""
 
 # The as_user, as_group, owner, group attributes will be filled in automatically
 # by the connection, once we know as which user we are operating.

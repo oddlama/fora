@@ -262,7 +262,7 @@ def load_groups() -> tuple[dict[str, GroupType], list[str]]:
     # Create default all group if it wasn't defined
     if 'all' not in loaded_groups:
         default_group = cast(GroupType, DefaultGroup())
-        setattr(default_group, 'meta', GroupType("all", "__internal__"))
+        GroupType(name="all", _loaded_from="__internal__").transfer(default_group)
         loaded_groups['all'] = default_group
 
     # Define special global variables
