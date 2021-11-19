@@ -1,3 +1,3 @@
 #!/bin/bash
-pylint fora --ignore=tunnel_dispatcher_minified.py --disable=C0301,C0103,R0902,R0903,R0913,R0914,duplicate-code"${1:+,}$1"
-mypy fora
+pylint src/fora --ignore=version.py --disable=line-too-long,invalid-name,too-many-instance-attributes,too-few-public-methods,too-many-arguments,too-many-locals,duplicate-code"${1:+,}$1"
+mypy src/fora

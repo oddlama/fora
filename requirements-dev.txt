@@ -1,8 +1,0 @@
--e .
-mypy
-pdoc
-tox
-pylint
-setuptools
-twine
-wheel
