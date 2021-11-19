@@ -4,7 +4,7 @@ Defines the connector interface.
 
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Callable, Optional, Union
+from typing import Callable, Optional, Type, Union
 
 from fora.types import HostType
 
@@ -52,10 +52,8 @@ class Connector:
     Overwrite this in your connector subclass. Must be unique among all connectors.
     """
 
-    registered_connectors: dict[str, Callable[[str, HostType], Connector]] = {}
-    """
-    The list of all registered connectors.
-    """
+    registered_connectors: dict[str, Type[Connector]] = {}
+    """The list of all registered connectors."""
 
     def __init__(self, url: Optional[str], host: HostType):
         self.url = url
@@ -220,7 +218,7 @@ class Connector:
                content: bytes,
                mode: Optional[str] = None,
                owner: Optional[str] = None,
-               group: Optional[str] = None):
+               group: Optional[str] = None) -> None:
         """
         Uploads the given content to the remote system and saves it under the given file path.
 
@@ -271,7 +269,7 @@ class Connector:
         _ = (self, file)
         raise NotImplementedError("Must be overwritten by subclass.")
 
-def connector(schema):
+def connector(schema: str) -> Callable[[Type[Connector]], Type[Connector]]:
     """
     The @connector class decorator used to register the connector
     to the global registry.
@@ -281,7 +279,7 @@ def connector(schema):
     schema
         The schema for the connector, for example 'ssh'.
     """
-    def wrapper(cls):
+    def wrapper(cls: Type[Connector]) -> Type[Connector]:
         cls.schema = schema
         Connector.registered_connectors[cls.schema] = cls
         return cls

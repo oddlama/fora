@@ -3,10 +3,13 @@ Provides API for script definitions.
 """
 
 import inspect
-from typing import Any, Optional, cast
+from types import TracebackType
+from typing import Any, Optional, Type, TypeVar, cast
 
 from fora.remote_settings import RemoteSettings, ResolvedRemoteSettings
 from fora.types import ScriptType
+
+T = TypeVar('T')
 
 class RemoteDefaultsContext:
     """A context manager to overlay remote defaults on a stack of defaults."""
@@ -21,8 +24,8 @@ class RemoteDefaultsContext:
         self.obj._defaults_stack.append(self.new_defaults)
         return cast(ResolvedRemoteSettings, fora.host.current_host.connection.base_settings.overlay(self.new_defaults))
 
-    def __exit__(self, type_t, value, traceback):
-        _ = (type_t, value, traceback)
+    def __exit__(self, exc_type: Optional[Type[BaseException]], exc: Optional[BaseException], traceback: Optional[TracebackType]) -> None:
+        _ = (exc_type, exc, traceback)
         self.obj._defaults_stack.pop()
 
 def defaults(as_user: Optional[str] = None,
@@ -75,7 +78,7 @@ def current_defaults() -> RemoteSettings:
     # pylint: disable=protected-access
     return _this._defaults_stack[-1]
 
-def script_params(params_cls):
+def script_params(params_cls: Type[T]) -> Type[T]:
     """
     Decorator used to declare script parameters.
 

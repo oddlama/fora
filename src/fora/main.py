@@ -6,22 +6,23 @@ the CLI interface and main script dispatching.
 import argparse
 import inspect
 import os
+from typing import NoReturn
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from fora import globals as G, logger
 from fora.connection import open_connection
 from fora.loader import load_site, run_script
 from fora.utils import die_error, install_exception_hook, set_current_host
-from fora.version import __version__
+from fora.version import version
 
-def init_runtime():
+def init_runtime() -> None:
     """Initializes runtime variables needed to run scripts."""
     G.jinja2_env = Environment(
             loader=FileSystemLoader('.', followlinks=True),
             autoescape=False,
             undefined=StrictUndefined)
 
-def main_run(args: argparse.Namespace):
+def main_run(args: argparse.Namespace) -> None:
     """
     Main method used to run a script on an inventory.
 
@@ -67,11 +68,11 @@ class ArgumentParserError(Exception):
 class ThrowingArgumentParser(argparse.ArgumentParser):
     """An argument parser that throws when invalid argument types are passed."""
 
-    def error(self, message):
+    def error(self, message: str) -> NoReturn:
         """Raises an exception on error."""
         raise ArgumentParserError(message)
 
-def main():
+def main() -> None:
     """
     The main program entry point. This will parse arguments, load inventory and task
     definitions and run the given user script.
@@ -80,7 +81,7 @@ def main():
 
     # General options
     parser.add_argument('--version', action='version',
-            version=f"%(prog)s version {__version__}")
+            version=f"%(prog)s version {version}")
 
     # Run script options
     parser.add_argument('-H', '--hosts', dest='hosts', default=None, type=str,

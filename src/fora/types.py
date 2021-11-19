@@ -24,10 +24,10 @@ class MockupType(ModuleType):
     __annotations__: dict[str, Any]
     """Provided by the dataclass decorator."""
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"<'{getattr(self, 'name')}' from '{getattr(self, 'loaded_from')}'>"
 
-    def transfer(self, module: ModuleType):
+    def transfer(self, module: ModuleType) -> None:
         """Transfers all annotated variables from this object to the given module."""
         for var in self.__annotations__:
             if hasattr(self, var):

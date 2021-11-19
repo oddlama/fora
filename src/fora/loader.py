@@ -5,6 +5,7 @@ import inspect
 import os
 import sys
 from itertools import combinations
+from types import ModuleType
 from typing import cast, Any, Optional
 
 import fora.host
@@ -74,7 +75,7 @@ def load_group(module_file: str) -> GroupType:
         if not name == 'all':
             fora.group.after("all")
 
-        def _pre_exec(module):
+        def _pre_exec(module: ModuleType) -> None:
             meta.transfer(module)
             ctx.update(module)
         ret = cast(GroupType, load_py_module(module_file, pre_exec=_pre_exec))
@@ -107,7 +108,7 @@ def check_modules_for_conflicts(a: GroupType, b: GroupType) -> bool:
         print_error(f"Definition of '{conflict}' is in conflict with definition at '{b._loaded_from}", loc=a._loaded_from)
     return had_conflicts
 
-def merge_group_dependencies(groups: dict[str, GroupType]):
+def merge_group_dependencies(groups: dict[str, GroupType]) -> None:
     """
     Merges the dependencies of a group module.
     This means that before and after dependencies are duplicated to the referenced group,
@@ -219,7 +220,7 @@ def sort_and_validate_groups(groups: dict[str, GroupType]) -> list[str]:
     # Return a topological order based on the top-rank
     return sorted(list(g for g in groups.keys()), key=lambda g: ranks_min[g])
 
-def define_special_global_variables(group_all: GroupType):
+def define_special_global_variables(group_all: GroupType) -> None:
     """
     Defines special global variables on the given all group.
     Respects if the corresponding variable is already set.
@@ -256,7 +257,7 @@ def load_groups() -> tuple[dict[str, GroupType], list[str]]:
     loaded_groups = {}
     for file in group_files:
         group = load_group(file)
-        loaded_groups[group.name] = cast(GroupType, group)
+        loaded_groups[group.name] = group
 
     # Create default all group if it wasn't defined
     if 'all' not in loaded_groups:
@@ -277,7 +278,7 @@ def load_groups() -> tuple[dict[str, GroupType], list[str]]:
 
     return (loaded_groups, topological_order)
 
-def resolve_connector(host: HostType):
+def resolve_connector(host: HostType) -> None:
     """
     Resolves the connector for a host, if it hasn't been set manually.
     We'll try to figure out which connector to use by detecting presence of their
@@ -295,11 +296,6 @@ def resolve_connector(host: HostType):
             host.connector = Connector.registered_connectors[schema]
         else:
             die_error(f"No connector found for schema {schema}", loc=host._loaded_from)
-    elif callable(host.connector):
-        # The connector was explicitly given
-        pass
-    else:
-        die_error("Invalid connector was specified", loc=host._loaded_from)
 
 def load_host(name: str, module_file: str) -> HostType:
     """
@@ -325,7 +321,7 @@ def load_host(name: str, module_file: str) -> HostType:
 
         # Instanciate module
         if module_file_exists:
-            def _pre_exec(module):
+            def _pre_exec(module: ModuleType) -> None:
                 meta.transfer(module)
                 ctx.update(module)
             ret = cast(HostType, load_py_module(module_file, pre_exec=_pre_exec))
@@ -364,10 +360,10 @@ def load_hosts() -> dict[str, HostType]:
             (name, module_py) = host
             loaded_hosts[name] = load_host(name=name, module_file=module_py)
         else:
-            die_error(f"invalid host '{str(host)}'", loc="inventory.py")
+            die_error(f"invalid host '{str(host)}'", loc="inventory.py") # type: ignore[unreachable]
     return loaded_hosts
 
-def load_site(inventories: list[str]):
+def load_site(inventories: list[str]) -> None:
     """
     Loads the whole site and exposes it globally via the corresponding variables
     in the fora module.
@@ -415,8 +411,8 @@ def load_site(inventories: list[str]):
 
 def run_script(script: str,
                frame: inspect.FrameInfo,
-               params: dict[str, Any] = None,
-               name: Optional[str] = None):
+               params: Optional[dict[str, Any]] = None,
+               name: Optional[str] = None) -> None:
     """
     Loads and implicitly runs the given script by creating a new instance.
 
@@ -447,7 +443,7 @@ def run_script(script: str,
                 # New script instance starts with fresh set of default values.
                 # Use defaults() here to start with the connections base settings.
                 with fora.script.defaults():
-                    def _pre_exec(module):
+                    def _pre_exec(module: ModuleType) -> None:
                         meta.transfer(module)
                         ctx.update(module)
                         setattr(module, '_params', params or {})

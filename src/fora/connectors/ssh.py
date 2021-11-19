@@ -4,14 +4,14 @@ import sys
 import base64
 import zlib
 import subprocess
-from typing import Any, Optional, Type
+from typing import Any, Optional, Type, cast
 
 from fora import globals as G, logger
 from fora.connectors import tunnel_dispatcher as td
 from fora.connectors.connector import CompletedRemoteCommand, Connector, StatResult, connector
 from fora.types import HostType
 
-def _expect_response_packet(packet: Any, expected_type: Type):
+def _expect_response_packet(packet: Any, expected_type: Type) -> None:
     """
     Check if the given packet is of the expected type, otherwise raise a IOError.
 
@@ -42,7 +42,7 @@ class SshConnector(Connector):
         self.conn: td.Connection
         self.is_open: bool = False
 
-    def open(self):
+    def open(self) -> None:
         logger.connection_init(self)
         with open(td.__file__, 'rb') as f:
             tunnel_dispatcher_gz_b64 = base64.b64encode(zlib.compress(f.read(), 9)).decode('ascii')
@@ -54,6 +54,8 @@ class SshConnector(Connector):
         # pylint: disable=consider-using-with
         # The process must outlive this function.
         self.process = subprocess.Popen(command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=sys.stderr)
+        if self.process.stdout is None or self.process.stdin is None:
+            raise RuntimeError("Subprocess has no stdin/stdout. If is a bug.")
         self.conn = td.Connection(self.process.stdout, self.process.stdin)
 
         try:
@@ -78,7 +80,7 @@ class SshConnector(Connector):
 
         logger.connection_established()
 
-    def close(self):
+    def close(self) -> None:
         if self.is_open:
             self.conn.write_packet(td.PacketExit())
 
@@ -159,21 +161,21 @@ class SshConnector(Connector):
         response = self._request(request)
 
         _expect_response_packet(response, td.PacketResolveResult)
-        return response.value
+        return cast(td.PacketResolveResult, response).value
 
     def resolve_group(self, group: Optional[str]) -> str:
         request = td.PacketResolveGroup(group=group)
         response = self._request(request)
 
         _expect_response_packet(response, td.PacketResolveResult)
-        return response.value
+        return cast(td.PacketResolveResult, response).value
 
     def upload(self,
             file: str,
             content: bytes,
             mode: Optional[str] = None,
             owner: Optional[str] = None,
-            group: Optional[str] = None):
+            group: Optional[str] = None) -> None:
         request = td.PacketUpload(
                 file=file,
                 content=content,
@@ -188,7 +190,7 @@ class SshConnector(Connector):
         response = self._request(request)
 
         _expect_response_packet(response, td.PacketDownloadResult)
-        return response.content
+        return cast(td.PacketDownloadResult, response).content
 
     def _ssh_command(self, remote_command_escaped: str) -> list[str]:
         """

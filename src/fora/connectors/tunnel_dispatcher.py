@@ -19,7 +19,7 @@ import typing
 from pwd import getpwnam, getpwuid
 from grp import getgrnam, getgrgid
 from struct import pack, unpack
-from typing import Any, TypeVar, Callable, Optional, Union, NamedTuple, NewType, cast
+from typing import IO, Any, Type, TypeVar, Callable, Optional, Union, NamedTuple, NewType, cast
 
 T = TypeVar('T')
 i32 = NewType('i32', int)
@@ -40,7 +40,7 @@ except ModuleNotFoundError:
 
 class RemoteOSError(Exception):
     """An exception type for remote OSErrors."""
-    def __init__(self, errno, strerror, msg):
+    def __init__(self, errno: int, strerror: str, msg: str):
         super().__init__(msg)
         self.errno = errno
         self.strerror = strerror
@@ -48,11 +48,11 @@ class RemoteOSError(Exception):
 # Utility functions
 # ----------------------------------------------------------------
 
-def _is_debug():
+def _is_debug() -> bool:
     """Returns True if debugging output should be genereated."""
-    return debug if is_server else G.args.debug
+    return debug if is_server else cast(bool, G.args.debug)
 
-def _log(msg: str):
+def _log(msg: str) -> None:
     """
     Logs the given message to stderr, appending a prefix to indicate whether this
     is running on a remote (server) or locally (client).
@@ -156,12 +156,12 @@ def _resolve_group(group: str) -> int:
 class Connection:
     """Represents a connection to this dispatcher via an input and output buffer."""
 
-    def __init__(self, buffer_in, buffer_out):
+    def __init__(self, buffer_in: IO[bytes], buffer_out: IO[bytes]):
         self.buffer_in = buffer_in
         self.buffer_out = buffer_out
         self.should_close = False
 
-    def flush(self):
+    def flush(self) -> None:
         """Flushes the output buffer."""
         self.buffer_out.flush()
 
@@ -169,11 +169,11 @@ class Connection:
         """Reads exactly the given amount of bytes."""
         return self.buffer_in.read(count)
 
-    def write(self, data: bytes, count: int):
+    def write(self, data: bytes, count: int) -> None:
         """Writes exactly the given amount of bytes from data."""
         self.buffer_out.write(data[:count])
 
-    def write_packet(self, packet: Any):
+    def write_packet(self, packet: Any) -> None:
         """Writes the given packet."""
         if not hasattr(packet, '_is_packet') or not bool(getattr(packet, '_is_packet')):
             raise ValueError("Invalid argument: Must be a packet!")
@@ -184,11 +184,11 @@ class Connection:
 # Primary serialization and deserialization
 # ----------------------------------------------------------------
 
-def _is_optional(field):
+def _is_optional(field: Type[Any]) -> bool:
     """Returns True when the given type annotation is Optional[...]."""
     return typing.get_origin(field) is Union and type(None) in typing.get_args(field)
 
-def _is_list(field):
+def _is_list(field: Type[Any]) -> bool:
     """Returns True when the given type annotation is list[...]."""
     return typing.get_origin(field) is list
 
@@ -198,10 +198,10 @@ _serializers[i32]   = lambda conn, v: conn.write(pack(">i", v), 4)
 _serializers[u32]   = lambda conn, v: conn.write(pack(">I", v), 4)
 _serializers[i64]   = lambda conn, v: conn.write(pack(">q", v), 8)
 _serializers[u64]   = lambda conn, v: conn.write(pack(">Q", v), 8)
-_serializers[bytes] = lambda conn, v: (_serializers[u64](conn, len(v)), conn.write(v, len(v)))
+_serializers[bytes] = lambda conn, v: (_serializers[u64](conn, len(v)), conn.write(v, len(v))) # type: ignore[func-returns-value]
 _serializers[str]   = lambda conn, v: _serializers[bytes](conn, v.encode('utf-8'))
 
-def _serialize(conn: Connection, vtype, v: Any):
+def _serialize(conn: Connection, vtype: Type[Any], v: Any) -> None:
     """Serializes v based on the underlying type 'vtype' and writes it to the given connection."""
     if vtype in _serializers:
         _serializers[vtype](conn, v)
@@ -227,7 +227,7 @@ _deserializers[u64]   = lambda conn: unpack(">Q", conn.read(8))[0]
 _deserializers[bytes] = lambda conn: conn.read(_deserializers[u64](conn))
 _deserializers[str]   = lambda conn: _deserializers[bytes](conn).decode('utf-8')
 
-def _deserialize(conn: Connection, vtype):
+def _deserialize(conn: Connection, vtype: Type[Any]) -> Any:
     """Deserializes an object from the given connection based on the underlying type 'vtype' and returns it."""
     # pylint: disable=no-else-return
     if vtype in _deserializers:
@@ -249,30 +249,30 @@ def _deserialize(conn: Connection, vtype):
 packets: list[Any] = []
 packet_deserializers: dict[int, Callable[[Connection], Any]] = {}
 
-def _handle_response_packet():
+def _handle_response_packet() -> None:
     raise RuntimeError("This packet is a server-side response packet and must never be sent by the client!")
 
 # Define generic read and write functions
-def _read_packet(cls, conn: Connection):
-    kwargs = {}
-    for f in cls._fields:
+def _read_packet(cls: Type[Any], conn: Connection) -> Any:
+    kwargs: dict[str, Any] = {}
+    for f in cast(Any, cls)._fields:
         ftype = cls.__annotations__[f]
         kwargs[f] = _deserialize(conn, ftype)
     return cls(**kwargs)
 
-def _write_packet(cls, packet_id: u32, self, conn: Connection):
+def _write_packet(cls: Type[Any], packet_id: u32, this: object, conn: Connection) -> None:
     _serialize(conn, u32, packet_id)
     for f in cls._fields:
         ftype = cls.__annotations__[f]
-        _serialize(conn, ftype, getattr(self, f))
+        _serialize(conn, ftype, getattr(this, f))
     conn.flush()
 
-def Packet(type): # pylint: disable=redefined-builtin
+def Packet(type: str) -> Callable[[Type[Any]], Any]: # pylint: disable=redefined-builtin
     """Decorator for packet types. Registers the packet and generates read and write methods."""
     if type not in ['response', 'request']:
         raise RuntimeError("Invalid @Packet decoration: type must be either 'response' or 'request'.")
 
-    def wrapper(cls):
+    def wrapper(cls: Type[Any]) -> Type[Any]:
         # Assert cls is a NamedTuple
         if not hasattr(cls, '_fields'):
             raise RuntimeError("Invalid @Packet decoration: Decorated class must inherit from NamedTuple.")
@@ -312,7 +312,7 @@ class PacketCheckAlive(NamedTuple):
     """This packet is used to check whether a connection is alive.
     The receiver must answer with PacketAck immediately."""
 
-    def handle(self, conn: Connection):
+    def handle(self, conn: Connection) -> None:
         """Responds with PacketAck."""
         _ = (self)
         conn.write_packet(PacketAck())
@@ -320,7 +320,7 @@ class PacketCheckAlive(NamedTuple):
 @Packet(type='request')
 class PacketExit(NamedTuple):
     """This packet is used to signal the server to close the connection and end the dispatcher."""
-    def handle(self, conn: Connection):
+    def handle(self, conn: Connection) -> None:
         """Signals the connection to close."""
         _ = (self)
         conn.should_close = True
@@ -360,7 +360,7 @@ class PacketProcessRun(NamedTuple):
     umask: Optional[str] = None
     cwd: Optional[str] = None
 
-    def handle(self, conn: Connection):
+    def handle(self, conn: Connection) -> None:
         """Runs the requested command."""
         # By default we will run commands as the current user.
         uid, gid = (None, None)
@@ -392,7 +392,7 @@ class PacketProcessRun(NamedTuple):
                 conn.write_packet(PacketInvalidField("cwd", "The directory does not exist"))
                 return
 
-        def child_preexec():
+        def child_preexec() -> None:
             """
             Sets umask and becomes the correct user.
             """
@@ -438,7 +438,7 @@ class PacketStat(NamedTuple):
     follow_links: bool = False
     sha512sum: bool = False
 
-    def handle(self, conn: Connection):
+    def handle(self, conn: Connection) -> None:
         """Stats the requested path."""
         try:
             s = os.stat(self.path, follow_symlinks=self.follow_links)
@@ -498,7 +498,7 @@ class PacketResolveUser(NamedTuple):
     """
     user: Optional[str]
 
-    def handle(self, conn: Connection):
+    def handle(self, conn: Connection) -> None:
         """Resolves the requested user."""
         user = self.user if self.user is not None else str(os.getuid())
 
@@ -523,7 +523,7 @@ class PacketResolveGroup(NamedTuple):
     """
     group: Optional[str]
 
-    def handle(self, conn: Connection):
+    def handle(self, conn: Connection) -> None:
         """Resolves the requested group."""
         group = self.group if self.group is not None else str(os.getgid())
 
@@ -551,7 +551,7 @@ class PacketUpload(NamedTuple):
     owner: Optional[str] = None
     group: Optional[str] = None
 
-    def handle(self, conn: Connection):
+    def handle(self, conn: Connection) -> None:
         """Saves the content under the given path."""
         uid, gid = (None, None)
         mode_oct = 0o600
@@ -597,7 +597,7 @@ class PacketDownload(NamedTuple):
     field contained an invalid value."""
     file: str
 
-    def handle(self, conn: Connection):
+    def handle(self, conn: Connection) -> None:
         """Reads the file."""
         try:
             with open(self.file, 'rb') as f:
@@ -655,7 +655,7 @@ def receive_packet(conn: Connection, request: Any = None) -> Any:
     except struct.error as e:
         raise IOError("Unexpected EOF in data stream") from e
 
-def _main():
+def _main() -> None:
     """Handles all incoming packets in a loop until an invalid packet or a PacketExit is received."""
     os.umask(0o077)
 

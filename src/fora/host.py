@@ -22,7 +22,7 @@ def name() -> str:
         raise RuntimeError("This function may only be called inside a host module definition.")
     return _this.name
 
-def add_group(group: str):
+def add_group(group: str) -> None:
     """
     Adds a this host to the specified group.
 
@@ -37,7 +37,7 @@ def add_group(group: str):
         raise ValueError(f"Referenced invalid group '{group}'!")
     _this.groups.add(group)
 
-def add_groups(groups: list[str]):
+def add_groups(groups: list[str]) -> None:
     """
     Adds a this host to the specified list of groups.
 
@@ -51,7 +51,7 @@ def add_groups(groups: list[str]):
     for g in groups:
         add_group(g)
 
-def _is_normal_var(attr, value):
+def _is_normal_var(attr: str, value: Any) -> bool:
     """Returns True if the attribute doesn't start with an underscore, and is not a module."""
     return not attr.startswith("_") \
             and not isinstance(value, ModuleType)

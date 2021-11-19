@@ -3,7 +3,10 @@ Provides a class to manage a remote connection via the host's connector.
 Stores state along with the connection.
 """
 
-from typing import cast, Optional
+from __future__ import annotations
+
+from types import TracebackType
+from typing import Type, cast, Optional
 
 import fora.script
 from fora import globals as G
@@ -26,18 +29,18 @@ class Connection:
         self.connector: Connector = self.host.connector(host.url, host)
         self.base_settings: RemoteSettings = G.base_remote_settings
 
-    def __enter__(self):
+    def __enter__(self) -> Connection:
         self.connector.open()
         self.host.connection = self
         self._resolve_identity()
         return self
 
-    def __exit__(self, type_t, value, traceback):
-        _ = (type_t, value, traceback)
+    def __exit__(self, exc_type: Optional[Type[BaseException]], exc: Optional[BaseException], traceback: Optional[TracebackType]) -> None:
+        _ = (exc_type, exc, traceback)
         self.host.connection = cast(Connection, None)
         self.connector.close()
 
-    def _resolve_identity(self):
+    def _resolve_identity(self) -> None:
         """
         Query the user and group under which we are operating, and store it
         in our base_settings. This ensures that the base settings reflect
@@ -74,7 +77,7 @@ class Connection:
         settings = fora.script.current_defaults().overlay(settings)
 
         # A function to check whether a mask is octal
-        def check_mask(mask: Optional[str], name: str):
+        def check_mask(mask: Optional[str], name: str) -> None:
             if mask is None:
                 raise ValueError(f"Error while resolving settings: {name} cannot be None!")
             try:
@@ -139,7 +142,7 @@ class Connection:
             content: bytes,
             mode: Optional[str] = None,
             owner: Optional[str] = None,
-            group: Optional[str] = None):
+            group: Optional[str] = None) -> None:
         """See `fora.connectors.connector.Connector.upload`."""
         return self.connector.upload(
             file=file,

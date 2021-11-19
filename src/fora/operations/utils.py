@@ -83,7 +83,7 @@ def save_content(op: Operation,
 
         return op.success()
 
-def check_absolute_path(path: str):
+def check_absolute_path(path: str) -> None:
     """
     Asserts that a given path is non empty and absolute.
 

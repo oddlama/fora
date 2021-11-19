@@ -6,7 +6,8 @@ import argparse
 import difflib
 import os
 from dataclasses import dataclass
-from typing import Any, Optional
+from types import TracebackType
+from typing import Any, Optional, Type, cast
 
 from fora import globals as G
 
@@ -17,12 +18,12 @@ class State:
     indentation_level: int = 0
     """The current global indentation level."""
 
-state = State()
+state: State = State()
 """The global logger state."""
 
 def col(color_code: str) -> str:
     """Returns the given argument only if color is enabled."""
-    if not isinstance(G.args, argparse.Namespace):
+    if not isinstance(cast(Any, G.args), argparse.Namespace):
         use_color = os.getenv("NO_COLOR") is None
     else:
         use_color = not G.args.no_color
@@ -31,11 +32,11 @@ def col(color_code: str) -> str:
 
 class IndentationContext:
     """A context manager to modify the indentation level."""
-    def __enter__(self):
+    def __enter__(self) -> None:
         state.indentation_level += 1
 
-    def __exit__(self, type_t, value, traceback):
-        _ = (type_t, value, traceback)
+    def __exit__(self, exc_type: Optional[Type[BaseException]], exc: Optional[BaseException], traceback: Optional[TracebackType]) -> None:
+        _ = (exc_type, exc, traceback)
         state.indentation_level -= 1
 
 def ellipsis(s: str, width: int) -> str:
@@ -66,39 +67,39 @@ def indent_prefix() -> str:
     """Returns the indentation prefix for the current indentation level."""
     return "  " * state.indentation_level
 
-def print_indented(msg, **kwargs):
+def print_indented(msg: str, **kwargs: Any) -> None:
     """Same as print(), but prefixes the message with the indentation prefix."""
     print(f"{indent_prefix()}{msg}", **kwargs)
 
 
-def connection_init(connector):
+def connection_init(connector: Any) -> None:
     """Prints connection initialization information."""
     print_indented(f"{col('[1;34m')}{connector.schema}{col('[m')} connecting... ", end="", flush=True)
 
-def connection_failed(error_msg: str):
+def connection_failed(error_msg: str) -> None:
     """Signals that an error has occurred while establishing the connection."""
     print(col("[1;31m") + "ERR" + col("[m"))
     print_indented(f" {col('[37m')}└{col('[m')} " + f"{col('[31m')}{error_msg}{col('[m')}")
 
-def connection_established():
+def connection_established() -> None:
     """Signals that the connection has been successfully established."""
     print(col("[1;32m") + "OK" + col("[m"))
 
 
-def run_script(script: str, name: Optional[str] = None):
+def run_script(script: str, name: Optional[str] = None) -> None:
     """Prints the script file and name that is being executed next."""
     if name is not None:
         print_indented(f"{col('[33;1m')}script{col('[m')} {script} {col('[37m')}({name}){col('[m')}")
     else:
         print_indented(f"{col('[33;1m')}script{col('[m')} {script}")
 
-def print_operation_title(op, title_color, end="\n"):
+def print_operation_title(op: Any, title_color: str, end: str = "\n") -> None:
     """Prints the operation title and description."""
     name_if_given = (" " + col('[37m') + f"({op.name})" + col('[m')) if op.name is not None else ""
     dry_run_info = f" {col('[37m')}(dry){col('[m')}" if G.args.dry else ""
     print_indented(f"{title_color}{op.op_name}{col('[m')}{dry_run_info} {op.description}{name_if_given}", end=end, flush=True)
 
-def print_operation_early(op):
+def print_operation_early(op: Any) -> None:
     """Prints the operation title and description before the final status is known."""
     title_color = col("[1;33m")
     # Only overwrite status later if debugging is not enabled.
@@ -193,7 +194,7 @@ def diff(filename: str, old: Optional[bytes], new: Optional[bytes], color: bool 
 
     # Apply coloring if desired
     if color:
-        def apply_color(line: str):
+        def apply_color(line: str) -> str:
             linecolor = {
                 '+': '[32m',
                 '-': '[31m',
@@ -207,9 +208,9 @@ def diff(filename: str, old: Optional[bytes], new: Optional[bytes], color: bool 
 
     return header + list(difflines)
 
-def _operation_state_infos(result):
+def _operation_state_infos(result: Any) -> list[str]:
     # Print "key: value" pairs with changes
-    state_infos = []
+    state_infos: list[str] = []
     for k,final_v in result.final.items():
         initial_v = result.initial[k]
 
@@ -234,7 +235,7 @@ def _operation_state_infos(result):
             state_infos.append(entry_str)
     return state_infos
 
-def print_operation(op, result):
+def print_operation(op: Any, result: Any) -> None:
     """Prints the operation summary after it has finished execution."""
     if result.success:
         title_color = col("[1;32m") if result.changed else col("[1m")

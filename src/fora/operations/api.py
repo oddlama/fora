@@ -3,7 +3,7 @@
 import sys
 
 from functools import wraps
-from typing import cast, Any, Optional
+from typing import Callable, cast, Any, Optional
 from types import TracebackType, FrameType
 
 import fora.script
@@ -43,7 +43,7 @@ class Operation:
         self.final_state_dict: Optional[dict[str, Any]] = None
         self.diffs: list[tuple[str, Optional[bytes], Optional[bytes]]] = []
 
-    def nested(self, has_nested: bool):
+    def nested(self, has_nested: bool) -> None:
         """
         Sets whet this operation spawns nested operations. In this case,
         this operation will not have separate state, and the printing will be
@@ -56,7 +56,7 @@ class Operation:
         """
         self.has_nested = has_nested
 
-    def desc(self, description: str):
+    def desc(self, description: str) -> None:
         """
         Sets the description of the operation, and prints an
         early status via the logger.
@@ -71,12 +71,12 @@ class Operation:
         if self.has_nested:
             print()
 
-    def defaults(self, *args, **kwargs) -> RemoteDefaultsContext:
+    def defaults(self, *args: Any, **kwargs: Any) -> RemoteDefaultsContext:
         """Sets defaults on the current script. See `fora.types.ScriptType.defaults`."""
         _ = (self)
         return fora.script.defaults(*args, **kwargs)
 
-    def initial_state(self, **kwargs):
+    def initial_state(self, **kwargs: Any) -> None:
         """Sets the initial state."""
         if self.has_nested:
             raise OperationError("An operation that nests other operations cannot have state on its own.")
@@ -84,7 +84,7 @@ class Operation:
             raise OperationError("An operation's 'initial_state' can only be set once.")
         self.initial_state_dict = dict(kwargs)
 
-    def final_state(self, **kwargs):
+    def final_state(self, **kwargs: Any) -> None:
         """Sets the final state."""
         if self.has_nested:
             raise OperationError("An operation that nests other operations cannot have state on its own.")
@@ -107,7 +107,7 @@ class Operation:
             raise OperationError("Both initial and final state must have been set before 'unchanged()' may be called.")
         return self.initial_state_dict == self.final_state_dict
 
-    def changed(self, key):
+    def changed(self, key: str) -> bool:
         """
         Checks whether a specific key will change.
 
@@ -125,9 +125,9 @@ class Operation:
             raise OperationError("An operation that nests other operations cannot have state on its own.")
         if self.initial_state_dict is None or self.final_state_dict is None:
             raise OperationError("Both initial and final state must have been set before 'changed()' may be called.")
-        return self.initial_state_dict[key] != self.final_state_dict[key]
+        return bool(self.initial_state_dict[key] != self.final_state_dict[key])
 
-    def diff(self, file: str, old: Optional[bytes], new: Optional[bytes]):
+    def diff(self, file: str, old: Optional[bytes], new: Optional[bytes]) -> None:
         """
         Adds a file to the diffing output.
 
@@ -185,7 +185,7 @@ class Operation:
         logger.print_operation(self, result)
         return result
 
-def operation(op_name):
+def operation(op_name: str) -> Callable[[Callable], Callable]:
     """Operation function decorator."""
 
     def _calling_site_traceback() -> TracebackType:
@@ -196,19 +196,23 @@ def operation(op_name):
         try:
             raise AssertionError
         except AssertionError:
-            traceback = cast(TracebackType, sys.exc_info()[2])
-            back_frame = cast(FrameType, traceback.tb_frame)
-            back_frame = cast(FrameType, back_frame.f_back) # Omit this function
-            back_frame = cast(FrameType, back_frame.f_back) # Omit the function where _calling_site_traceback is called (the operation_wrapper below)
+            traceback = sys.exc_info()[2]
+            if traceback is None:
+                raise RuntimeError("Traceback cannot be None. This is a bug!")
+            back_frame: Optional[FrameType] = traceback.tb_frame
+            back_frame = back_frame.f_back if back_frame else None # Omit this function
+            back_frame = back_frame.f_back if back_frame else None # Omit the function where _calling_site_traceback is called (the operation_wrapper below)
+            if back_frame is None:
+                raise RuntimeError("back_frame cannot be None. This is a bug!")
 
         return TracebackType(tb_next=None,
                              tb_frame=back_frame,
                              tb_lasti=back_frame.f_lasti,
                              tb_lineno=back_frame.f_lineno)
 
-    def operation_wrapper(function):
+    def operation_wrapper(function: Callable) -> Callable:
         @wraps(function)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             op = Operation(op_name=op_name, name=kwargs.get("name", None))
             check = kwargs.get("check", True)
 

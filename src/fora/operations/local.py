@@ -10,8 +10,8 @@ from fora.loader import script_stack, run_script
 
 def script(script: str, # pylint: disable=redefined-outer-name
            recursive: bool = False,
-           params: dict[str, Any] = None,
-           name: Optional[str] = None):
+           params: Optional[dict[str, Any]] = None,
+           name: Optional[str] = None) -> None:
     """
     Executes the given script for the current host.
     Useful to split functionality into smaller sub-scripts.

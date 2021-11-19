@@ -2,6 +2,8 @@
 Provides utility functions.
 """
 
+from __future__ import annotations
+
 import importlib.machinery
 import importlib.util
 import inspect
@@ -9,8 +11,8 @@ import os
 import sys
 import traceback
 import uuid
-from types import ModuleType
-from typing import Any, TypeVar, Callable, Iterable, Optional
+from types import ModuleType, TracebackType
+from typing import Any, Type, TypeVar, Callable, Iterable, Optional
 
 import fora.group
 import fora.host
@@ -29,7 +31,7 @@ dynamically_loaded_modules: set[str] = set()
 class CycleError(ValueError):
     """An error that is throw to report a cycle in a graph that must be cycle free."""
 
-    def __init__(self, msg, cycle):
+    def __init__(self, msg: str, cycle: list[Any]):
         super().__init__(msg)
         self.cycle = cycle
 
@@ -41,34 +43,32 @@ class SetVariableContextManager:
         self.value: Any = value
         self.old_value: Any = getattr(self.obj, self.var)
 
-    def __enter__(self):
+    def __enter__(self) -> SetVariableContextManager:
         setattr(self.obj, self.var, self.value)
         return self
 
-    def __exit__(self, exc_type, exc_value, trace):
-        _ = (exc_type, exc_value, trace)
+    def __exit__(self, exc_type: Optional[Type[BaseException]], exc: Optional[BaseException], traceback: Optional[TracebackType]) -> None:
+        _ = (exc_type, exc, traceback)
         setattr(self.obj, self.var, self.old_value)
 
-    def update(self, value: Any):
+    def update(self, value: Any) -> None:
         """Updates the stored variable while the context manager is active."""
         self.value = value
         setattr(self.obj, self.var, self.value)
 
-def print_warning(msg: str):
+def print_warning(msg: str) -> None:
     """Prints a message with a (possibly colored) 'warning: ' prefix."""
     print(f"{col('[1;33m')}warning:{col('[m')} {msg}")
 
-def print_error(msg: str, loc=None):
+def print_error(msg: str, loc: Optional[str] = None) -> None:
     """Prints a message with a (possibly colored) 'error: ' prefix."""
     if loc is None:
         print(f"{col('[1;31m')}error:{col('[m')} {msg}")
     else:
         print(f"{col('[1m')}{loc}: {col('[1;31m')}error:{col('[m')} {msg}")
 
-def die_error(msg: str, loc=None, status_code=1):
-    """
-    Prints a message with a colored 'error: ' prefix, and exit with the given status code afterwards.
-    """
+def die_error(msg: str, loc: Optional[str] = None, status_code: int = 1) -> None:
+    """Prints a message with a colored 'error: ' prefix, and exit with the given status code afterwards."""
     print_error(msg, loc=loc)
     sys.exit(status_code)
 
@@ -179,7 +179,7 @@ def rank_sort(vertices: Iterable[T], preds_of: Callable[[T], Iterable[T]], child
     return ranks
 
 def script_trace(script_stack: list[tuple[ScriptType, inspect.FrameInfo]],
-                 include_root: bool = False):
+                 include_root: bool = False) -> str:
     """
     Creates a script trace similar to a python backtrace.
 
@@ -190,10 +190,11 @@ def script_trace(script_stack: list[tuple[ScriptType, inspect.FrameInfo]],
     include_root
         Whether or not to include the root frame in the script trace.
     """
-    def format_frame(f):
+    def format_frame(f: inspect.FrameInfo) -> str:
         frame = f"  File \"{f.filename}\", line {f.lineno}, in {f.frame.f_code.co_name}\n"
-        for context in f.code_context:
-            frame += f"    {context.strip()}\n"
+        if f.code_context is not None:
+            for context in f.code_context:
+                frame += f"    {context.strip()}\n"
         return frame
 
     ret = "Script stack (most recent call last):\n"
@@ -202,7 +203,7 @@ def script_trace(script_stack: list[tuple[ScriptType, inspect.FrameInfo]],
 
     return ret[:-1] # Strip last newline
 
-def print_exception(exc_type, exc_info, tb):
+def print_exception(exc_type: Optional[Type[BaseException]], exc_info: Optional[BaseException], tb: Optional[TracebackType]) -> None:
     """
     A function that hook that prints an exception traceback beginning from the
     last dynamically loaded module, but including a script stack so the error
@@ -229,7 +230,7 @@ def print_exception(exc_type, exc_info, tb):
     # if one is involved.
     traceback.print_exception(exc_type, exc_info, last_dynamic_tb or original_tb)
 
-def install_exception_hook():
+def install_exception_hook() -> None:
     """
     Installs a new global exception handler, that will modify the
     traceback of exceptions raised from dynamically loaded modules

@@ -24,7 +24,7 @@ def name() -> str:
         raise RuntimeError("This function may only be called inside a group module definition.")
     return _this.name
 
-def before(group: str):
+def before(group: str) -> None:
     """
     Adds a reverse-dependency on the given group.
 
@@ -43,7 +43,7 @@ def before(group: str):
     # pylint: disable=protected-access
     _this._groups_before.add(group)
 
-def before_all(groups: list[str]):
+def before_all(groups: list[str]) -> None:
     """
     Adds a reverse-dependency on all given groups.
 
@@ -57,7 +57,7 @@ def before_all(groups: list[str]):
     for g in groups:
         before(g)
 
-def after(group: str):
+def after(group: str) -> None:
     """
     Adds a dependency on the given group.
 
@@ -76,7 +76,7 @@ def after(group: str):
     # pylint: disable=protected-access
     _this._groups_after.add(group)
 
-def after_all(groups: list[str]):
+def after_all(groups: list[str]) -> None:
     """
     Adds a dependency on all given groups.
 
