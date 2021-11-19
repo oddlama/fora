@@ -198,12 +198,12 @@ def operation(op_name: str) -> Callable[[Callable], Callable]:
         except AssertionError:
             traceback = sys.exc_info()[2]
             if traceback is None:
-                raise RuntimeError("Traceback cannot be None. This is a bug!")
+                raise RuntimeError("Traceback cannot be None. This is a bug!") from None
             back_frame: Optional[FrameType] = traceback.tb_frame
             back_frame = back_frame.f_back if back_frame else None # Omit this function
             back_frame = back_frame.f_back if back_frame else None # Omit the function where _calling_site_traceback is called (the operation_wrapper below)
             if back_frame is None:
-                raise RuntimeError("back_frame cannot be None. This is a bug!")
+                raise RuntimeError("back_frame cannot be None. This is a bug!") from None
 
         return TracebackType(tb_next=None,
                              tb_frame=back_frame,

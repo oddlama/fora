@@ -12,7 +12,7 @@ import sys
 import traceback
 import uuid
 from types import ModuleType, TracebackType
-from typing import Any, Type, TypeVar, Callable, Iterable, Optional
+from typing import Any, NoReturn, Type, TypeVar, Callable, Iterable, Optional
 
 import fora.group
 import fora.host
@@ -47,8 +47,8 @@ class SetVariableContextManager:
         setattr(self.obj, self.var, self.value)
         return self
 
-    def __exit__(self, exc_type: Optional[Type[BaseException]], exc: Optional[BaseException], traceback: Optional[TracebackType]) -> None:
-        _ = (exc_type, exc, traceback)
+    def __exit__(self, exc_type: Optional[Type[BaseException]], exc: Optional[BaseException], tb: Optional[TracebackType]) -> None:
+        _ = (exc_type, exc, tb)
         setattr(self.obj, self.var, self.old_value)
 
     def update(self, value: Any) -> None:
@@ -67,7 +67,7 @@ def print_error(msg: str, loc: Optional[str] = None) -> None:
     else:
         print(f"{col('[1m')}{loc}: {col('[1;31m')}error:{col('[m')} {msg}")
 
-def die_error(msg: str, loc: Optional[str] = None, status_code: int = 1) -> None:
+def die_error(msg: str, loc: Optional[str] = None, status_code: int = 1) -> NoReturn:
     """Prints a message with a colored 'error: ' prefix, and exit with the given status code afterwards."""
     print_error(msg, loc=loc)
     sys.exit(status_code)

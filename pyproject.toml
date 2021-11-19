@@ -51,5 +51,6 @@ commands =
 deps = pdoc
 description = check if docs can be built
 basepython = python3.9
-commands = {toxworkdir}/docs/make.py
+extras = docs
+commands = python docs/make.py -o {toxworkdir}/docs_build
 """
