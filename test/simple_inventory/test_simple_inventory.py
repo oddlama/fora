@@ -1,4 +1,5 @@
 import os
+from typing import Any, cast
 import fora.loader
 import fora.globals as G
 
@@ -15,16 +16,16 @@ def test_missing_hosts(request):
     assert G.hosts["host4"].groups == set(["all", "somehosts", "only34"])
     assert G.hosts["host5"].groups == set(["all"])
 
-    assert G.hosts["host1"].overwrite_host == "host1"
-    assert G.hosts["host2"].overwrite_host == "host2"
-    assert G.hosts["host3"].overwrite_host == "host3"
-    assert G.hosts["host4"].overwrite_host == "host4"
-    assert G.hosts["host5"].overwrite_host == "host5"
+    assert cast(Any, G.hosts["host1"]).overwrite_host == "host1"
+    assert cast(Any, G.hosts["host2"]).overwrite_host == "host2"
+    assert cast(Any, G.hosts["host3"]).overwrite_host == "host3"
+    assert cast(Any, G.hosts["host4"]).overwrite_host == "host4"
+    assert cast(Any, G.hosts["host5"]).overwrite_host == "host5"
 
-    assert G.hosts["host1"].overwrite_group == "desktops"
-    assert G.hosts["host2"].overwrite_group == "somehosts"
-    assert G.hosts["host3"].overwrite_group == "desktops"
-    assert G.hosts["host4"].overwrite_group == "somehosts"
-    assert G.hosts["host5"].overwrite_group == "all"
+    assert cast(Any, G.hosts["host1"]).overwrite_group == "desktops"
+    assert cast(Any, G.hosts["host2"]).overwrite_group == "somehosts"
+    assert cast(Any, G.hosts["host3"]).overwrite_group == "desktops"
+    assert cast(Any, G.hosts["host4"]).overwrite_group == "somehosts"
+    assert cast(Any, G.hosts["host5"]).overwrite_group == "all"
 
     os.chdir(request.config.invocation_dir)
