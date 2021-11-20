@@ -6,7 +6,7 @@ import os
 import sys
 from itertools import combinations
 from types import ModuleType
-from typing import cast, Any, Optional
+from typing import Union, cast, Any, Optional
 
 import fora.host
 import fora.group
@@ -297,7 +297,7 @@ def resolve_connector(host: HostType) -> None:
         else:
             die_error(f"No connector found for schema {schema}", loc=host._loaded_from)
 
-def load_host(name: str, module_file: str) -> HostType:
+def load_host(name: str, module_file: str, fallback_url: bool = False) -> HostType:
     """
     Load and validates the host with the given name from the given module file path.
 
@@ -307,6 +307,8 @@ def load_host(name: str, module_file: str) -> HostType:
         The host name of the host to be loaded
     module_file
         The path to the host module file that will be instanciated
+    fallback_url
+        Whether to instanciate a DefaultHost if the name contains an url scheme `(*:*)`
 
     Returns
     -------
@@ -326,6 +328,10 @@ def load_host(name: str, module_file: str) -> HostType:
                 ctx.update(module)
             ret = cast(HostType, load_py_module(module_file, pre_exec=_pre_exec))
         else:
+            if not fallback_url:
+                raise ValueError(f"module file '{module_file}' for host '{name}' doesn't exist")
+            if ":" not in name:
+                raise ValueError(f"host '{name}' without matching 'hosts/<name>.py' must contain a connector schema (e.g. 'ssh://host').")
             # Instanciate default module and set url to the name
             ret = cast(HostType, DefaultHost)
             meta.url = name
@@ -355,15 +361,19 @@ def load_hosts() -> dict[str, HostType]:
     loaded_hosts = {}
     for host in G.inventory.hosts:
         if isinstance(host, str):
-            loaded_hosts[host] = load_host(name=host, module_file=f"hosts/{host}.py")
+            if host in loaded_hosts:
+                raise ValueError(f"duplicate host: {host}")
+            loaded_hosts[host] = load_host(name=host, module_file=f"hosts/{host}.py", fallback_url=True)
         elif isinstance(host, tuple):
             (name, module_py) = host
-            loaded_hosts[name] = load_host(name=name, module_file=module_py)
+            if name in loaded_hosts:
+                raise ValueError(f"duplicate host: {host}")
+            loaded_hosts[name] = load_host(name=name, module_file=module_py, fallback_url=False)
         else:
             die_error(f"invalid host '{str(host)}'", loc="inventory.py") # type: ignore[unreachable]
     return loaded_hosts
 
-def load_site(inventories: list[str]) -> None:
+def load_site(inventories: list[Union[str, tuple[str, str]]]) -> None:
     """
     Loads the whole site and exposes it globally via the corresponding variables
     in the fora module.
@@ -379,10 +389,10 @@ def load_site(inventories: list[str]) -> None:
     """
 
     # Separate inventory modules from single host definitions
-    module_files = []
-    single_hosts = []
+    module_files: list[str] = []
+    single_hosts: list[Union[str, tuple[str, str]]] = []
     for i in inventories:
-        if i.endswith(".py"):
+        if isinstance(i, str) and i.endswith(".py"):
             module_files.append(i)
         else:
             single_hosts.append(i)

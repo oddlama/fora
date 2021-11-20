@@ -208,6 +208,7 @@ def diff(filename: str, old: Optional[bytes], new: Optional[bytes], color: bool 
 
     return header + list(difflines)
 
+# TODO: move functions to operation api. cleaner and has type access.
 def _operation_state_infos(result: Any) -> list[str]:
     # Print "key: value" pairs with changes
     state_infos: list[str] = []

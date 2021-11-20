@@ -7,7 +7,6 @@ import argparse
 import inspect
 import os
 from typing import NoReturn
-from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from fora import globals as G, logger
 from fora.connection import open_connection
