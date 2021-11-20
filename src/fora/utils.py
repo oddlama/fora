@@ -63,9 +63,9 @@ def print_warning(msg: str) -> None:
 def print_error(msg: str, loc: Optional[str] = None) -> None:
     """Prints a message with a (possibly colored) 'error: ' prefix."""
     if loc is None:
-        print(f"{col('[1;31m')}error:{col('[m')} {msg}")
+        print(f"{col('[1;31m')}error:{col('[m')} {msg}", file=sys.stderr)
     else:
-        print(f"{col('[1m')}{loc}: {col('[1;31m')}error:{col('[m')} {msg}")
+        print(f"{col('[1m')}{loc}: {col('[1;31m')}error:{col('[m')} {msg}", file=sys.stderr)
 
 def die_error(msg: str, loc: Optional[str] = None, status_code: int = 1) -> NoReturn:
     """Prints a message with a colored 'error: ' prefix, and exit with the given status code afterwards."""
