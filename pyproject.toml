@@ -27,6 +27,7 @@ disable = "fixme, line-too-long, invalid-name, too-many-instance-attributes, too
 
 [tool.coverage.run]
 branch = true
+source = ["src/fora"]
 parallel = true
 
 [tool.coverage.report]
@@ -36,7 +37,7 @@ show_missing = true
 legacy_tox_ini = """
 [tox]
 isolated_build = True
-envlist = py39,pylint,type,docs
+envlist = py39,pylint,type,docs,coverage
 
 [testenv]
 description = run tests and create coverage data
@@ -44,7 +45,7 @@ deps =
 	pytest
 	coverage[toml]
 	pytest-cov
-commands = pytest --cov src/fora
+commands = pytest -v --cov={envsitepackagesdir}/fora
 
 [testenv:pylint]
 description = check with pylint
@@ -68,5 +69,8 @@ commands = python docs/make.py -o {toxworkdir}/docs_build
 [testenv:coverage]
 description = [run after tests]: combine coverage data and create report
 deps = coverage[toml]
-commands = coverage report
+skip_install = true
+commands =
+	coverage html
+	coverage report --fail-under=100
 """

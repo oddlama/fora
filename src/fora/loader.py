@@ -297,7 +297,7 @@ def resolve_connector(host: HostType) -> None:
         else:
             die_error(f"No connector found for schema {schema}", loc=host._loaded_from)
 
-def load_host(name: str, module_file: str, fallback_url: bool = False) -> HostType:
+def load_host(name: str, module_file: Optional[str] = None) -> HostType:
     """
     Load and validates the host with the given name from the given module file path.
 
@@ -306,15 +306,19 @@ def load_host(name: str, module_file: str, fallback_url: bool = False) -> HostTy
     name
         The host name of the host to be loaded
     module_file
-        The path to the host module file that will be instanciated
-    fallback_url
-        Whether to instanciate a DefaultHost if the name contains an url scheme `(*:*)`
+        The path to the host module file that will be instanciated.
+        Pass None to try loading `hosts/{name}.py` and otherwise fall
+        back to instanciating a `DefaultHost` if the name is an url scheme `(*:*)`.
 
     Returns
     -------
     HostType
         The host module
     """
+    fallback_url = module_file is None
+    if module_file is None:
+        module_file = f"hosts/{name}.py"
+
     module_file_exists = os.path.exists(module_file)
     meta = HostType(name=name, _loaded_from=module_file if module_file_exists else "__cmdline__")
 
@@ -363,12 +367,12 @@ def load_hosts() -> dict[str, HostType]:
         if isinstance(host, str):
             if host in loaded_hosts:
                 raise ValueError(f"duplicate host: {host}")
-            loaded_hosts[host] = load_host(name=host, module_file=f"hosts/{host}.py", fallback_url=True)
+            loaded_hosts[host] = load_host(name=host)
         elif isinstance(host, tuple):
             (name, module_py) = host
             if name in loaded_hosts:
                 raise ValueError(f"duplicate host: {host}")
-            loaded_hosts[name] = load_host(name=name, module_file=module_py, fallback_url=False)
+            loaded_hosts[name] = load_host(name=name, module_file=module_py)
         else:
             die_error(f"invalid host '{str(host)}'", loc="inventory.py") # type: ignore[unreachable]
     return loaded_hosts
