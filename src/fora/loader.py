@@ -291,6 +291,8 @@ def resolve_connector(host: HostType) -> None:
     """
     # pylint: disable=protected-access
     if host.connector is None:
+        if ':' not in host.url:
+            die_error(f"Url doesn't include a schema and no connector was specified explicitly", loc=host._loaded_from)
         schema = host.url.split(':')[0]
         if schema in Connector.registered_connectors:
             host.connector = Connector.registered_connectors[schema]
