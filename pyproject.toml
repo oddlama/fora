@@ -6,6 +6,9 @@ build-backend = "setuptools.build_meta"
 write_to = "src/fora/version.py"
 git_describe_command = "git describe --dirty --tags --long --match 'v*' --first-parent"
 
+[tool.twine]
+sign = yes
+
 [tool.mypy]
 ignore_missing_imports = true
 disallow_untyped_defs = true
