@@ -337,7 +337,7 @@ def load_host(name: str, module_file: Optional[str] = None) -> HostType:
             if ":" not in name:
                 raise ValueError(f"host '{name}' without matching 'hosts/<name>.py' must contain a connector schema (e.g. 'ssh://host').")
             # Instanciate default module and set url to the name
-            ret = cast(HostType, DefaultHost)
+            ret = cast(HostType, DefaultHost())
             meta.url = name
             meta.transfer(ret)
 
