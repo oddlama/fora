@@ -166,14 +166,18 @@ def rank_sort(vertices: Iterable[T], preds_of: Callable[[T], Iterable[T]], child
             n, p = needs_rank_list.pop(0)
             r = ranks[p] + 1
 
-            # Skip nodes that already have a rank
-            # higher than the one we would assign
+            # If the rank to assign is greater than the total number of nodes, the graph must be cyclic.
+            if r > len(list(vertices)):
+                raise CycleError("Cannot apply rank_sort to cyclic graph.", [p])
+
+            # Skip nodes that already have a rank higher than
+            # or equal to the one we would assign
             if ranks[n] >= r:
                 continue
 
             # Assign rank
             ranks[n] = r
-            # Queue childen for rank assignment
+            # Queue childenii for rank assignment
             needs_rank_list.extend([(c, n) for c in childs_of(n)])
 
     return ranks

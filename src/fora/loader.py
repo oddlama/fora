@@ -250,6 +250,9 @@ def load_groups() -> tuple[dict[str, GroupType], list[str]]:
     for file in group_files:
         available_groups.append(os.path.splitext(os.path.basename(file))[0])
 
+    if 'all' not in available_groups:
+        available_groups.append('all')
+
     # Store available_groups so it can be accessed while groups are actually loaded.
     G.available_groups = available_groups
 
@@ -262,7 +265,7 @@ def load_groups() -> tuple[dict[str, GroupType], list[str]]:
     # Create default all group if it wasn't defined
     if 'all' not in loaded_groups:
         default_group = cast(GroupType, DefaultGroup())
-        GroupType(name="all", _loaded_from="__internal__").transfer(default_group)
+        GroupType(name="all", _loaded_from="__all__internal_group__").transfer(default_group)
         loaded_groups['all'] = default_group
 
     # Define special global variables
