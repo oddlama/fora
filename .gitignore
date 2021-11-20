@@ -6,6 +6,7 @@ __pycache__
 
 venv/
 build/
+htmlcov/
 dist/
 *.egg-info
 
