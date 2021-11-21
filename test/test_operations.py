@@ -72,8 +72,8 @@ def test_files_link():
 
 def test_files_upload_content():
     content = os.urandom(512)
-    files.upload_content(dest="/tmp/__pytest_fora/testlink", content=content, mode="755")
-    with open("/tmp/__pytest_fora/testlink", 'rb') as f:
+    files.upload_content(dest="/tmp/__pytest_fora/testcontent", content=content, mode="755")
+    with open("/tmp/__pytest_fora/testcontent", 'rb') as f:
         assert f.read() == content
 
 def test_cleanup_directory():

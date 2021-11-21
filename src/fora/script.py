@@ -48,7 +48,7 @@ def defaults(as_user: Optional[str] = None,
     def canonicalize_mode(mode: Optional[str]) -> Optional[str]:
         return None if mode is None else oct(int(mode, 8))[2:]
 
-    new_defaults = RemoteSettings(
+    requested_defaults = RemoteSettings(
             as_user=as_user,
             as_group=as_group,
             owner=owner,
@@ -63,7 +63,7 @@ def defaults(as_user: Optional[str] = None,
 
     new_defaults = fora.host.current_host.connection.base_settings
     new_defaults = new_defaults.overlay(current_defaults())
-    new_defaults = new_defaults.overlay(new_defaults)
+    new_defaults = new_defaults.overlay(requested_defaults)
     return RemoteDefaultsContext(_this, new_defaults)
 
 def current_defaults() -> RemoteSettings:
