@@ -118,6 +118,9 @@ class SshConnector(Connector):
             cwd=cwd)
         response = self._request(request)
 
+        if isinstance(response, td.PacketProcessPreexecError):
+            raise ValueError(response.message)
+
         _expect_response_packet(response, td.PacketProcessCompleted)
         result = CompletedRemoteCommand(stdout=response.stdout,
                                         stderr=response.stderr,

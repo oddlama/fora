@@ -348,6 +348,7 @@ class PacketProcessCompleted(NamedTuple):
 @Packet(type='response')
 class PacketProcessPreexecError(NamedTuple):
     """This packet is used to indicate an error in the preexec_fn when running the process."""
+    message: str
 
 @Packet(type='request')
 class PacketProcessRun(NamedTuple):
@@ -411,9 +412,9 @@ class PacketProcessRun(NamedTuple):
                 capture_output=self.capture_output,
                 cwd=self.cwd,
                 preexec_fn=child_preexec,
-                check=True)
+                check=False)
         except subprocess.SubprocessError as e:
-            conn.write_packet(PacketProcessPreexecError())
+            conn.write_packet(PacketProcessPreexecError(str(e)))
             return
 
         # Send response for command result
