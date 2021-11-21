@@ -16,7 +16,7 @@ hostname = "ssh://root@localhost"
 host: HostType = cast(HostType, None)
 connection: Connection = cast(Connection, None)
 
-def test_init(pytestconfig):
+def test_init():
     class DefaultArgs:
         debug = False
         diff = False
