@@ -9,7 +9,7 @@ from types import TracebackType
 from typing import Type, cast, Optional
 
 import fora.script
-from fora import globals as G
+from fora import globals as G, logger
 from fora.connectors.connector import Connector, CompletedRemoteCommand, StatResult
 from fora.remote_settings import RemoteSettings
 from fora.types import HostType
@@ -111,6 +111,7 @@ class Connection:
             umask: Optional[str] = None,
             cwd: Optional[str] = None) -> CompletedRemoteCommand:
         """See `fora.connectors.connector.Connector.run`."""
+        logger.debug_args("Connection.run", locals())
         defaults = fora.script.current_defaults()
         return self.connector.run(
             command=command,
@@ -124,14 +125,17 @@ class Connection:
 
     def resolve_user(self, user: Optional[str]) -> Optional[str]:
         """See `fora.connectors.connector.Connector.resolve_user`."""
+        logger.debug_args("Connection.resolve_user", locals())
         return self.connector.resolve_user(user)
 
     def resolve_group(self, group: Optional[str]) -> Optional[str]:
         """See `fora.connectors.connector.Connector.resolve_group`."""
+        logger.debug_args("Connection.resolve_group", locals())
         return self.connector.resolve_group(group)
 
     def stat(self, path: str, follow_links: bool = False, sha512sum: bool = False) -> Optional[StatResult]:
         """See `fora.connectors.connector.Connector.stat`."""
+        logger.debug_args("Connection.stat", locals())
         return self.connector.stat(
             path=path,
             follow_links=follow_links,
@@ -144,6 +148,7 @@ class Connection:
             owner: Optional[str] = None,
             group: Optional[str] = None) -> None:
         """See `fora.connectors.connector.Connector.upload`."""
+        logger.debug_args("Connection.upload", locals())
         return self.connector.upload(
             file=file,
             content=content,
@@ -153,6 +158,7 @@ class Connection:
 
     def download(self, file: str) -> bytes:
         """See `fora.connectors.connector.Connector.download`."""
+        logger.debug_args("Connection.download", locals())
         return self.connector.download(file=file)
 
     def download_or(self, file: str, default: Optional[bytes] = None) -> Optional[bytes]:

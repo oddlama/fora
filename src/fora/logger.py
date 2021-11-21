@@ -6,6 +6,7 @@ import argparse
 import difflib
 import os
 from dataclasses import dataclass
+import sys
 from types import TracebackType
 from typing import Any, Optional, Type, cast
 
@@ -66,6 +67,25 @@ def indent() -> IndentationContext:
 def indent_prefix() -> str:
     """Returns the indentation prefix for the current indentation level."""
     return "  " * state.indentation_level
+
+def debug(msg: str) -> None:
+    """Prints the given message only in debug mode."""
+    if not G.args.debug:
+        return
+
+    print(f"   [1;34mDEBUG[m: {msg}", file=sys.stderr)
+
+def debug_args(msg: str, args: dict[str, Any]) -> None:
+    """Prints all given arguments when in debug mode."""
+    if not G.args.debug:
+        return
+
+    str_args = ""
+    args = {k: v for k,v in args.items() if k != "self"}
+    if len(args) > 0:
+        str_args = " " + ", ".join(f"{k}={v}" for k,v in args.items())
+
+    print(f"   [1;34mDEBUG[m: {msg}{str_args}", file=sys.stderr)
 
 def print_indented(msg: str, **kwargs: Any) -> None:
     """Same as print(), but prefixes the message with the indentation prefix."""
