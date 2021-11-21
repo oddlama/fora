@@ -48,6 +48,7 @@ deps =
 	pytest
 	coverage[toml]
 	pytest-cov
+passenv = SSH_AUTH_SOCK
 commands = pytest -v --cov={envsitepackagesdir}/fora
 
 [testenv:pylint]
