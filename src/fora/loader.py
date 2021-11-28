@@ -320,12 +320,13 @@ def load_host(name: str, module_file: Optional[str] = None) -> HostType:
     HostType
         The host module
     """
-    fallback_url = module_file is None
+    requires_module_file = module_file is not None
     if module_file is None:
         module_file = f"hosts/{name}.py"
 
     module_file_exists = os.path.exists(module_file)
-    meta = HostType(name=name, _loaded_from=module_file if module_file_exists else "__cmdline__")
+    url = name if ':' in name else f"ssh://{name}"
+    meta = HostType(name=name, _loaded_from=module_file if module_file_exists else "__cmdline__", url=url)
 
     with set_this_host(meta) as ctx:
         fora.host.add_group("all")
@@ -337,13 +338,10 @@ def load_host(name: str, module_file: Optional[str] = None) -> HostType:
                 ctx.update(module)
             ret = cast(HostType, load_py_module(module_file, pre_exec=_pre_exec))
         else:
-            if not fallback_url:
+            if requires_module_file:
                 raise ValueError(f"module file '{module_file}' for host '{name}' doesn't exist")
-            if ":" not in name:
-                raise ValueError(f"host '{name}' without matching 'hosts/<name>.py' must contain a connector schema (e.g. 'ssh://host').")
-            # Instanciate default module and set url to the name
+            # Instanciate default module
             ret = cast(HostType, DefaultHost())
-            meta.url = name
             meta.transfer(ret)
 
     resolve_connector(ret)

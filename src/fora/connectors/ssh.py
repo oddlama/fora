@@ -33,6 +33,7 @@ class SshConnector(Connector):
         super().__init__(url, host)
 
         self.ssh_opts: list[str] = getattr(host, 'ssh_opts') if hasattr(host, 'ssh_opts') else []
+        print(url)
         if url is not None and url.startswith(f"{self.schema}://"):
             self.url = url
         else:

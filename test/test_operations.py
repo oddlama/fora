@@ -6,6 +6,7 @@ import fora.globals as G
 import fora.host
 import fora.loader
 import fora.script
+from fora.main import main
 from fora.operations import local, files
 from fora.connection import Connection
 from fora.types import HostType, ScriptType
@@ -63,7 +64,7 @@ def test_files_directory():
     assert os.path.isdir("/tmp/__pytest_fora")
 
 def test_files_file():
-    files.file(path="/tmp/__pytest_fora/testfile", mode="755")
+    files.file(path="/tmp/__pytest_fora/testfile", mode="644")
     assert os.path.isfile("/tmp/__pytest_fora/testfile")
 
 def test_files_link():
@@ -72,9 +73,64 @@ def test_files_link():
 
 def test_files_upload_content():
     content = os.urandom(512)
-    files.upload_content(dest="/tmp/__pytest_fora/testcontent", content=content, mode="755")
+    files.upload_content(dest="/tmp/__pytest_fora/testcontent", content=content, mode="644")
     with open("/tmp/__pytest_fora/testcontent", 'rb') as f:
         assert f.read() == content
+
+def test_files_upload():
+    files.upload(src=__file__, dest="/tmp/__pytest_fora/testupload", mode="644")
+    with open("/tmp/__pytest_fora/testupload", 'rb') as f:
+        with open(__file__, 'rb') as g:
+            assert f.read() == g.read()
+
+def test_files_template_content():
+    files.template_content(dest="/tmp/__pytest_fora/testtemplcontent", content="{{ myvar }}", context=dict(myvar="q948fhqh489f"), mode="644")
+    with open("/tmp/__pytest_fora/testtemplcontent", 'rb') as f:
+        assert f.read() == b"q948fhqh489f"
+
+def test_files_template():
+    files.template(src="test/templates/test.j2", dest="/tmp/__pytest_fora/testtempl", context=dict(myvar="graio208hfae"), mode="644")
+    with open("/tmp/__pytest_fora/testtempl", 'rb') as f:
+        assert f.read() == b"graio208hfae"
+
+def files_upload_dir(dest):
+    src = "test/simple_inventory"
+    files.upload_dir(src=src, dest=dest, dir_mode="755", file_mode="644")
+
+    if dest[-1] == "/":
+        dest = os.path.join(dest, os.path.basename(src))
+    for root, _, subfiles in os.walk(src):
+        root = os.path.relpath(root, start=src)
+        sroot = os.path.normpath(os.path.join(src, root))
+        droot = os.path.normpath(os.path.join(dest, root))
+        assert os.path.exists(droot)
+        assert os.path.isdir(sroot)
+        assert os.path.isdir(droot)
+        for f in subfiles:
+            sf, df = (os.path.join(sroot, f), os.path.join(droot, f))
+            assert os.path.exists(df)
+            assert os.path.isfile(sf)
+            assert os.path.isfile(df)
+            with open(sf, 'rb') as f:
+                with open(df, 'rb') as g:
+                    assert f.read() == g.read()
+
+def test_files_upload_dir():
+    files_upload_dir(dest="/tmp/__pytest_fora/")
+
+def test_files_upload_dir_2():
+    files_upload_dir(dest="/tmp/__pytest_fora/")
+
+def test_files_upload_dir_rename():
+    files_upload_dir(dest="/tmp/__pytest_fora/simple_inventory_renamed")
+
+def test_files_upload_dir_rename_2():
+    files_upload_dir(dest="/tmp/__pytest_fora/simple_inventory_renamed")
+
+def test_full_deploy(request):
+    os.chdir("test/simple_deploy")
+    main(["inventory.py", "deploy.py"])
+    os.chdir(request.config.invocation_dir)
 
 def test_cleanup_directory():
     files.directory("/tmp/__pytest_fora", present=False)

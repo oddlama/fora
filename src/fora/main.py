@@ -6,6 +6,7 @@ the CLI interface and main script dispatching.
 import argparse
 import inspect
 import os
+import sys
 from typing import NoReturn
 
 from fora import globals as G, logger
@@ -63,7 +64,7 @@ class ThrowingArgumentParser(argparse.ArgumentParser):
         """Raises an exception on error."""
         raise ArgumentParserError(message)
 
-def main() -> None:
+def main(argv: list[str] = sys.argv[1:]) -> None:
     """
     The main program entry point. This will parse arguments, load inventory and task
     definitions and run the given user script.
@@ -96,7 +97,7 @@ def main() -> None:
     parser.set_defaults(func=main_run)
 
     try:
-        args: argparse.Namespace = parser.parse_args()
+        args: argparse.Namespace = parser.parse_args(argv)
     except ArgumentParserError as e:
         die_error(str(e))
 

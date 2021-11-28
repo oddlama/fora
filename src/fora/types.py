@@ -101,15 +101,16 @@ class HostType(MockupType):
     _loaded_from: str
     """The original file path of the instanciated module."""
 
-    groups: set[str] = field(default_factory=set)
-    """The set of groups this host belongs to."""
-
-    url: str = "ssh:"
+    url: str
     """
     The url to the host. A matching connector for the schema must exist.
-    Defaults to an ssh connection if not explicitly specified. Connection
-    details can be given in the url schema or via attributes on the host module.
+    Defaults to the name if not explicitly specified. Appends ssh:// if
+    no schema is included in the name. Connection details can be given
+    in the url schema or via attributes on the host module.
     """
+
+    groups: set[str] = field(default_factory=set)
+    """The set of groups this host belongs to."""
 
     connector: Optional[Callable[[str, HostType], Connector]] = None
     """The connector class to use. If unset the connector will be determined by the url."""

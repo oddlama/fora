@@ -389,6 +389,7 @@ def upload_dir(src: str,
     """
     Uploads the given directory to the remote host. Unrelated files
     in an existing destination directories will be left untouched.
+    This will only upload files and directories, not links or other special files.
 
     Given the following source directory:
 
@@ -460,7 +461,8 @@ def upload_dir(src: str,
         for d in dirs:
             directory(path=d, mode=dir_mode, owner=owner, group=group)
         for sf,df in files:
-            upload(src=sf, dest=df, mode=file_mode, owner=owner, group=group)
+            if os.path.isfile(sf):
+                upload(src=sf, dest=df, mode=file_mode, owner=owner, group=group)
 
     # TODO: accumulate results, don't create our own (no printing from us)
     return OperationResult(True, False, {}, {})

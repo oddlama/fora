@@ -3,7 +3,7 @@ from typing import Any, cast
 import fora.loader
 import fora.globals as G
 
-def test_missing_hosts(request):
+def test_simple_inventory(request):
     os.chdir(request.fspath.dirname)
 
     fora.loader.load_site(["inventory.py"])

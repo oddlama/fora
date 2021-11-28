@@ -7,8 +7,7 @@ from fora.types import HostType
 
 def create_host(name: str):
     ret = cast(HostType, fora.loader.DefaultHost())
-    meta = HostType(name=name, _loaded_from="__test_internal__")
-    meta.url = name
+    meta = HostType(name=name, _loaded_from="__test_internal__", url=name)
     meta.transfer(ret)
     return ret
 
