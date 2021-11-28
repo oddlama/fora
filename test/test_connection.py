@@ -1,5 +1,7 @@
+import grp
 import hashlib
 import os
+import pwd
 import pytest
 import subprocess
 from typing import cast
@@ -9,12 +11,25 @@ import fora.host
 import fora.loader
 import fora.script
 from fora.connection import Connection
+from fora.connectors import tunnel_dispatcher as td
+from fora.connectors.connector import connector
+from fora.connectors.tunnel_connector import TunnelConnector
 from fora.connectors.tunnel_dispatcher import RemoteOSError
 from fora.types import HostType, ScriptType
 
-hostname = "ssh://root@localhost"
+hostname = "coverage:"
 host: HostType = cast(HostType, None)
 connection: Connection = cast(Connection, None)
+
+@connector(schema='coverage')
+class CoverageConnector(TunnelConnector):
+    """A tunnel connector that provides fake remote access (always localhost) via a tunnel dispatcher subprocess."""
+
+    def command(self) -> list[str]:
+        command = ["python3", os.path.realpath(td.__file__)]
+        if G.args.debug:
+            command.append("--debug")
+        return command
 
 def test_init():
     class DefaultArgs:
@@ -28,6 +43,12 @@ def test_init():
     fora.host.current_host = host
     fora.script._this = ScriptType("__internal_test", "__internal_test")
 
+def current_test_user():
+    return pwd.getpwuid(os.getuid()).pw_name
+
+def current_test_group():
+    return grp.getgrgid(os.getgid()).gr_name
+
 def test_open_connection():
     global connection
     connection = Connection(host)
@@ -36,20 +57,24 @@ def test_open_connection():
 
     ctx = fora.script.defaults()
     defs = ctx.__enter__()
-    assert defs.as_user == "root"
-    assert defs.as_group == "root"
-    assert defs.owner == "root"
-    assert defs.group == "root"
+    current_user = current_test_user()
+    current_group = current_test_group()
+    assert defs.as_user == current_user
+    assert defs.as_group == current_group
+    assert defs.owner == current_user
+    assert defs.group == current_group
     assert defs.cwd == "/tmp"
     assert int(defs.dir_mode, 8) == 0o700
     assert int(defs.file_mode, 8) == 0o600
     assert int(defs.umask, 8) == 0o77
 
 def test_resolve_identity():
-    assert connection.base_settings.as_user == "root"
-    assert connection.base_settings.as_group == "root"
-    assert connection.base_settings.owner == "root"
-    assert connection.base_settings.group == "root"
+    current_user = current_test_user()
+    current_group = current_test_group()
+    assert connection.base_settings.as_user == current_user
+    assert connection.base_settings.as_group == current_group
+    assert connection.base_settings.owner == current_user
+    assert connection.base_settings.group == current_group
 
 def test_run_false():
     with pytest.raises(subprocess.CalledProcessError) as e:
@@ -90,38 +115,8 @@ def test_run_id():
     assert ret.returncode == 0
     assert ret.stdout is not None
     stdout = ret.stdout.decode('utf-8', 'ignore')
-    assert "uid=0(root)" in stdout
-    assert "gid=0(root)" in stdout
-    assert ret.stderr == b""
-
-def test_run_id_as_user_nobody():
-    ret = connection.run(["id"], user="nobody")
-    assert ret.returncode == 0
-    assert ret.stdout is not None
-    stdout = ret.stdout.decode('utf-8', 'ignore')
-    parts = stdout.split(" ")
-    assert "nobody" in parts[0]
-    assert "root" in parts[1]
-    assert ret.stderr == b""
-
-def test_run_id_as_group_nobody():
-    ret = connection.run(["id"], group="nobody")
-    assert ret.returncode == 0
-    assert ret.stdout is not None
-    stdout = ret.stdout.decode('utf-8', 'ignore')
-    parts = stdout.split(" ")
-    assert "root" in parts[0]
-    assert "nobody" in parts[1]
-    assert ret.stderr == b""
-
-def test_run_id_as_user_nobody_group_nobody():
-    ret = connection.run(["id"], user="nobody", group="nobody")
-    assert ret.returncode == 0
-    assert ret.stdout is not None
-    stdout = ret.stdout.decode('utf-8', 'ignore')
-    parts = stdout.split(" ")
-    assert "nobody" in parts[0]
-    assert "nobody" in parts[1]
+    assert f"uid={os.getuid()}({current_test_user()})" in stdout
+    assert f"gid={os.getgid()}({current_test_group()})" in stdout
     assert ret.stderr == b""
 
 def test_run_pwd():
@@ -137,7 +132,7 @@ def test_run_pwd_in_var_tmp():
     assert ret.stderr == b""
 
 def test_resolve_user_self():
-    assert connection.resolve_user(None) == "root"
+    assert connection.resolve_user(None) == current_test_user()
 
 def test_resolve_user_root_by_uid():
     assert connection.resolve_user("0") == "root"
@@ -146,7 +141,7 @@ def test_resolve_user_nobody():
     assert connection.resolve_user("nobody") == "nobody"
 
 def test_resolve_group_self():
-    assert connection.resolve_group(None) == "root"
+    assert connection.resolve_group(None) == current_test_group()
 
 def test_resolve_group_root_by_uid():
     assert connection.resolve_group("0") == "root"
@@ -157,6 +152,8 @@ def test_resolve_group_nobody():
 @pytest.mark.parametrize("n", [0, 1, 8, 32, 128, 1024, 1024 * 32, 1024 * 256])
 def test_upload_download(n):
     content = os.urandom(n)
+    if os.path.exists("/tmp/__pytest_fora_upload"):
+        os.remove("/tmp/__pytest_fora_upload")
     connection.upload("/tmp/__pytest_fora_upload", content=content)
     assert connection.download("/tmp/__pytest_fora_upload") == content
     assert connection.download_or("/tmp/__pytest_fora_upload") == content
@@ -165,6 +162,7 @@ def test_upload_download(n):
     assert stat.type == "file"
     assert stat.size == n
     assert stat.sha512sum == hashlib.sha512(content).digest()
+    os.remove("/tmp/__pytest_fora_upload")
 
 def test_stat_nonexistent():
     stat = connection.stat("/tmp/__nonexistent")

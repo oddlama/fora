@@ -48,6 +48,36 @@ def test_open_connection():
     assert int(defs.file_mode, 8) == 0o600
     assert int(defs.umask, 8) == 0o77
 
+def test_run_id_as_user_nobody():
+    ret = connection.run(["id"], user="nobody")
+    assert ret.returncode == 0
+    assert ret.stdout is not None
+    stdout = ret.stdout.decode('utf-8', 'ignore')
+    parts = stdout.split(" ")
+    assert "nobody" in parts[0]
+    assert "root" in parts[1]
+    assert ret.stderr == b""
+
+def test_run_id_as_group_nobody():
+    ret = connection.run(["id"], group="nobody")
+    assert ret.returncode == 0
+    assert ret.stdout is not None
+    stdout = ret.stdout.decode('utf-8', 'ignore')
+    parts = stdout.split(" ")
+    assert "root" in parts[0]
+    assert "nobody" in parts[1]
+    assert ret.stderr == b""
+
+def test_run_id_as_user_nobody_group_nobody():
+    ret = connection.run(["id"], user="nobody", group="nobody")
+    assert ret.returncode == 0
+    assert ret.stdout is not None
+    stdout = ret.stdout.decode('utf-8', 'ignore')
+    parts = stdout.split(" ")
+    assert "nobody" in parts[0]
+    assert "nobody" in parts[1]
+    assert ret.stderr == b""
+
 def test_local_script(capsys):
     local.script(script="test/operations/subdeploy.py")
     out, _ = capsys.readouterr()
