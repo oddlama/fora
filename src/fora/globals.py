@@ -1,7 +1,7 @@
 """Stores all global state."""
 
 import argparse
-from typing import cast
+from typing import Any, cast
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from fora.remote_settings import RemoteSettings
@@ -12,6 +12,9 @@ class NotYetLoaded:
     A dummy class which instances are used to provoke runtime-errors when
     using a part of fora that hasn't been initialized yet.
     """
+
+    def __contains__(self, _: Any) -> bool:
+        return False
 
 args: argparse.Namespace = cast(argparse.Namespace, NotYetLoaded())
 """
