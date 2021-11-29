@@ -86,13 +86,11 @@ def getattr_hierarchical(host: HostType, attr: str) -> Any:
     AttributeError
         The given attribute was not found.
     """
+    # While getattr implicitly does a local lookup before calling this function,
+    # we still need this block to force certain variables to always be looked up locally.
     if attr.startswith("_") or attr in HostType.__annotations__:
         if attr not in vars(host):
             raise AttributeError(attr)
-        return vars(host)[attr]
-
-    # Look up variable on host module
-    if attr in vars(host):
         return vars(host)[attr]
 
     if attr not in GroupType.__annotations__:
@@ -121,57 +119,6 @@ def getattr_hierarchical(host: HostType, attr: str) -> Any:
                     return value
 
     raise AttributeError(attr)
-
-def hasattr_hierarchical(host: HostType, attr: str) -> Any:
-    """
-    Functions exactly similar to `getattr_hierarchical` but checks whether the given
-    attribute exists in the host's hierarchy instead of returning its value.
-    The same constraints as for `getattr_hierarchical` apply.
-
-    Parameters
-    ----------
-    host
-        The host for which the attribute should be checked.
-    attr
-        The attribute to check.
-
-    Returns
-    -------
-    bool
-        True if the attribute exists
-    """
-    if attr.startswith("_") or attr in HostType.__annotations__:
-        return attr in vars(host)
-
-    # Look up variable on host module
-    if attr in vars(host):
-        return True
-
-    if attr not in GroupType.__annotations__:
-        # Look up variable on groups
-        for g in G.group_order:
-            # Only consider a group if the host is in that group
-            if g not in vars(host)["groups"]:
-                continue
-
-            # Return the attribute if it is set on the group
-            group = G.groups[g]
-            if hasattr(group, attr):
-                value = getattr(group, attr)
-                if _is_normal_var(attr, value):
-                    return True
-
-    if attr not in ScriptType.__annotations__:
-        # Look up variable on current script
-        # pylint: disable=protected-access,import-outside-toplevel,cyclic-import
-        import fora.script
-        if fora.script._this is not None:
-            if hasattr(fora.script._this, attr):
-                value = getattr(fora.script._this, attr)
-                if _is_normal_var(attr, value):
-                    return True
-
-    return False
 
 def vars_hierarchical(host: HostType, include_all_host_variables: bool = False) -> dict[str, Any]:
     """

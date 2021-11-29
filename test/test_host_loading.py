@@ -12,3 +12,5 @@ def test_load_host_url():
 def test_load_host_from_file():
     h = fora.loader.load_host("test", "test/inventory/hosts/host1.py")
     assert h.name == "test"
+    assert hasattr(h, 'pyfile')
+    assert getattr(h, 'pyfile') == "host1.py"

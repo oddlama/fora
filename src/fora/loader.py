@@ -28,6 +28,8 @@ class DefaultHost:
     This class will be instanciated for each host that has not been defined by a corresponding
     host module file, and is used to represent a host with no special configuration.
     """
+    def __getattr__(self, attr: str) -> Any:
+        return fora.host.getattr_hierarchical(cast(HostType, self), attr)
 
 def load_inventory(file: str) -> InventoryType:
     """
@@ -337,6 +339,7 @@ def load_host(name: str, module_file: Optional[str] = None) -> HostType:
                 meta.transfer(module)
                 ctx.update(module)
             ret = cast(HostType, load_py_module(module_file, pre_exec=_pre_exec))
+            setattr(ret, '__getattr__', lambda attr, ret=ret: fora.host.getattr_hierarchical(ret, attr))
         else:
             if requires_module_file:
                 raise ValueError(f"module file '{module_file}' for host '{name}' doesn't exist")
@@ -345,15 +348,6 @@ def load_host(name: str, module_file: Optional[str] = None) -> HostType:
             meta.transfer(ret)
 
     resolve_connector(ret)
-
-    # Monkeypatch the __hasattr__ and __getattr__ methods to perform hierachical lookup from now on
-    if module_file_exists:
-        setattr(ret, '__getattr__', lambda attr: fora.host.getattr_hierarchical(ret, attr))
-        setattr(ret, '__hasattr__', lambda attr: fora.host.hasattr_hierarchical(ret, attr))
-    else:
-        setattr(ret, '__getattr__', lambda _, attr: fora.host.getattr_hierarchical(ret, attr))
-        setattr(ret, '__hasattr__', lambda _, attr: fora.host.hasattr_hierarchical(ret, attr))
-
     return ret
 
 def load_hosts() -> dict[str, HostType]:

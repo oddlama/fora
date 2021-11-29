@@ -16,6 +16,7 @@ def test_dynamic_instanciation(request):
         assert i in G.hosts
 
     for h, e in zip(G.hosts.values(), expected_files):
+        assert hasattr(h, 'pyfile')
         assert getattr(h, 'pyfile', None) == e
 
     os.chdir(request.config.invocation_dir)

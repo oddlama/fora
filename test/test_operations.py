@@ -1,10 +1,12 @@
 import os
-import pytest
 from typing import cast
+
+import pytest
 
 import fora.globals as G
 import fora.host
 import fora.loader
+from fora.operations.api import OperationError
 import fora.script
 from fora.main import main
 from fora.operations import local, files
@@ -96,6 +98,18 @@ def test_files_directory():
 def test_files_file():
     files.file(path="/tmp/__pytest_fora/testfile", mode="644")
     assert os.path.isfile("/tmp/__pytest_fora/testfile")
+
+def test_files_dir_wrong_existing_type():
+    with pytest.raises(OperationError) as e:
+        files.directory(path="/tmp/__pytest_fora/testfile")
+    assert "exists but is not a directory" in str(e.value)
+
+def test_files_dir_wrong_existing_type_less_traceback():
+    G.args.debug = False
+    with pytest.raises(OperationError) as e:
+        files.directory(path="/tmp/__pytest_fora/testfile")
+    G.args.debug = True
+    assert "exists but is not a directory" in str(e.value)
 
 def test_files_link():
     files.link(path="/tmp/__pytest_fora/testlink", target="/tmp/__pytest_fora/testfile")
