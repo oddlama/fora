@@ -38,7 +38,7 @@ class Operation:
         self.op_name = op_name
         self.name = name
         self.has_nested = False
-        self.description: str
+        self.description: str = "?"
         self.initial_state_dict: Optional[dict[str, Any]] = None
         self.final_state_dict: Optional[dict[str, Any]] = None
         self.diffs: list[tuple[str, Optional[bytes], Optional[bytes]]] = []

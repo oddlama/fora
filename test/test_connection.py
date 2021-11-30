@@ -140,6 +140,10 @@ def test_resolve_user_root_by_uid():
 def test_resolve_user_nobody():
     assert connection.resolve_user("nobody") == "nobody"
 
+def test_resolve_user_invalid():
+    with pytest.raises(ValueError):
+        connection.resolve_user("_invalid_")
+
 def test_resolve_group_self():
     assert connection.resolve_group(None) == current_test_group()
 
@@ -148,6 +152,10 @@ def test_resolve_group_root_by_uid():
 
 def test_resolve_group_nobody():
     assert connection.resolve_group("nobody") == "nobody"
+
+def test_resolve_group_invalid():
+    with pytest.raises(ValueError):
+        connection.resolve_group("_invalid_")
 
 @pytest.mark.parametrize("n", [0, 1, 8, 32, 128, 1024, 1024 * 32, 1024 * 256])
 def test_upload_download(n):
@@ -164,6 +172,19 @@ def test_upload_download(n):
     assert stat.sha512sum == hashlib.sha512(content).digest()
     os.remove("/tmp/__pytest_fora_upload")
 
+def test_upload_owner_group():
+    content = b"1234"
+    if os.path.exists("/tmp/__pytest_fora_upload"):
+        os.remove("/tmp/__pytest_fora_upload")
+    connection.upload("/tmp/__pytest_fora_upload", content=content, mode="644", owner=str(os.getuid()), group=str(os.getgid()))
+    assert connection.download("/tmp/__pytest_fora_upload") == content
+    assert connection.download_or("/tmp/__pytest_fora_upload") == content
+    stat = connection.stat("/tmp/__pytest_fora_upload", sha512sum=True)
+    assert stat is not None
+    assert stat.type == "file"
+    assert stat.sha512sum == hashlib.sha512(content).digest()
+    os.remove("/tmp/__pytest_fora_upload")
+
 def test_stat_nonexistent():
     stat = connection.stat("/tmp/__nonexistent")
     assert stat is None
@@ -172,6 +193,50 @@ def test_download_nonexistent():
     assert connection.download_or("/tmp/__nonexistent") == None
     with pytest.raises(ValueError):
         assert connection.download("/tmp/__nonexistent")
+
+def test_run_none_in_fields():
+    ret = connection.connector.run(["true"], umask=None, user=None, group=None, cwd=None)
+    assert ret.returncode == 0
+
+def test_run_invalid_command():
+    with pytest.raises(RemoteOSError, match=r"No such file or directory"):
+        connection.run(["_invalid_"])
+
+def test_run_invalid_umask():
+    with pytest.raises(ValueError, match=r"Invalid value.*given for field 'umask'"):
+        connection.run(["true"], umask="_invalid_")
+
+def test_run_invalid_user():
+    with pytest.raises(ValueError, match=r"Invalid value.*given for field 'user'"):
+        connection.run(["true"], user="_invalid_")
+
+def test_run_invalid_user_id():
+    with pytest.raises(ValueError, match=r"Invalid value.*given for field 'user'"):
+        connection.run(["true"], user="1234567890")
+
+def test_run_invalid_group():
+    with pytest.raises(ValueError, match=r"Invalid value.*given for field 'group'"):
+        connection.run(["true"], group="_invalid_")
+
+def test_run_invalid_group_id():
+    with pytest.raises(ValueError, match=r"Invalid value.*given for field 'group'"):
+        connection.run(["true"], group="1234567890")
+
+def test_run_invalid_cwd():
+    with pytest.raises(ValueError, match=r"Invalid value.*given for field 'cwd'"):
+        connection.run(["true"], cwd="/_invalid_")
+
+def test_upload_invalid_mode():
+    with pytest.raises(ValueError, match=r"Invalid value.*given for field 'mode'"):
+        connection.upload("/invalid", content=b"", mode="_invalid_")
+
+def test_upload_invalid_owner():
+    with pytest.raises(ValueError, match=r"Invalid value.*given for field 'owner'"):
+        connection.upload("/invalid", content=b"", owner="_invalid_")
+
+def test_upload_invalid_group():
+    with pytest.raises(ValueError, match=r"Invalid value.*given for field 'group'"):
+        connection.upload("/invalid", content=b"", group="_invalid_")
 
 def test_close_connection():
     connection.__exit__(None, None, None)

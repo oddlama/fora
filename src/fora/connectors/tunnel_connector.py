@@ -108,7 +108,7 @@ class TunnelConnector(Connector):
             cwd=cwd)
         response = self._request(request)
 
-        if isinstance(response, td.PacketProcessPreexecError):
+        if isinstance(response, td.PacketProcessError):
             raise ValueError(response.message)
 
         _expect_response_packet(response, td.PacketProcessCompleted)

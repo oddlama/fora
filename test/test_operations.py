@@ -1,7 +1,9 @@
+import inspect
 import os
 from typing import cast
 
 import pytest
+from fora import utils
 
 import fora.globals as G
 import fora.host
@@ -19,11 +21,10 @@ connection: Connection = cast(Connection, None)
 
 def test_init():
     class DefaultArgs:
-        debug = False
+        debug = True
         diff = True
         dry = False
         changes = True
-        debug = True
         verbose = 99
     G.args = DefaultArgs()
     fora.loader.load_site([hostname])
@@ -100,16 +101,14 @@ def test_files_file():
     assert os.path.isfile("/tmp/__pytest_fora/testfile")
 
 def test_files_dir_wrong_existing_type():
-    with pytest.raises(OperationError) as e:
+    with pytest.raises(OperationError, match="exists but is not a directory"):
         files.directory(path="/tmp/__pytest_fora/testfile")
-    assert "exists but is not a directory" in str(e.value)
 
 def test_files_dir_wrong_existing_type_less_traceback():
     G.args.debug = False
-    with pytest.raises(OperationError) as e:
+    with pytest.raises(OperationError, match="exists but is not a directory"):
         files.directory(path="/tmp/__pytest_fora/testfile")
     G.args.debug = True
-    assert "exists but is not a directory" in str(e.value)
 
 def test_files_link():
     files.link(path="/tmp/__pytest_fora/testlink", target="/tmp/__pytest_fora/testfile")
@@ -174,6 +173,24 @@ def test_files_upload_dir_rename_2():
 def test_full_deploy(request):
     os.chdir("test/simple_deploy")
     main(["inventory.py", "deploy.py"])
+    os.chdir(request.config.invocation_dir)
+
+def test_full_deploy_bad(request):
+    os.chdir("test/simple_deploy")
+    G.args.debug = False
+    with pytest.raises(ValueError, match="Path must be absolute"):
+        main(["inventory.py", "deploy_bad.py"])
+    G.args.debug = True
+    os.chdir(request.config.invocation_dir)
+
+def test_full_deploy_bad_recursive_test_script_traceback(request):
+    os.chdir("test/simple_deploy")
+    G.args.debug = False
+    with pytest.raises(ValueError, match="Invalid recursive call to") as e:
+        main(["inventory.py", "deploy_bad_recursive.py"])
+    utils.print_exception(e.type, e.value, e.tb)
+    utils.script_trace([(None, inspect.getouterframes(inspect.currentframe())[0])], include_root=True)
+    G.args.debug = True
     os.chdir(request.config.invocation_dir)
 
 def test_cleanup_directory():

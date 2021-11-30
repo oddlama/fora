@@ -7,7 +7,7 @@ import argparse
 import inspect
 import os
 import sys
-from typing import NoReturn
+from typing import NoReturn, Optional
 
 from fora import globals as G, logger
 from fora.connection import open_connection
@@ -64,11 +64,13 @@ class ThrowingArgumentParser(argparse.ArgumentParser):
         """Raises an exception on error."""
         raise ArgumentParserError(message)
 
-def main(argv: list[str] = sys.argv[1:]) -> None:
+def main(argv: Optional[list[str]] = None) -> None:
     """
     The main program entry point. This will parse arguments, load inventory and task
-    definitions and run the given user script.
+    definitions and run the given user script. Defaults to sys.argv[1:] if argv is None.
     """
+    if argv is None:
+        argv = sys.argv[1:]
     parser = ThrowingArgumentParser(description="Runs a fora script.")
 
     # General options

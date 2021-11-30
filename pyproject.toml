@@ -35,6 +35,14 @@ parallel = true
 
 [tool.coverage.report]
 show_missing = true
+exclude_lines = [
+	'^\s*raise AssertionError\b',
+	'^\s*raise NotImplementedError\b',
+	'^\s*raise$',
+	'^\s*except ModuleNotFoundError:$',
+	'^\s*pass$',
+	"^if __name__ == ['\"]__main__['\"]:$",
+]
 
 [tool.tox]
 legacy_tox_ini = """
@@ -76,5 +84,5 @@ deps = coverage[toml]
 skip_install = true
 commands =
 	coverage html
-	coverage report --fail-under=100
+	coverage report --fail-under=75
 """

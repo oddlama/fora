@@ -346,8 +346,8 @@ class PacketProcessCompleted(NamedTuple):
     returncode: i32
 
 @Packet(type='response')
-class PacketProcessPreexecError(NamedTuple):
-    """This packet is used to indicate an error in the preexec_fn when running the process."""
+class PacketProcessError(NamedTuple):
+    """This packet is used to indicate an error when running a process or when running the preexec_fn."""
     message: str
 
 @Packet(type='request')
@@ -414,7 +414,7 @@ class PacketProcessRun(NamedTuple):
                 preexec_fn=child_preexec,
                 check=False)
         except subprocess.SubprocessError as e:
-            conn.write_packet(PacketProcessPreexecError(str(e)))
+            conn.write_packet(PacketProcessError(str(e)))
             return
 
         # Send response for command result
@@ -644,7 +644,7 @@ def receive_packet(conn: Connection, request: Any = None) -> Any:
         try:
             packet_name = packets[packet_id].__name__
         except KeyError:
-            packet_name = f"[unkown packet with id {packet_id}]"
+            packet_name = f"[unknown packet with id {packet_id}]"
 
         _log(f"got packet header for: {packet_name}")
         packet = packet_deserializers[packet_id](conn)
