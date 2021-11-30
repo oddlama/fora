@@ -651,7 +651,7 @@ def receive_packet(conn: Connection, request: Any = None) -> Any:
         if isinstance(packet, PacketOSError):
             raise RemoteOSError(msg=packet.msg, errno=packet.errno, strerror=packet.strerror)
         if isinstance(packet, PacketInvalidField):
-            raise ValueError(f"Invalid value '{getattr(request, packet.field)}' given for field '{packet.field}': {packet.error_message}")
+            raise ValueError(f"invalid value '{getattr(request, packet.field)}' given for field '{packet.field}': {packet.error_message}")
         return packet
     except struct.error as e:
         raise IOError("Unexpected EOF in data stream") from e

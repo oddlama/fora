@@ -56,6 +56,29 @@ class Operation:
         """
         self.has_nested = has_nested
 
+    def add_nested_result(self, key: str, result: OperationResult) -> None:
+        """
+        Adds initial and final state of a nested operation under the given key
+        into this operation's state dictionaries.
+
+        Parameters
+        ----------
+        key
+            The key under which to add the nested result.
+        result
+            The result to add.
+        """
+        if not self.has_nested:
+            raise OperationError("An operation can only accumulate nested results if it is marked as nested.")
+        if self.initial_state_dict is None:
+            self.initial_state_dict = {}
+        if self.final_state_dict is None:
+            self.final_state_dict = {}
+        if key in self.initial_state_dict or key in self.final_state_dict:
+            raise OperationError(f"Cannot add nested operation result under existing key '{key}'.")
+        self.initial_state_dict[key] = result.initial
+        self.final_state_dict[key] = result.final
+
     def desc(self, description: str) -> None:
         """
         Sets the description of the operation, and prints an
@@ -101,8 +124,6 @@ class Operation:
         bool
             Whether the states differ.
         """
-        if self.has_nested:
-            raise OperationError("An operation that nests other operations cannot have state on its own.")
         if self.initial_state_dict is None or self.final_state_dict is None:
             raise OperationError("Both initial and final state must have been set before 'unchanged()' may be called.")
         return self.initial_state_dict == self.final_state_dict
@@ -155,14 +176,13 @@ class Operation:
         OperationResult
             The OperationResult for this failed operation.
         """
-        if self.has_nested:
-            raise OperationError("An operation that nests other operations cannot have state on its own.")
         result = OperationResult(success=False,
                 changed=False,
                 initial=self.initial_state_dict or {},
-                final={},
+                final=self.final_state_dict or {},
                 failure_message=msg)
-        logger.print_operation(self, result)
+        if not self.has_nested:
+            logger.print_operation(self, result)
         return result
 
     def success(self) -> OperationResult:
@@ -174,15 +194,14 @@ class Operation:
         OperationResult
             The OperationResult for this successful operation.
         """
-        if self.has_nested:
-            raise OperationError("An operation that nests other operations cannot have state on its own.")
         if self.initial_state_dict is None or self.final_state_dict is None:
             raise OperationError("Both initial and final state must have been set before 'success()' may be called.")
         result = OperationResult(success=True,
                 changed=self.initial_state_dict != self.final_state_dict,
                 initial=self.initial_state_dict,
                 final=self.final_state_dict)
-        logger.print_operation(self, result)
+        if not self.has_nested:
+            logger.print_operation(self, result)
         return result
 
 def operation(op_name: str) -> Callable[[Callable], Callable]:

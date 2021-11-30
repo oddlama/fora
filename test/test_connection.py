@@ -203,39 +203,39 @@ def test_run_invalid_command():
         connection.run(["_invalid_"])
 
 def test_run_invalid_umask():
-    with pytest.raises(ValueError, match=r"Invalid value.*given for field 'umask'"):
+    with pytest.raises(ValueError, match=r"invalid value.*given for field 'umask'"):
         connection.run(["true"], umask="_invalid_")
 
 def test_run_invalid_user():
-    with pytest.raises(ValueError, match=r"Invalid value.*given for field 'user'"):
+    with pytest.raises(ValueError, match=r"invalid value.*given for field 'user'"):
         connection.run(["true"], user="_invalid_")
 
 def test_run_invalid_user_id():
-    with pytest.raises(ValueError, match=r"Invalid value.*given for field 'user'"):
+    with pytest.raises(ValueError, match=r"invalid value.*given for field 'user'"):
         connection.run(["true"], user="1234567890")
 
 def test_run_invalid_group():
-    with pytest.raises(ValueError, match=r"Invalid value.*given for field 'group'"):
+    with pytest.raises(ValueError, match=r"invalid value.*given for field 'group'"):
         connection.run(["true"], group="_invalid_")
 
 def test_run_invalid_group_id():
-    with pytest.raises(ValueError, match=r"Invalid value.*given for field 'group'"):
+    with pytest.raises(ValueError, match=r"invalid value.*given for field 'group'"):
         connection.run(["true"], group="1234567890")
 
 def test_run_invalid_cwd():
-    with pytest.raises(ValueError, match=r"Invalid value.*given for field 'cwd'"):
+    with pytest.raises(ValueError, match=r"invalid value.*given for field 'cwd'"):
         connection.run(["true"], cwd="/_invalid_")
 
 def test_upload_invalid_mode():
-    with pytest.raises(ValueError, match=r"Invalid value.*given for field 'mode'"):
+    with pytest.raises(ValueError, match=r"invalid value.*given for field 'mode'"):
         connection.upload("/invalid", content=b"", mode="_invalid_")
 
 def test_upload_invalid_owner():
-    with pytest.raises(ValueError, match=r"Invalid value.*given for field 'owner'"):
+    with pytest.raises(ValueError, match=r"invalid value.*given for field 'owner'"):
         connection.upload("/invalid", content=b"", owner="_invalid_")
 
 def test_upload_invalid_group():
-    with pytest.raises(ValueError, match=r"Invalid value.*given for field 'group'"):
+    with pytest.raises(ValueError, match=r"invalid value.*given for field 'group'"):
         connection.upload("/invalid", content=b"", group="_invalid_")
 
 def test_close_connection():

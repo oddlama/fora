@@ -47,7 +47,7 @@ def script(script: str, # pylint: disable=redefined-outer-name
         for meta, _ in script_stack:
             # pylint: disable=protected-access
             if os.path.samefile(script, meta._loaded_from):
-                raise ValueError(f"Invalid recursive call to script '{script}'. Use recursive=True to allow this.")
+                raise ValueError(f"invalid recursive call to script '{script}'. Use recursive=True to allow this.")
 
     outer_frame = inspect.getouterframes(inspect.currentframe())[1]
     run_script(script, outer_frame, params=params, name=name)

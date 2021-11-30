@@ -84,5 +84,5 @@ deps = coverage[toml]
 skip_install = true
 commands =
 	coverage html
-	coverage report --fail-under=75
+	coverage report --fail-under=90
 """

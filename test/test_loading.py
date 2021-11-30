@@ -1,7 +1,10 @@
 import pytest
-import fora.loader
+
+from fora.main import main
+import fora.globals as G
 import fora.group
 import fora.host
+import fora.loader
 
 def test_init():
     # This function is needed to init fora global state,
@@ -30,10 +33,20 @@ def test_group_functions_from_outside_definition():
     with pytest.raises(RuntimeError, match="may only be called inside a group module definition"):
         fora.group.after_all([""])
 
-def test_group_functions_from_outside_definition():
+def test_host_functions_from_outside_definition():
     with pytest.raises(RuntimeError, match="may only be called inside a host module definition"):
         fora.host.name()
     with pytest.raises(RuntimeError, match="may only be called inside a host module definition"):
         fora.host.add_group("")
     with pytest.raises(RuntimeError, match="may only be called inside a host module definition"):
         fora.host.add_groups([""])
+
+def test_help_output():
+    with pytest.raises(SystemExit) as e:
+        main(["--help"])
+    assert e.value.code == 0
+
+def test_invalid_args():
+    with pytest.raises(SystemExit) as e:
+        main(["--whatisthis_nonexistent"])
+    assert e.value.code == 1

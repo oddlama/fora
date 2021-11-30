@@ -82,13 +82,17 @@ def directory(path: str,
     op
         The operation wrapper. Must not be supplied by the user.
     """
+    # pylint: disable=too-many-branches
     _ = (name, check) # Processed automatically.
     check_absolute_path(path)
     op.desc(path)
 
     conn = fora.host.current_host.connection
     with op.defaults(dir_mode=mode, owner=owner, group=group) as attr:
-        op.final_state(exists=present, mode=attr.dir_mode, owner=attr.owner, group=attr.group, touched=touch)
+        if present:
+            op.final_state(exists=True, mode=attr.dir_mode, owner=attr.owner, group=attr.group, touched=touch)
+        else:
+            op.final_state(exists=False, mode=None, owner=None, group=None, touched=False)
 
         # Examine current state
         stat = conn.stat(path)
@@ -174,7 +178,10 @@ def file(path: str,
 
     conn = fora.host.current_host.connection
     with op.defaults(file_mode=mode, owner=owner, group=group) as attr:
-        op.final_state(exists=present, mode=attr.file_mode, owner=attr.owner, group=attr.group, touched=touch)
+        if present:
+            op.final_state(exists=True, mode=attr.file_mode, owner=attr.owner, group=attr.group, touched=touch)
+        else:
+            op.final_state(exists=False, mode=None, owner=None, group=None, touched=False)
 
         # Examine current state
         stat = conn.stat(path)
@@ -196,7 +203,8 @@ def file(path: str,
         if not G.args.dry:
             if present:
                 # Create file if it doesn't exist
-                if op.changed("exists"):
+                # or touch file if requested
+                if op.changed("exists") or op.changed("touched"):
                     conn.run(["touch", "--", path])
 
                 # Set correct mode, if needed
@@ -206,10 +214,6 @@ def file(path: str,
                 # Set correct owner and group, if needed
                 if op.changed("owner") or op.changed("group"):
                     conn.run(["chown", f"{attr.owner}:{attr.group}", "--", path])
-
-                # Touch file if requested
-                if not op.changed("exists") and op.changed("touched"):
-                    conn.run(["touch", "--", path])
             else:
                 # Remove file if it should not be present
                 if op.changed("exists"):
@@ -254,13 +258,19 @@ def link(path: str,
     op
         The operation wrapper. Must not be supplied by the user.
     """
+    # pylint: disable=too-many-branches
     _ = (name, check) # Processed automatically.
     check_absolute_path(path)
+    if not target:
+        raise ValueError("link target cannot be empty")
     op.desc(path)
 
     conn = fora.host.current_host.connection
     with op.defaults(owner=owner, group=group) as attr:
-        op.final_state(exists=present, owner=attr.owner, group=attr.group, touched=touch)
+        if present:
+            op.final_state(exists=True, owner=attr.owner, group=attr.group, touched=touch)
+        else:
+            op.final_state(exists=False, owner=None, group=None, touched=False)
 
         # Examine current state
         stat = conn.stat(path)
@@ -436,7 +446,7 @@ def upload_dir(src: str,
 
     check_absolute_path(dest)
     if not os.path.isdir(src):
-        raise OperationError(f"{src=} must be a directory")
+        raise ValueError(f"{src=} must be a directory")
 
     # If the destination denotes a directory, the actual directory is a
     # child directory thereof with similar name to the source.
@@ -459,13 +469,12 @@ def upload_dir(src: str,
                 files.append((join(sroot, f), join(droot, f)))
 
         for d in dirs:
-            directory(path=d, mode=dir_mode, owner=owner, group=group)
+            op.add_nested_result(d, directory(path=d, mode=dir_mode, owner=owner, group=group))
         for sf,df in files:
             if os.path.isfile(sf):
-                upload(src=sf, dest=df, mode=file_mode, owner=owner, group=group)
+                op.add_nested_result(df, upload(src=sf, dest=df, mode=file_mode, owner=owner, group=group))
 
-    # TODO: accumulate results, don't create our own (no printing from us)
-    return OperationResult(True, False, {}, {})
+    return op.success()
 
 @operation("template_content")
 def template_content(content: str,
@@ -512,7 +521,7 @@ def template_content(content: str,
         templ = G.jinja2_env.from_string(content)
         rendered_content = _render_template(templ, context)
     except UndefinedError as e:
-        raise OperationError(f"error while templating string: {str(e)}") from None
+        raise ValueError(f"error while templating string: {str(e)}") from None
 
     return save_content(op, rendered_content, dest, mode, owner, group)
 
@@ -562,12 +571,12 @@ def template(src: str,
     try:
         templ = G.jinja2_env.get_template(src)
     except TemplateNotFound as e:
-        raise OperationError(f"template '{str(e)}' not found") from None
+        raise ValueError(f"template '{str(e)}' not found") from None
 
     try:
         rendered_content = _render_template(templ, context)
     except UndefinedError as e:
-        raise OperationError(f"error while templating '{src}': {str(e)}") from None
+        raise ValueError(f"error while templating '{src}': {str(e)}") from None
 
     return save_content(op, rendered_content, dest, mode, owner, group)
 
