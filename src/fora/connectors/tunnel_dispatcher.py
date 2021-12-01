@@ -17,7 +17,8 @@ import sys
 import typing
 
 from pwd import getpwnam, getpwuid
-from grp import getgrnam, getgrgid
+from grp import getgrnam, getgrgid, getgrall
+from spwd import getspnam
 from struct import pack, unpack
 from typing import IO, Any, Type, TypeVar, Callable, Optional, Union, NamedTuple, NewType, cast
 
@@ -510,7 +511,7 @@ class PacketResolveUser(NamedTuple):
                 uid = int(user)
                 pw = getpwuid(uid)
             except (KeyError, ValueError):
-                conn.write_packet(PacketInvalidField("user", "The user does not exist")) # pylint: disable=raise-missing-from
+                conn.write_packet(PacketInvalidField("user", "The user does not exist"))
                 return
 
         # Send response
@@ -535,7 +536,7 @@ class PacketResolveGroup(NamedTuple):
                 gid = int(group)
                 gr = getgrgid(gid)
             except (KeyError, ValueError):
-                conn.write_packet(PacketInvalidField("group", "The group does not exist")) # pylint: disable=raise-missing-from
+                conn.write_packet(PacketInvalidField("group", "The group does not exist"))
                 return
 
         # Send response
@@ -610,6 +611,90 @@ class PacketDownload(NamedTuple):
             return
 
         conn.write_packet(PacketDownloadResult(content))
+
+@Packet(type='response')
+class PacketUserEntry(NamedTuple):
+    """This packet is used to return information about a user."""
+    name: str
+    """The name of the user"""
+    uid: int
+    """The numerical user id"""
+    group: str
+    """The name of the primary group"""
+    gid: int
+    """The numerical primary group id"""
+    groups: list[str]
+    """All names of the supplementary groups this user belongs to"""
+    password_hash: str
+    """The password hash from shadow"""
+    gecos: str
+    """The comment (GECOS) field of the user"""
+    home: str
+    """The home directory of the user"""
+    shell: str
+    """The default shell of the user"""
+
+@Packet(type='request')
+class PacketQueryUser(NamedTuple):
+    """This packet is used to get information about a group via pwd.getpw*."""
+    user: str
+    """User name or decimal uid"""
+
+    def handle(self, conn: Connection) -> None:
+        try:
+            pw = getpwnam(self.user)
+        except KeyError:
+            try:
+                gid = int(self.user)
+                pw = getpwuid(gid)
+            except (KeyError, ValueError):
+                conn.write_packet(PacketInvalidField("user", "The user does not exist"))
+                return
+
+        groups = [g.gr_name for g in getgrall() if pw.pw_name in g.gr_mem]
+        try:
+            conn.write_packet(PacketUserEntry(
+                name=pw.pw_name,
+                uid=pw.pw_uid,
+                group=getgrgid(pw.pw_gid).gr_name,
+                gid=pw.pw_gid,
+                groups=groups,
+                password_hash=getspnam(pw.pw_name).sp_pwdp,
+                gecos=pw.pw_gecos,
+                home=pw.pw_dir,
+                shell=pw.pw_shell))
+        except KeyError as e:
+            conn.write_packet(PacketOSError(errno=i64(sys_errno.ENOENT), strerror="", msg=f"Inconsistent state of passwd/group/shadow: {str(e)}"))
+
+@Packet(type='response')
+class PacketGroupEntry(NamedTuple):
+    """This packet is used to return information about a group."""
+    name: str
+    """The name of the group"""
+    gid: int
+    """The numerical group id"""
+    members: list[str]
+    """All the group member's user names"""
+
+@Packet(type='request')
+class PacketQueryGroup(NamedTuple):
+    """This packet is used to get information about a group via grp.getgr*."""
+    group: str
+    """Group name or decimal gid"""
+
+    def handle(self, conn: Connection) -> None:
+        try:
+            gr = getgrnam(self.group)
+        except KeyError:
+            try:
+                gid = int(self.group)
+                gr = getgrgid(gid)
+            except (KeyError, ValueError):
+                conn.write_packet(PacketInvalidField("group", "The group does not exist"))
+                return
+
+        # Send response
+        conn.write_packet(PacketGroupEntry(name=gr.gr_name, gid=gr.gr_gid, members=gr.gr_mem))
 
 def receive_packet(conn: Connection, request: Any = None) -> Any:
     """
