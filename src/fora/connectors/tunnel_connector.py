@@ -168,14 +168,26 @@ class TunnelConnector(Connector):
         response = self._request(request)
 
         _expect_response_packet(response, td.PacketUserEntry)
-        return cast(td.PacketUserEntry, response).value
+        return UserEntry(
+            name=response.name,
+            uid=response.uid,
+            group=response.group,
+            gid=response.gid,
+            groups=response.groups,
+            password_hash=response.password_hash,
+            gecos=response.gecos,
+            home=response.home,
+            shell=response.shell)
 
     def query_group(self, group: str) -> GroupEntry:
         request = td.PacketQueryGroup(group=group)
         response = self._request(request)
 
         _expect_response_packet(response, td.PacketGroupEntry)
-        return cast(td.PacketGroupEntry, response).value
+        return GroupEntry(
+            name=response.name,
+            gid=response.gid,
+            members=response.members)
 
     def upload(self,
             file: str,

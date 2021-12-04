@@ -641,6 +641,7 @@ class PacketQueryUser(NamedTuple):
     """User name or decimal uid"""
 
     def handle(self, conn: Connection) -> None:
+        """Queries the requested user."""
         try:
             pw = getpwnam(self.user)
         except KeyError:
@@ -683,6 +684,7 @@ class PacketQueryGroup(NamedTuple):
     """Group name or decimal gid"""
 
     def handle(self, conn: Connection) -> None:
+        """Queries the requested group."""
         try:
             gr = getgrnam(self.group)
         except KeyError:

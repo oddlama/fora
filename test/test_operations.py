@@ -14,7 +14,7 @@ import fora.loader
 from fora.operations.api import OperationError
 import fora.script
 from fora.main import main
-from fora.operations import local, files
+from fora.operations import local, files, system
 from fora.connection import Connection
 from fora.types import HostType, ScriptType
 
@@ -416,6 +416,14 @@ def test_full_deploy_bad_recursive_test_script_traceback(request):
     utils.script_trace([(None, inspect.getouterframes(inspect.currentframe())[0])], include_root=True)
     G.args.debug = True
     os.chdir(request.config.invocation_dir)
+
+def test_create_user():
+    G.args.dry = True
+    ret = system.user(user="foratest")
+    assert ret.changed
+    with pytest.raises(KeyError):
+        pwd.getpwnam("foratest")
+    G.args.dry = False
 
 def test_cleanup_directory():
     files.directory("/tmp/__pytest_fora", present=False)

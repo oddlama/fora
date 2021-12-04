@@ -7,7 +7,7 @@ import fora.host
 from fora.operations.api import Operation, OperationResult, operation
 
 @operation("user")
-def user(user: str,
+def user(user: str, # pylint: disable=redefined-outer-name,too-many-statements
          present: bool = True,
          uid: Optional[int] = None,
          group: Optional[str] = None,
@@ -116,7 +116,7 @@ def user(user: str,
                 # Create new user
                 create_command = ["useradd"]
                 if system:
-                   create_command.append("--system")
+                    create_command.append("--system")
 
                 if target_uid is not None:
                     create_command.extend(["--uid", str(target_uid)])
