@@ -35,6 +35,14 @@ def user(user: str, # pylint: disable=redefined-outer-name,too-many-statements
     the same name as the user will be created for it. As for deletion, this only applies when
     USERGROUPS_ENAB is set to yes in `/etc/login.defs`.
 
+    You can generate a password hash by using the following code:
+
+    ```python
+    import crypt, getpass
+    real_pw = getpass.getpass()
+    password_hash = crypt.crypt(real_pw, crypt.mksalt(crypt.METHOD_SHA512))
+    ```
+
     Parameters
     ----------
     user
@@ -53,13 +61,7 @@ def user(user: str, # pylint: disable=redefined-outer-name,too-many-statements
     system
         If `True` the user will be created as a system user. This doesn't affect existing users.
     password_hash
-        The password hash for the user as given by `crypt(3)`. Use `"!"` to lock the account.
-        You can generate a password hash by using the following code:
-
-            import crypt, getpass
-            real_pw = getpass.getpass()
-            password_hash = crypt.crypt(real_pw, crypt.mksalt(crypt.METHOD_SHA512))
-
+        The password hash for the user as given by `crypt(3)`.
         Defaults to '!' if not given but a user needs to be created.
     home
         The home directory for the user. Defaults to `/dev/null` if not given but a user needs to be created.
