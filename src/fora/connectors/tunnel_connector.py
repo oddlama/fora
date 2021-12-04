@@ -6,7 +6,7 @@ from typing import Any, Optional, Type, cast
 
 from fora import logger
 from fora.connectors import tunnel_dispatcher as td
-from fora.connectors.connector import CompletedRemoteCommand, Connector, StatResult
+from fora.connectors.connector import CompletedRemoteCommand, Connector, GroupEntry, StatResult, UserEntry
 from fora.types import HostType
 
 def _expect_response_packet(packet: Any, expected_type: Type) -> None:
@@ -162,6 +162,20 @@ class TunnelConnector(Connector):
 
         _expect_response_packet(response, td.PacketResolveResult)
         return cast(td.PacketResolveResult, response).value
+
+    def query_user(self, user: str) -> UserEntry:
+        request = td.PacketQueryUser(user=user)
+        response = self._request(request)
+
+        _expect_response_packet(response, td.PacketUserEntry)
+        return cast(td.PacketUserEntry, response).value
+
+    def query_group(self, group: str) -> GroupEntry:
+        request = td.PacketQueryGroup(group=group)
+        response = self._request(request)
+
+        _expect_response_packet(response, td.PacketGroupEntry)
+        return cast(td.PacketGroupEntry, response).value
 
     def upload(self,
             file: str,

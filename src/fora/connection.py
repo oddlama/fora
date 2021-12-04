@@ -10,7 +10,7 @@ from typing import Type, cast, Optional
 
 import fora.script
 from fora import globals as G, logger
-from fora.connectors.connector import Connector, CompletedRemoteCommand, StatResult
+from fora.connectors.connector import Connector, CompletedRemoteCommand, GroupEntry, StatResult, UserEntry
 from fora.remote_settings import RemoteSettings
 from fora.types import HostType
 
@@ -186,6 +186,20 @@ class Connection:
         """
         try:
             return self.download(file=file)
+        except ValueError:
+            return default
+
+    def query_user(self, user: str, default: Optional[UserEntry] = None) -> Optional[UserEntry]:
+        """See `fora.connectors.connector.Connector.query_user`, but returns the given default in case the user doesn't exist."""
+        try:
+            return self.connector.query_user(user=user)
+        except ValueError:
+            return default
+
+    def query_group(self, group: str, default: Optional[GroupEntry] = None) -> Optional[GroupEntry]:
+        """See `fora.connectors.connector.Connector.query_group`, but returns the given default in case the group doesn't exist."""
+        try:
+            return self.connector.query_group(group=group)
         except ValueError:
             return default
 

@@ -579,5 +579,3 @@ def template(src: str,
         raise ValueError(f"error while templating '{src}': {str(e)}") from None
 
     return save_content(op, rendered_content, dest, mode, owner, group)
-
-# TODO: unix user, group, user_supplementary_group

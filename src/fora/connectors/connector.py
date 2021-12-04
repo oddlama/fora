@@ -39,6 +39,38 @@ class StatResult:
         self.ctime = ctime
         self.sha512sum = sha512sum
 
+@dataclass
+class UserEntry:
+    """The result of a user query."""
+    name: str
+    """The name of the user"""
+    uid: int
+    """The numerical user id"""
+    group: str
+    """The name of the primary group"""
+    gid: int
+    """The numerical primary group id"""
+    groups: list[str]
+    """All names of the supplementary groups this user belongs to"""
+    password_hash: str
+    """The password hash from shadow"""
+    gecos: str
+    """The comment (GECOS) field of the user"""
+    home: str
+    """The home directory of the user"""
+    shell: str
+    """The default shell of the user"""
+
+@dataclass
+class GroupEntry:
+    """The result of a group query."""
+    name: str
+    """The name of the group"""
+    gid: int
+    """The numerical group id"""
+    members: list[str]
+    """All the group member's user names"""
+
 class Connector:
     """
     The base class for all connectors.
@@ -139,7 +171,7 @@ class Connector:
 
         Returns
         -------
-        Optional[str]
+        str
             The resolved username or None if the input was None.
 
         Raises
@@ -167,7 +199,7 @@ class Connector:
 
         Returns
         -------
-        Optional[str]
+        str
             The resolved groupname or None if the input was None.
 
         Raises
@@ -267,6 +299,58 @@ class Connector:
             An error occurred with the connection.
         """
         _ = (self, file)
+        raise NotImplementedError("Must be overwritten by subclass.")
+
+    def query_user(self, user: str) -> UserEntry:
+        """
+        Queries information about a user on the reomte system.
+
+        Parameters
+        ----------
+        user
+            The username or uid that should be queried.
+
+        Returns
+        -------
+        UserEntry
+            The information about the user.
+
+        Raises
+        ------
+        ValueError
+            If the user could not be resolved.
+        fora.connectors.tunnel_dispatcher.RemoteOSError
+            If the remote command fails because of an remote OSError.
+        IOError
+            An error occurred with the connection.
+        """
+        _ = (self, user)
+        raise NotImplementedError("Must be overwritten by subclass.")
+
+    def query_group(self, group: str) -> GroupEntry:
+        """
+        Queries information about a group on the reomte system.
+
+        Parameters
+        ----------
+        group
+            The groupname or gid that should be queried.
+
+        Returns
+        -------
+        GroupEntry
+            The resolved groupname or None if the input was None.
+
+        Raises
+        ------
+        ValueError
+            If the group could not be resolved.
+        fora.connectors.tunnel_dispatcher.RemoteOSError
+            If the remote command fails because of an remote OSError.
+        IOError
+            An error occurred with the connection.
+        """
+        _ = (self, group)
         raise NotImplementedError("Must be overwritten by subclass.")
 
 def connector(schema: str) -> Callable[[Type[Connector]], Type[Connector]]:
