@@ -230,13 +230,16 @@ def diff(filename: str, old: Optional[bytes], new: Optional[bytes], color: bool 
 
 # TODO: move functions to operation api. cleaner and has type access.
 def _operation_state_infos(result: Any) -> list[str]:
+    def to_str(v: Any) -> str:
+        return v.hex() if isinstance(v, bytes) else str(v)
+
     # Print "key: value" pairs with changes
     state_infos: list[str] = []
     for k,final_v in result.final.items():
-        initial_v = result.initial[k]
+        if final_v is None:
+            continue
 
-        def to_str(v: Any) -> str:
-            return v.hex() if isinstance(v, bytes) else str(v)
+        initial_v = result.initial[k]
 
         # Add ellipsis on long strings
         str_k = ellipsis(k, 12)
