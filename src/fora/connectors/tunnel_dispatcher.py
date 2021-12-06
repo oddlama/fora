@@ -655,16 +655,16 @@ class PacketQueryUser(NamedTuple):
         try:
             pw_hash = getspnam(pw.pw_name).sp_pwdp
         except KeyError:
-            conn.write_packet(PacketInvalidField("user", "The user has no shadow entry"))
+            conn.write_packet(PacketInvalidField("user", "The user has no shadow entry, or it is inaccessible."))
             return
 
         groups = [g.gr_name for g in getgrall() if pw.pw_name in g.gr_mem]
         try:
             conn.write_packet(PacketUserEntry(
                 name=pw.pw_name,
-                uid=pw.pw_uid,
+                uid=i64(pw.pw_uid),
                 group=getgrgid(pw.pw_gid).gr_name,
-                gid=pw.pw_gid,
+                gid=i64(pw.pw_gid),
                 groups=groups,
                 password_hash=pw_hash,
                 gecos=pw.pw_gecos,
@@ -703,7 +703,7 @@ class PacketQueryGroup(NamedTuple):
                 return
 
         # Send response
-        conn.write_packet(PacketGroupEntry(name=gr.gr_name, gid=gr.gr_gid, members=gr.gr_mem))
+        conn.write_packet(PacketGroupEntry(name=gr.gr_name, gid=i64(gr.gr_gid), members=gr.gr_mem))
 
 def receive_packet(conn: Connection, request: Any = None) -> Any:
     """

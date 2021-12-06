@@ -420,6 +420,7 @@ def test_full_deploy_bad_recursive_test_script_traceback(request):
 
 def test_create_user():
     system.user(user="foratest", present=False)
+    system.group(group="foratest", present=False)
 
     def getpwhash():
         ue = connection.query_user("foratest")
@@ -555,6 +556,66 @@ def test_create_user():
     assert ret.changed
     with pytest.raises(KeyError):
         pwd.getpwnam("foratest")
+    with pytest.raises(KeyError):
+        grp.getgrnam("foratest")
+
+def test_create_group():
+    system.group(group="foratest", present=False)
+
+    G.args.dry = True
+    ret = system.group(group="foratest")
+    assert ret.changed
+    with pytest.raises(KeyError):
+        grp.getgrnam("foratest")
+    G.args.dry = False
+
+    ret = system.group(group="foratest")
+    assert ret.changed
+    gr = grp.getgrnam("foratest")
+    assert gr.gr_name == "foratest"
+
+    ret = system.group(group="foratest")
+    assert not ret.changed
+    gr = grp.getgrnam("foratest")
+    assert gr.gr_name == "foratest"
+
+    ret = system.group(group="foratest", present=False)
+    assert ret.changed
+    with pytest.raises(KeyError):
+        grp.getgrnam("foratest")
+
+    ret = system.group(group="foratest", present=False)
+    assert not ret.changed
+    with pytest.raises(KeyError):
+        grp.getgrnam("foratest")
+
+    ret = system.group(group="foratest", system=True)
+    assert ret.changed
+    gr = grp.getgrnam("foratest")
+    assert gr.gr_name == "foratest"
+
+    ret = system.group(group="foratest", gid=12345)
+    assert ret.changed
+    gr = grp.getgrgid(12345)
+    assert gr.gr_name == "foratest"
+
+    ret = system.group(group="foratest")
+    assert not ret.changed
+    gr = grp.getgrnam("foratest")
+    assert gr.gr_name == "foratest"
+
+    ret = system.group(group="foratest", present=False)
+    assert ret.changed
+    with pytest.raises(KeyError):
+        grp.getgrnam("foratest")
+
+    ret = system.group(group="foratest", gid=12345)
+    assert ret.changed
+    gr = grp.getgrgid(12345)
+    assert gr.gr_name == "foratest"
+
+    ret = system.group(group="foratest", present=False)
+    assert ret.changed
     with pytest.raises(KeyError):
         grp.getgrnam("foratest")
 

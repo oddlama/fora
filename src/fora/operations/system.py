@@ -10,7 +10,7 @@ from fora.operations.api import Operation, OperationResult, operation
 def user(user: str, # pylint: disable=redefined-outer-name,too-many-statements
          present: bool = True,
          uid: Optional[int] = None,
-         group: Optional[str] = None,
+         group: Optional[str] = None, # pylint: disable=redefined-outer-name
          groups: Optional[list[str]] = None,
          append_groups: bool = False,
          system: bool = False,
@@ -48,7 +48,9 @@ def user(user: str, # pylint: disable=redefined-outer-name,too-many-statements
     user
         The name of the user.
     present
-        Whether the given user should exists. If False any existing user will be deleted and other parameters ignored.
+        Whether the given user should exists. If False any existing user with that name will be deleted and all other parameters ignored.
+    uid
+        The uid for the user. Automatically determined if not specified.
     group
         The primary group (name or gid) for the user. If given, the group must already exists.
         Otherwise, a group will be created with the same name as the user, if USERGROUPS_ENAB is set in /etc/login.defs.
@@ -179,5 +181,86 @@ def user(user: str, # pylint: disable=redefined-outer-name,too-many-statements
 
             if op.changed("password_hash") and target_password_hash is not None:
                 conn.run(["usermod", "--password", target_password_hash, "--", user])
+
+    return op.success()
+
+@operation("group")
+def group(group: str, # pylint: disable=redefined-outer-name,too-many-statements
+          present: bool = True,
+          gid: Optional[int] = None,
+          system: bool = False,
+          name: Optional[str] = None,
+          check: bool = True,
+          op: Operation = Operation.internal_use_only) -> OperationResult:
+    """
+    Creates, modifies or deletes a unix group.
+
+    Parameters
+    ----------
+    group
+        The name of the group.
+    present
+        Whether the given group should exists. If False any existing group with that name will be deleted and all other parameters ignored.
+    gid
+        The gid for the group. Automatically determined if not specified.
+    system
+        If `True` the group will be created as a system group. This doesn't affect existing groups.
+    name
+        The name for the operation.
+    check
+        If True, returning `op.failure()` will raise an OperationError. All manually raised
+        OperationErrors will be propagated. When False, any manually raised OperationError will
+        be caught and `op.failure()` will be returned with the given message while continuing execution.
+    op
+        The operation wrapper. Must not be supplied by the user.
+    """
+    # pylint: disable=too-many-branches
+    _ = (name, check) # Processed automatically.
+    op.desc(group)
+    conn = fora.host.current_host.connection
+
+    # Examine current state
+    current = conn.query_group(group=group)
+    if current is None:
+        op.initial_state(exists=False, gid=None)
+    else:
+        op.initial_state(exists=True, gid=current.gid)
+
+    # Calculate target state. None means no-desired-value (i.e. keep as-is or use default on creation)
+    target_gid = gid or (current.gid if current else None)
+
+    if present:
+        op.final_state(exists=True, gid=target_gid)
+    else:
+        op.final_state(exists=False, gid=None)
+
+    # Return success if nothing needs to be changed
+    if op.unchanged():
+        return op.success()
+
+    # Apply actions to reach desired state, but only if we are not doing a dry run
+    if not G.args.dry:
+        if op.changed("exists"):
+            if present:
+                # Create new group
+                create_command = ["groupadd"]
+                if system:
+                    create_command.append("--system")
+
+                if target_gid is not None:
+                    create_command.extend(["--gid", str(target_gid)])
+
+                # Group's name
+                create_command.extend(["--", group])
+
+                # Create group
+                conn.run(create_command)
+            else:
+                # Remove group
+                conn.run(["groupdel", "--", group])
+        elif present:
+            # Group exists but we need to change some properties
+            if op.changed("gid") and target_gid is not None:
+                conn.run(["groupmod", "--gid", str(target_gid), "--", group])
 
     return op.success()
