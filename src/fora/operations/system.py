@@ -83,10 +83,13 @@ def user(user: str, # pylint: disable=redefined-outer-name,too-many-statements
     op.desc(user)
     conn = fora.host.current_host.connection
 
+    if groups is not None and not isinstance(groups, list):
+        raise ValueError("groups must be a list!")
+
     # Examine current state
     current = conn.query_user(user=user)
     if current is None:
-        op.initial_state(exists=False, uid=None, group=None, groups=None, comment=None, home=None, shell=None, password_hash=None)
+        op.initial_state(exists=False, uid=None, group=None, groups=[], comment=None, home=None, shell=None, password_hash=None)
     else:
         op.initial_state(exists=True, uid=current.uid, group=current.group, groups=current.groups, comment=current.gecos, home=current.home, shell=current.shell, password_hash=current.password_hash)
 
@@ -99,13 +102,13 @@ def user(user: str, # pylint: disable=redefined-outer-name,too-many-statements
         target_groups = groups or (current.groups if current else [])
     target_password_hash = password_hash or (current.password_hash if current else None)
     target_comment = comment or (current.gecos if current else None)
-    target_home = home or (current.home if current else None)
+    target_home = home or (current.home if current else '/dev/null')
     target_shell = shell or (current.shell if current else '/sbin/nologin')
 
     if present:
         op.final_state(exists=True, uid=target_uid, group=target_group, groups=target_groups, comment=target_comment, home=target_home, shell=target_shell, password_hash=target_password_hash)
     else:
-        op.final_state(exists=False, uid=None, group=None, groups=None, comment=None, home=None, shell=None, password_hash=None)
+        op.final_state(exists=False, uid=None, group=None, groups=[], comment=None, home=None, shell=None, password_hash=None)
 
     # Return success if nothing needs to be changed
     if op.unchanged():
@@ -138,7 +141,7 @@ def user(user: str, # pylint: disable=redefined-outer-name,too-many-statements
                     create_command.extend(["--comment", target_comment])
 
                 # Home and shell
-                create_command.extend(["--no-create-home", "--home-dir", target_home or '/dev/null'])
+                create_command.extend(["--no-create-home", "--home-dir", target_home])
                 create_command.extend(["--shell", target_shell])
 
                 # Password hash
@@ -161,14 +164,14 @@ def user(user: str, # pylint: disable=redefined-outer-name,too-many-statements
             if op.changed("group") and target_group is not None:
                 conn.run(["usermod", "--gid", target_group, "--", user])
 
-            if op.changed("groups"):
+            if op.changed("groups") and len(target_groups) > 0:
                 # Empty param for --groups is OK and does the expected thing.
                 conn.run(["usermod", "--groups", ','.join(target_groups), "--", user])
 
             if op.changed("comment") and target_comment is not None:
                 conn.run(["usermod", "--comment", target_comment, "--", user])
 
-            if op.changed("home") and target_home is not None:
+            if op.changed("home"):
                 conn.run(["usermod", "--home", target_home, "--", user])
 
             if op.changed("shell"):

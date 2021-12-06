@@ -91,6 +91,7 @@ def test_local_script(capsys):
 
 def test_files_directory():
     path = "/tmp/__pytest_fora"
+    files.directory(path, present=False)
 
     # dry run create
     G.args.dry = True
@@ -418,12 +419,144 @@ def test_full_deploy_bad_recursive_test_script_traceback(request):
     os.chdir(request.config.invocation_dir)
 
 def test_create_user():
+    system.user(user="foratest", present=False)
+
+    def getpwhash():
+        ue = connection.query_user("foratest")
+        return ue.password_hash if ue is not None else None
+
     G.args.dry = True
     ret = system.user(user="foratest")
     assert ret.changed
     with pytest.raises(KeyError):
         pwd.getpwnam("foratest")
+    with pytest.raises(KeyError):
+        grp.getgrnam("foratest")
     G.args.dry = False
+
+    ret = system.user(user="foratest")
+    assert ret.changed
+    pw = pwd.getpwnam("foratest")
+    gr = grp.getgrgid(pw.pw_gid)
+    assert gr.gr_name == "foratest"
+    assert pw.pw_name == "foratest"
+    assert pw.pw_gid == gr.gr_gid
+    assert pw.pw_dir == "/dev/null"
+    assert pw.pw_shell == "/sbin/nologin"
+    assert pw.pw_gecos == ""
+    assert getpwhash() == "!"
+
+    ret = system.user(user="foratest")
+    assert not ret.changed
+    pw = pwd.getpwnam("foratest")
+    gr = grp.getgrgid(pw.pw_gid)
+    assert gr.gr_name == "foratest"
+    assert pw.pw_name == "foratest"
+    assert pw.pw_gid == gr.gr_gid
+    assert pw.pw_dir == "/dev/null"
+    assert pw.pw_shell == "/sbin/nologin"
+    assert pw.pw_gecos == ""
+    assert getpwhash() == "!"
+
+    ret = system.user(user="foratest", present=False)
+    assert ret.changed
+    with pytest.raises(KeyError):
+        pwd.getpwnam("foratest")
+    with pytest.raises(KeyError):
+        grp.getgrnam("foratest")
+
+    ret = system.user(user="foratest", present=False)
+    assert not ret.changed
+    with pytest.raises(KeyError):
+        pwd.getpwnam("foratest")
+    with pytest.raises(KeyError):
+        grp.getgrnam("foratest")
+
+    ret = system.user(user="foratest", system=True)
+    assert ret.changed
+    pw = pwd.getpwnam("foratest")
+    gr = grp.getgrgid(pw.pw_gid)
+    assert gr.gr_name == "foratest"
+    assert pw.pw_name == "foratest"
+    assert pw.pw_gid == gr.gr_gid
+    assert pw.pw_dir == "/dev/null"
+    assert pw.pw_shell == "/sbin/nologin"
+    assert pw.pw_gecos == ""
+    assert getpwhash() == "!"
+
+    ret = system.user(user="foratest", uid=12345, group="nobody", groups=["video"], append_groups=False, password_hash="!!", home="/", shell="/bin/bash", comment="some comment")
+    assert ret.changed
+    pw = pwd.getpwnam("foratest")
+    gr = grp.getgrgid(pw.pw_gid)
+    assert gr.gr_name == "nobody"
+    groups = [g.gr_name for g in grp.getgrall() if pw.pw_name in g.gr_mem]
+    assert pw.pw_name == "foratest"
+    assert pw.pw_gid == gr.gr_gid
+    assert pw.pw_uid == 12345
+    assert pw.pw_dir == "/"
+    assert pw.pw_shell == "/bin/bash"
+    assert pw.pw_gecos == "some comment"
+    assert getpwhash() == "!!"
+    assert set(groups) == set(["video"])
+
+    ret = system.user(user="foratest", groups=["audio"], append_groups=True)
+    assert ret.changed
+    pw = pwd.getpwnam("foratest")
+    gr = grp.getgrgid(pw.pw_gid)
+    assert gr.gr_name == "nobody"
+    groups = [g.gr_name for g in grp.getgrall() if pw.pw_name in g.gr_mem]
+    assert pw.pw_name == "foratest"
+    assert pw.pw_uid == 12345
+    assert pw.pw_dir == "/"
+    assert pw.pw_shell == "/bin/bash"
+    assert pw.pw_gecos == "some comment"
+    assert getpwhash() == "!!"
+    assert set(groups) == set(["video", "audio"])
+
+    ret = system.user(user="foratest")
+    assert not ret.changed
+    pw = pwd.getpwnam("foratest")
+    gr = grp.getgrgid(pw.pw_gid)
+    assert gr.gr_name == "nobody"
+    groups = [g.gr_name for g in grp.getgrall() if pw.pw_name in g.gr_mem]
+    assert pw.pw_name == "foratest"
+    assert pw.pw_uid == 12345
+    assert pw.pw_dir == "/"
+    assert pw.pw_shell == "/bin/bash"
+    assert pw.pw_gecos == "some comment"
+    assert getpwhash() == "!!"
+    assert set(groups) == set(["video", "audio"])
+
+    ret = system.user(user="foratest", present=False)
+    assert ret.changed
+    with pytest.raises(KeyError):
+        pwd.getpwnam("foratest")
+    gr = grp.getgrnam("foratest")
+    assert gr.gr_name == "foratest"
+
+    ret = system.user(user="foratest", uid=12345, group="foratest", groups=["nobody"], comment="abc", password_hash="!!")
+    assert ret.changed
+    pw = pwd.getpwnam("foratest")
+    gr = grp.getgrgid(pw.pw_gid)
+    assert gr.gr_name == "foratest"
+    groups = [g.gr_name for g in grp.getgrall() if pw.pw_name in g.gr_mem]
+    assert pw.pw_name == "foratest"
+    assert pw.pw_uid == 12345
+    assert pw.pw_dir == "/dev/null"
+    assert pw.pw_shell == "/sbin/nologin"
+    assert pw.pw_gecos == "abc"
+    assert getpwhash() == "!!"
+    assert set(groups) == set(["nobody"])
+
+    with pytest.raises(ValueError, match="must be a list"):
+        system.user(user="foratest", groups="oops_not_a_list")
+
+    ret = system.user(user="foratest", present=False)
+    assert ret.changed
+    with pytest.raises(KeyError):
+        pwd.getpwnam("foratest")
+    with pytest.raises(KeyError):
+        grp.getgrnam("foratest")
 
 def test_cleanup_directory():
     files.directory("/tmp/__pytest_fora", present=False)

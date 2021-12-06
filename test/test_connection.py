@@ -238,6 +238,23 @@ def test_upload_invalid_group():
     with pytest.raises(ValueError, match=r"invalid value.*given for field 'group'"):
         connection.upload("/invalid", content=b"", group="_invalid_")
 
+def test_query_group_nonexistent():
+    entry = connection.query_group("__nonexistent")
+    assert entry is None
+
+def test_query_user_nonexistent():
+    entry = connection.query_user("__nonexistent")
+    assert entry is None
+
+def test_query_group():
+    entry = connection.query_group("nobody")
+    assert entry is not None
+    assert entry.name == "nobody"
+
+def test_query_user():
+    with pytest.raises(RemoteOSError, match=r"Permission denied"):
+        connection.query_user("nobody")
+
 def test_close_connection():
     connection.__exit__(None, None, None)
     assert host.connection is None

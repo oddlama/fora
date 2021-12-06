@@ -197,7 +197,7 @@ class Operation:
         if self.initial_state_dict is None or self.final_state_dict is None:
             raise OperationError("Both initial and final state must have been set before 'success()' may be called.")
         result = OperationResult(success=True,
-                changed=self.initial_state_dict != self.final_state_dict,
+                changed=not self.unchanged(),
                 initial=self.initial_state_dict,
                 final=self.final_state_dict)
         if not self.has_nested:

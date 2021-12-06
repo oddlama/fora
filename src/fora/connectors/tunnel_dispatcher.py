@@ -617,11 +617,11 @@ class PacketUserEntry(NamedTuple):
     """This packet is used to return information about a user."""
     name: str
     """The name of the user"""
-    uid: int
+    uid: i64
     """The numerical user id"""
     group: str
     """The name of the primary group"""
-    gid: int
+    gid: i64
     """The numerical primary group id"""
     groups: list[str]
     """All names of the supplementary groups this user belongs to"""
@@ -652,6 +652,12 @@ class PacketQueryUser(NamedTuple):
                 conn.write_packet(PacketInvalidField("user", "The user does not exist"))
                 return
 
+        try:
+            pw_hash = getspnam(pw.pw_name).sp_pwdp
+        except KeyError:
+            conn.write_packet(PacketInvalidField("user", "The user has no shadow entry"))
+            return
+
         groups = [g.gr_name for g in getgrall() if pw.pw_name in g.gr_mem]
         try:
             conn.write_packet(PacketUserEntry(
@@ -660,19 +666,20 @@ class PacketQueryUser(NamedTuple):
                 group=getgrgid(pw.pw_gid).gr_name,
                 gid=pw.pw_gid,
                 groups=groups,
-                password_hash=getspnam(pw.pw_name).sp_pwdp,
+                password_hash=pw_hash,
                 gecos=pw.pw_gecos,
                 home=pw.pw_dir,
                 shell=pw.pw_shell))
-        except KeyError as e:
-            conn.write_packet(PacketOSError(errno=i64(sys_errno.ENOENT), strerror="", msg=f"Inconsistent state of passwd/group/shadow: {str(e)}"))
+        except KeyError:
+            conn.write_packet(PacketInvalidField("user", "The user's primary group doesn't exist"))
+            return
 
 @Packet(type='response')
 class PacketGroupEntry(NamedTuple):
     """This packet is used to return information about a group."""
     name: str
     """The name of the group"""
-    gid: int
+    gid: i64
     """The numerical group id"""
     members: list[str]
     """All the group member's user names"""
