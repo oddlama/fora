@@ -240,22 +240,25 @@ def _operation_state_infos(result: Any) -> list[str]:
             continue
 
         initial_v = result.initial[k]
+        str_initial_v = to_str(initial_v)
+        str_final_v = to_str(final_v)
 
-        # Add ellipsis on long strings
-        str_k = ellipsis(k, 12)
-        str_initial_v = ellipsis(to_str(initial_v), 9)
-        str_final_v = ellipsis(to_str(final_v), 9+3+9 if initial_v is None else 9)
+        # Add ellipsis on long strings, if we are not in verbose mode
+        if G.args.verbose == 0:
+            k = ellipsis(k, 12)
+            str_initial_v = ellipsis(to_str(initial_v), 9)
+            str_final_v = ellipsis(to_str(final_v), 9+3+9 if initial_v is None else 9)
 
         if initial_v == final_v:
             if G.args.verbose >= 1:
                 # TODO = instead of : for better readability
-                entry_str = f"{col('[37m')}{str_k}: {str_initial_v}{col('[m')}"
+                entry_str = f"{col('[37m')}{k}: {str_initial_v}{col('[m')}"
                 state_infos.append(entry_str)
         else:
             if initial_v is None:
-                entry_str = f"{col('[33m')}{str_k}: {col('[32m')}{str_final_v}{col('[m')}"
+                entry_str = f"{col('[33m')}{k}: {col('[32m')}{str_final_v}{col('[m')}"
             else:
-                entry_str = f"{col('[33m')}{str_k}: {col('[31m')}{str_initial_v}{col('[33m')} → {col('[32m')}{str_final_v}{col('[m')}"
+                entry_str = f"{col('[33m')}{k}: {col('[31m')}{str_initial_v}{col('[33m')} → {col('[32m')}{str_final_v}{col('[m')}"
             state_infos.append(entry_str)
     return state_infos
 
