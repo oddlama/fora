@@ -4,15 +4,17 @@ Provides utility functions.
 
 from __future__ import annotations
 
+import importlib
 import importlib.machinery
 import importlib.util
 import inspect
 import os
+import pkgutil
 import sys
 import traceback
 import uuid
 from types import ModuleType, TracebackType
-from typing import Any, NoReturn, Type, TypeVar, Callable, Iterable, Optional
+from typing import Any, NoReturn, Type, TypeVar, Callable, Iterable, Optional, Union
 
 import fora.group
 import fora.host
@@ -241,3 +243,28 @@ def install_exception_hook() -> None:
     so that they are printed in a cleaner and more meaningful way (for the user).
     """
     sys.excepthook = print_exception
+
+def import_submodules(package: Union[str, ModuleType], recursive: bool = False) -> dict[str, ModuleType]:
+    """
+    Import all submodules of a module, possibly recursively including subpackages.
+
+    Parameters
+    ----------
+    package
+        The package to import all submodules from.
+    recursive
+        Whether to recursively include subpackages.
+
+    Returns
+    -------
+    dict[str, ModuleType]
+    """
+    if isinstance(package, str):
+        package = importlib.import_module(package)
+    results = {}
+    for _, name, is_pkg in pkgutil.walk_packages(package.__path__): # type: ignore[attr-defined]
+        full_name = package.__name__ + '.' + name
+        results[full_name] = importlib.import_module(full_name)
+        if recursive and is_pkg:
+            results.update(_import_submodules(results[full_name]))
+    return results

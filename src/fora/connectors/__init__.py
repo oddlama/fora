@@ -1,8 +1,7 @@
-"""
-Imports all standard connectors to register them by default.
-"""
+"""Contains all standard conectors to register them by default."""
 
-# Force inclusion of known connectors so they will be registered.
-from .ssh import SshConnector
+from fora.utils import import_submodules
 
-_ = (SshConnector)
+# Import all submodules to ensure that decorators have a chance
+# to register operations to a registry (e.g. package_managers).
+import_submodules(__name__)

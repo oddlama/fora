@@ -4,8 +4,8 @@ from typing import Optional, Union, cast
 
 from fora import globals as G
 from fora.operations import utils
-from fora.operations.api import Operation, OperationError, OperationResult, operation
-from fora.operations.utils import find_command
+from fora.operations.api import Operation, OperationResult, operation
+from fora.operations.utils import find_command, new_op_fail
 import fora.host
 
 @operation("user")
@@ -344,14 +344,12 @@ def package(package: Union[str, list[str]], # pylint: disable=redefined-outer-na
         If True, returning `op.failure()` will raise an OperationError. All manually raised
         OperationErrors will be propagated. When False, any manually raised OperationError will
         be caught and `op.failure()` will be returned with the given message while continuing execution.
-    op
-        The operation wrapper. Must not be supplied by the user.
     """
-    # Find system package manager module
+    # Find package manager module
     conn = fora.host.current_host.connection
     package_fn = find_command(conn, utils.package_managers)
     if package_fn is None:
-        raise OperationError("No supported system package manager was found on the remote system.")
+        raise new_op_fail(op_name="package", name=name, desc=str(package), error=f"No supported package manager was found on the remote system. Searched commands: {utils.package_managers.keys()}")
 
     return cast(OperationResult, package_fn(package=package, present=present, name=name, check=check))
 
@@ -402,13 +400,11 @@ def service(service: str, # pylint: disable=redefined-outer-name
         If True, returning `op.failure()` will raise an OperationError. All manually raised
         OperationErrors will be propagated. When False, any manually raised OperationError will
         be caught and `op.failure()` will be returned with the given message while continuing execution.
-    op
-        The operation wrapper. Must not be supplied by the user.
     """
-    # Find system package manager module
+    # Find service manager module
     conn = fora.host.current_host.connection
     service_fn = find_command(conn, utils.service_managers)
     if service_fn is None:
-        raise OperationError("No supported system service manager was found on the remote system.")
+        raise new_op_fail(op_name="service", name=name, desc=str(service), error=f"No supported service manager was found on the remote system. Searched commands: {utils.service_managers.keys()}")
 
     return cast(OperationResult, service_fn(service=service, state=state, enabled=enabled, name=name, check=check))

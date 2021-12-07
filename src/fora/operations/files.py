@@ -11,7 +11,7 @@ from jinja2.exceptions import TemplateNotFound, UndefinedError
 
 import fora.host
 from fora import globals as G, logger
-from fora.operations.api import Operation, OperationError, OperationResult, operation
+from fora.operations.api import Operation, OperationResult, operation
 from fora.operations.utils import check_absolute_path, save_content
 
 def _render_template(templ: Template, context: Optional[dict]) -> bytes:
@@ -101,7 +101,7 @@ def directory(path: str,
             op.initial_state(exists=False, mode=None, owner=None, group=None, touched=False)
         else:
             if stat.type != "dir":
-                raise OperationError(f"path '{path}' exists but is not a directory!")
+                return op.failure(f"path '{path}' exists but is not a directory!")
 
             # The directory exists but may have different attributes
             op.initial_state(exists=True, mode=stat.mode, owner=stat.owner, group=stat.group, touched=False)
@@ -190,7 +190,7 @@ def file(path: str,
             op.initial_state(exists=False, mode=None, owner=None, group=None, touched=False)
         else:
             if stat.type != "file":
-                raise OperationError(f"path '{path}' exists but is not a file!")
+                return op.failure(f"path '{path}' exists but is not a file!")
 
             # The file exists but may have different attributes
             op.initial_state(exists=True, mode=stat.mode, owner=stat.owner, group=stat.group, touched=False)
@@ -279,7 +279,7 @@ def link(path: str,
             op.initial_state(exists=False, owner=None, group=None, touched=False)
         else:
             if stat.type != "link":
-                raise OperationError(f"path '{path}' exists but is not a link!")
+                return op.failure(f"path '{path}' exists but is not a link!")
 
             # The link exists but may have different attributes
             op.initial_state(exists=True, owner=stat.owner, group=stat.group, touched=False)

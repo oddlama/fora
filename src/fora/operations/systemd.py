@@ -92,13 +92,13 @@ def service(service: str, # pylint: disable=redefined-outer-name
 
     # Examine current state
     systemd_active_state = conn.run(["systemctl", "show", "--value", "--property", "ActiveState", "--", service]).stdout
-    if (systemd_active_state or b"").decode('utf-8', errors='ignore') in ["active", "activating"]:
+    if (systemd_active_state or b"").decode('utf-8', errors='ignore').strip() in ["active", "activating"]:
         cur_state = "started"
     else:
         cur_state = "stopped"
 
     systemd_unit_file_state = conn.run(["systemctl", "show", "--value", "--property", "UnitFileState", "--", service]).stdout
-    cur_enabled = (systemd_unit_file_state or b"").decode('utf-8', errors='ignore') == "enabled"
+    cur_enabled = (systemd_unit_file_state or b"").decode('utf-8', errors='ignore').strip() == "enabled"
 
     op.initial_state(state=cur_state, enabled=cur_enabled)
     op.final_state(state=state, enabled=enabled)
@@ -110,7 +110,7 @@ def service(service: str, # pylint: disable=redefined-outer-name
     # Apply actions to reach desired state, but only if we are not doing a dry run
     if not G.args.dry:
         base_command = ["systemctl", "--user"] if user_mode else ["systemctl"]
-        if op.changed("status") and state is not None:
+        if op.changed("state") and state is not None:
             conn.run(base_command + [state_actions[state], "--", service])
 
         if op.changed("enabled") and enabled is not None:

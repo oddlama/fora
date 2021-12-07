@@ -25,7 +25,7 @@ def find_command(conn: Connection, command_to_result_map: dict[str, Any]) -> Opt
     query += " || echo __unknown__"
     res = conn.run(["bash", "-c", query])
 
-    return command_to_result_map.get((res.stdout or b"").decode('utf-8', errors='ignore'), None)
+    return command_to_result_map.get((res.stdout or b"").decode('utf-8', errors='ignore').strip(), None)
 
 def package_manager(command: str) -> Callable[[Callable], Callable]:
     """
@@ -145,7 +145,7 @@ def save_content(op: Operation,
             op.initial_state(exists=False, mode=None, owner=None, group=None, sha512=None)
         else:
             if stat.type != "file":
-                raise OperationError(f"path '{dest}' exists but is not a file!")
+                return op.failure(f"path '{dest}' exists but is not a file!")
 
             # The file exists but may have different attributes or content
             op.initial_state(exists=True, mode=stat.mode, owner=stat.owner, group=stat.group, sha512=stat.sha512sum)
@@ -192,3 +192,18 @@ def check_absolute_path(path: str) -> None:
         raise ValueError("path must be non-empty")
     if path[0] != "/":
         raise ValueError("path must be absolute")
+
+def new_op_fail(op_name: str, name: Optional[str], desc: str, error: str) -> OperationError:
+    """
+    Creates a new operation with given name and description and immediately
+    returns a failed status with the given error message. Also returns a OperationError in case
+    the callee want's to raise and exception.
+
+    This is useful for meta-operations, that have a failure condition before the
+    required sub-operation is determined (e.g. system.package() can call different package
+    manager's package() operation, but can also fail to find a suitable one).
+    """
+    op = Operation(op_name=op_name, name=name)
+    op.desc(desc)
+    op.failure(error)
+    return OperationError(error)

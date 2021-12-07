@@ -1,5 +1,7 @@
 """Provides API to define operations."""
 
+import shutil
+import subprocess
 import sys
 
 from functools import wraps
@@ -34,7 +36,7 @@ class Operation:
     internal_use_only: "Operation" = cast("Operation", None)
     """operation's op variable is defaulted to this value to indicate that it must not be given by the user."""
 
-    def __init__(self, op_name: str, name: str):
+    def __init__(self, op_name: str, name: Optional[str]):
         self.op_name = op_name
         self.name = name
         self.has_nested = False
@@ -253,12 +255,36 @@ def operation(op_name: str) -> Callable[[Callable], Callable]:
                 ret = function(*args, **kwargs, op=op)
             except OperationError as e:
                 ret = op.failure(str(e))
-                if check:
-                    # If we are not in debug mode, we modify the traceback such that the exception
-                    # seems to originate at the calling site where the operation is called.
-                    if G.args.debug:
-                        raise
-                    raise e.with_traceback(_calling_site_traceback())
+                # If we are not in debug mode, we modify the traceback such that the exception
+                # seems to originate at the calling site where the operation is called.
+                if G.args.debug:
+                    raise
+                raise e.with_traceback(_calling_site_traceback())
+            except subprocess.CalledProcessError as e:
+                ret = op.failure(str(e))
+                cols = max(shutil.get_terminal_size((80, 20)).columns, 80)
+
+                def print_fullwith(msg: list[str], pad: str = '─') -> None:
+                    """Prints a message padded to the terminal width to stderr."""
+                    msglen = sum(map(lambda s: 0 if s.startswith("\033[") else len(s), msg))
+                    print(pad * 8 + ''.join(msg) + pad * (cols - msglen - 8), file=sys.stderr)
+
+                # Print output of failed command for debugging
+                col_red = logger.col("\033[1;31m")
+                col_reset = logger.col("\033[m")
+                print_fullwith(["────────[ ",
+                    col_red, "command", col_reset, " ",
+                    str(e.cmd),
+                    col_red, "failed", col_reset, " ",
+                    f"with code {e.returncode} ]"])
+                print_fullwith(["────────[ ", col_red, "stdout", col_reset, " (special characters escaped) ]"])
+                print(e.stdout.decode("utf-8", errors="backslashreplace"), file=sys.stderr)
+                print_fullwith(["────────[ ", col_red, "stderr", col_reset, " (special characters escaped) ]"])
+                print(e.stderr.decode("utf-8", errors="backslashreplace"), file=sys.stderr)
+
+                if G.args.debug:
+                    raise
+                raise e.with_traceback(_calling_site_traceback())
             except Exception as e:
                 ret = op.failure(str(e))
                 raise
