@@ -32,5 +32,4 @@ def _import_submodules(package: Union[str, ModuleType], recursive: bool = False)
 
 # Import all submodules to ensure that decorators have a chance
 # to register operations to a registry (e.g. package_managers).
-__all__: list[str] = []
 _import_submodules(__name__)

@@ -62,7 +62,7 @@ def service(service: str, # pylint: disable=redefined-outer-name
         The unit to manage.
     state
         The desired state of the unit. Valid options are `started`, `restarted`, `reloaded` and `stopped`.
-        If None, the service current state will be kept as-is.
+        If None, the service's current state will not be changed.
     enabled
         Whether the unit should be started on boot.
     user_mode
