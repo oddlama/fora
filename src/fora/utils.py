@@ -266,5 +266,5 @@ def import_submodules(package: Union[str, ModuleType], recursive: bool = False) 
         full_name = package.__name__ + '.' + name
         results[full_name] = importlib.import_module(full_name)
         if recursive and is_pkg:
-            results.update(_import_submodules(results[full_name]))
+            results.update(import_submodules(results[full_name]))
     return results
