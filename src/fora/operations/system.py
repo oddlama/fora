@@ -1,10 +1,12 @@
 """Provides operations related to the operating system such as user, group or service management."""
 
-from typing import Optional
+from typing import Optional, Union, cast
 
 from fora import globals as G
+from fora.operations import utils
+from fora.operations.api import Operation, OperationError, OperationResult, operation
+from fora.operations.utils import find_command
 import fora.host
-from fora.operations.api import Operation, OperationResult, operation
 
 @operation("user")
 def user(user: str, # pylint: disable=redefined-outer-name,too-many-statements
@@ -41,6 +43,34 @@ def user(user: str, # pylint: disable=redefined-outer-name,too-many-statements
     import crypt, getpass
     real_pw = getpass.getpass()
     password_hash = crypt.crypt(real_pw, crypt.mksalt(crypt.METHOD_SHA512))
+    ```
+
+    ### Example:
+
+    ```python
+    system.user(
+        name="Create a new user for some service including a group of the same name",
+        user="testuser"
+    )
+
+    system.user(
+        name="Create a new user with an existing primary group",
+        user="testuser",
+        group="users"
+    )
+
+    system.user(
+        name="Add myuser to the video group",
+        user="myuser",
+        groups=["video"],
+        append_groups=True
+    )
+
+    system.user(
+        name="Delete testuser. Will also delete the corresponding primary group if it isn't used for anything else",
+        user="testuser",
+        present=False
+    )
     ```
 
     Parameters
@@ -195,6 +225,15 @@ def group(group: str, # pylint: disable=redefined-outer-name,too-many-statements
     """
     Creates, modifies or deletes a unix group.
 
+    ### Example:
+
+    ```python
+    system.group(
+        name="Create a new group",
+        user="testgroup"
+    )
+    ```
+
     Parameters
     ----------
     group
@@ -264,3 +303,112 @@ def group(group: str, # pylint: disable=redefined-outer-name,too-many-statements
                 conn.run(["groupmod", "--gid", str(target_gid), "--", group])
 
     return op.success()
+
+def package(package: Union[str, list[str]], # pylint: disable=redefined-outer-name,too-many-statements
+            present: bool = True,
+            name: Optional[str] = None,
+            check: bool = True) -> OperationResult:
+    """
+    Adds or removes system packages. This operation first detects whether a supported package manager
+    is available on the remote system to execute the operation.
+
+    ### Example:
+
+    ```python
+    system.package(
+        name="Install htop",
+        package="htop"
+    )
+
+    system.package(
+        name="Install neovim and git",
+        package=["neovim", "git"]
+    )
+
+    system.package(
+        name="Uninstall nano",
+        package="nano",
+        present=False
+    )
+    ```
+
+    Parameters
+    ----------
+    package
+        The package name or list of package names
+    present
+        Whether the given package should be installed or uninstalled.
+    name
+        The name for the operation.
+    check
+        If True, returning `op.failure()` will raise an OperationError. All manually raised
+        OperationErrors will be propagated. When False, any manually raised OperationError will
+        be caught and `op.failure()` will be returned with the given message while continuing execution.
+    op
+        The operation wrapper. Must not be supplied by the user.
+    """
+    # Find system package manager module
+    conn = fora.host.current_host.connection
+    package_fn = find_command(conn, utils.package_managers)
+    if package_fn is None:
+        raise OperationError("No supported system package manager was found on the remote system.")
+
+    return cast(OperationResult, package_fn(package=package, present=present, name=name, check=check))
+
+def service(service: str, # pylint: disable=redefined-outer-name
+            state: Optional[str] = None,
+            enabled: Optional[bool] = None,
+            name: Optional[str] = None,
+            check: bool = True) -> OperationResult:
+    """
+    Manages a system service. This operation first detects whether a supported init system
+    is available on the remote system to execute the operation.
+
+    ### Example:
+
+    ```python
+    system.service(
+        name="Enable sshd to start on boot, and ensure it is started now",
+        service="sshd",
+        state="started",
+        enable=True
+    )
+
+    system.service(
+        name="Just enable sshd to start on boot, but don't change anything about its current state",
+        service="sshd",
+        enable=True
+    )
+
+    system.service(
+        name="Restart the nginx service now",
+        service="nginx",
+        state="restarted"
+    )
+    ```
+
+    Parameters
+    ----------
+    service
+        The unit to manage.
+    state
+        The desired state of the unit. Valid options are `started`, `restarted`, `reloaded` and `stopped`.
+        If None, the service current state will be kept as-is.
+    enabled
+        Whether the unit should be started on boot.
+    name
+        The name for the operation.
+    check
+        If True, returning `op.failure()` will raise an OperationError. All manually raised
+        OperationErrors will be propagated. When False, any manually raised OperationError will
+        be caught and `op.failure()` will be returned with the given message while continuing execution.
+    op
+        The operation wrapper. Must not be supplied by the user.
+    """
+    # Find system package manager module
+    conn = fora.host.current_host.connection
+    service_fn = find_command(conn, utils.service_managers)
+    if service_fn is None:
+        raise OperationError("No supported system service manager was found on the remote system.")
+
+    return cast(OperationResult, service_fn(service=service, state=state, enabled=enabled, name=name, check=check))

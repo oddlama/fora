@@ -115,9 +115,14 @@ class Operation:
             raise OperationError("An operation's 'final_state' can only be set once.")
         self.final_state_dict = dict(kwargs)
 
-    def unchanged(self) -> bool:
+    def unchanged(self, ignore_none: bool = False) -> bool:
         """
         Checks whether the initial and final states differ.
+
+        Parameters
+        ----------
+        ignore_none
+            Set to `True` to not count states where the final value is None.
 
         Returns
         -------
@@ -126,7 +131,16 @@ class Operation:
         """
         if self.initial_state_dict is None or self.final_state_dict is None:
             raise OperationError("Both initial and final state must have been set before 'unchanged()' may be called.")
-        return self.initial_state_dict == self.final_state_dict
+
+        if not ignore_none:
+            return self.initial_state_dict == self.final_state_dict
+
+        keys_not_none = (k for k in self.final_state_dict if k is not None)
+        for k in keys_not_none:
+            if self.initial_state_dict[k] != self.final_state_dict[k]:
+                return False
+        return True
+
 
     def changed(self, key: str) -> bool:
         """
