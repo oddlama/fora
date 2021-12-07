@@ -51,6 +51,60 @@ def service_manager(command: str) -> Callable[[Callable], Callable]:
         return function
     return operation_wrapper
 
+def generic_package(op: Operation,
+                    package: Union[str, list[str]],
+                    present: bool,
+                    is_installed: Callable[[str], bool],
+                    install: Callable[[str], None],
+                    uninstall: Callable[[str], None]) -> OperationResult:
+    """
+    A generic package operation that will query the current system state and
+    call install/uninstall on each of the packages where an action is required
+    to reach the target state.
+
+    Parameters
+    ----------
+    op
+        The operation wrapper.
+    package
+        The package or list of packages to modify.
+    present
+        Whether the given package should be installed or uninstalled.
+    is_installed
+        A function that returns whether a given package is installed.
+    install
+        A function that installs the given package on the remote system.
+    uninstall
+        A function that uninstalls the given package on the remote system.
+    """
+    if isinstance(package, str):
+        package = [package]
+
+    # Examine current state
+    installed = set()
+    for p in package:
+        if is_installed(p):
+            installed.add(p)
+
+    # Set initial and target state.
+    op.initial_state(installed=sorted(list(installed)))
+    op.final_state(installed=sorted(list(package)) if present else [])
+
+    # Return success if nothing needs to be changed
+    if op.unchanged():
+        return op.success()
+
+    # Apply actions to reach desired state, but only if we are not doing a dry run
+    if not G.args.dry:
+        if present:
+            for p in set(package) - installed:
+                install(p)
+        else:
+            for p in installed:
+                uninstall(p)
+
+    return op.success()
+
 def save_content(op: Operation,
                  content: Union[bytes, str],
                  dest: str,

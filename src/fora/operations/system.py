@@ -335,7 +335,7 @@ def package(package: Union[str, list[str]], # pylint: disable=redefined-outer-na
     Parameters
     ----------
     package
-        The package name or list of package names
+        The package or list of packages to modify.
     present
         Whether the given package should be installed or uninstalled.
     name
