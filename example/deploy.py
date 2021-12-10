@@ -1,5 +1,5 @@
 from fora.host import current_host as host
-from fora.operations import local, system
+from fora.operations import local, system, git
 
 somedefault = 134
 
@@ -15,6 +15,14 @@ local.script(name="Run script",
 system.package("neovim")
 system.service("chronyd", enabled=False)
 system.service("chronyd", enabled=True)
+
+# git.repo(name="Clone some wierd repo",
+#          url="https://github.com/oddlama/fora",
+#          path="/tmp/__fora__tmp__clone",
+#          branch_or_tag="develop",
+#          update_submodules=True,
+#          shallow_submodules=True,
+#          depth=1)
 
 if "desktops" in host.groups:
     print("is desktop")

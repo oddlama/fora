@@ -10,7 +10,7 @@ from fora.operations.utils import check_absolute_path
 @operation("repo")
 def repo(url: str,
          path: str,
-         branch: str = None,
+         branch_or_tag: str = None,
          update: bool = True,
          depth: Optional[int] = None,
          rebase: bool = True,
@@ -22,10 +22,31 @@ def repo(url: str,
          check: bool = True,
          op: Operation = Operation.internal_use_only) -> OperationResult:
     """
-    TODO
+    Clones or updates a git repository and its submodules.
 
     Parameters
     ----------
+    url
+        The url to the git repository.
+    path
+        The path where the repository should be cloned.
+    branch_or_tag
+        Either a branch name or a tag to clone. Follows the default branch of the remote if not given.
+    update
+        Whether to keep the repository up to date if it has already been cloned.
+    depth
+        Keep the repository as a shallow clone with the specified number of commits.
+        Also applies when pulling updates.
+    rebase
+        Use `--rebase` when pulling updates.
+    ff_only
+        Use `--ff-only` when pulling updates.
+    update_submodules
+        Also initialize and update submodules after cloning or pulling.
+    recursive_submodules
+        Recursively update submodules after cloning or pulling.
+    shallow_submodules
+        Also apply the given `depth` to submodule updates.
     name
         The name for the operation.
     check
@@ -37,7 +58,7 @@ def repo(url: str,
     """
     _ = (name, check) # Processed automatically.
     check_absolute_path(path)
-    op.desc(f"{url} {path}")
+    op.desc(f"{path} [{url}]")
 
     conn = fora.host.current_host.connection
 
@@ -67,7 +88,7 @@ def repo(url: str,
         return op.success()
 
     # Check the newest available commit
-    remote_newest_commit = conn.run(["git", "ls-remote", "--exit-code", "--", url, "HEAD"])
+    remote_newest_commit = conn.run(["git", "ls-remote", "--exit-code", "--", url, branch_or_tag or "HEAD"])
     newest_commit = (remote_newest_commit.stdout or b"").decode("utf-8", errors="backslashreplace").strip().split()[0]
 
     op.final_state(initialized=True, commit=newest_commit)
@@ -80,19 +101,46 @@ def repo(url: str,
     if not G.args.dry:
         if stat_path is None:
             # Create a fresh clone of the repository
-            cmd = ["git", "clone"]
+            clone_cmd = ["git", "clone"]
             if depth is not None:
-                cmd.extend(["--depth", str(depth)])
-            cmd.extend(["--", url, path])
+                clone_cmd.extend(["--depth", str(depth)])
+            if branch_or_tag is not None:
+                clone_cmd.extend(["--branch", branch_or_tag])
+            clone_cmd.extend(["--", url, path])
+            conn.run(clone_cmd)
 
-            conn.run(cmd)
+            if update_submodules:
+                # Initialize submodules if requested
+                submodule_cmd = ["git", "-C", path, "submodule", "update", "--init"]
+                if shallow_submodules and depth is not None:
+                    submodule_cmd.extend(["--depth", str(depth)])
+                if recursive_submodules:
+                    submodule_cmd.extend(["--recursive"])
+                conn.run(submodule_cmd)
         elif update:
-            # Update the existing repository
-            # TODO: assert that the remote url matches! not that we pull an unrelated repo...
-            cmd = ["git", "-C", path, "pull"]
-            if depth is not None:
-                cmd.extend(["--depth", str(depth)])
+            # Assert that the existing repository's remote url matches the given url to prevent pulling an unrelated repo
+            ret_current_remote = conn.run(["git", "-C", path, "config", "--get", "remote.origin.url"])
+            current_remote = (ret_current_remote.stdout or b"").decode("utf-8", errors="backslashreplace").strip()
+            if current_remote != url:
+                return op.failure(f"refusing to update existing git repository with different remote url '{current_remote}'")
 
-            conn.run(cmd)
+            # Update the existing repository
+            update_cmd = ["git", "-C", path, "pull"]
+            if depth is not None:
+                update_cmd.extend(["--depth", str(depth)])
+            if rebase:
+                update_cmd.append("--rebase")
+            if ff_only:
+                update_cmd.append("--ff-only")
+            conn.run(update_cmd)
+
+            if update_submodules:
+                # Update submodules if requested
+                submodule_update_cmd = ["git", "-C", path, "submodule", "update", "--init"]
+                if shallow_submodules and depth is not None:
+                    submodule_update_cmd.extend(["--depth", str(depth)])
+                if recursive_submodules:
+                    submodule_update_cmd.extend(["--recursive"])
+                conn.run(submodule_update_cmd)
 
     return op.success()
