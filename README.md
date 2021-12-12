@@ -1,5 +1,12 @@
-![Fora Icon](./docs/fora.png)
-[![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+<p align="center">
+  <img width="auto" height="120" src="./docs/fora.png">
+</p>
+
+<p align="center">
+   <a href="https://pypi.python.org/pypi/fora"><img src="https://img.shields.io/pypi/v/fora?color=green" title="PyPI Version"></a>
+   <a href="https://pepy.tech/project/fora"><img src="https://static.pepy.tech/personalized-badge/fora?period=total&units=abbreviation&left_color=grey&right_color=green&left_text=downloads" title="PyPI Downloads"></a>
+   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" title="MIT License"></a>
+</p>
 
 **ATTENTION: This project is currently in beta development. The API may still change at anytime.**
 
