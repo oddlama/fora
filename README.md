@@ -1,3 +1,4 @@
+![Fora Icon](./docs/fora.png)
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
 **ATTENTION: This project is currently in beta development. The API may still change at anytime.**
@@ -54,4 +55,9 @@ This script can then be executed on any ssh host.
 ```bash
 fora ssh://root@localhost deploy.py
 ```
+
 Of course you can separately define inventories, groups and hosts for larger deploys.
+
+## Acknowledgements
+
+The fora icon is slightly modified version of an image made by [Freepik](https://www.freepik.com) from [Flaticon](https://www.flaticon.com/).
