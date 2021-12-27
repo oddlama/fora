@@ -10,7 +10,7 @@ from fora.operations.utils import check_absolute_path
 @operation("repo")
 def repo(url: str,
          path: str,
-         branch_or_tag: str = None,
+         branch_or_tag: Optional[str] = None,
          update: bool = True,
          depth: Optional[int] = None,
          rebase: bool = True,
