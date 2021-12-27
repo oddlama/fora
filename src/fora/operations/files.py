@@ -349,13 +349,13 @@ def upload_content(content: Union[str, bytes],
 
 @operation("upload")
 def upload(src: str,
-        dest: str,
-        mode: Optional[str] = None,
-        owner: Optional[str] = None,
-        group: Optional[str] = None,
-        name: Optional[str] = None,
-        check: bool = True,
-        op: Operation = Operation.internal_use_only) -> OperationResult:
+           dest: str,
+           mode: Optional[str] = None,
+           owner: Optional[str] = None,
+           group: Optional[str] = None,
+           name: Optional[str] = None,
+           check: bool = True,
+           op: Operation = Operation.internal_use_only) -> OperationResult:
     """
     Uploads the given file or to the remote host.
 

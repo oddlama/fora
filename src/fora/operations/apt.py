@@ -1,7 +1,7 @@
 """Provides operations related to the apt package manager."""
 
 from functools import partial
-from typing import Optional, Union
+from typing import Optional
 import fora.host
 from fora.operations.api import Operation, OperationResult, operation
 from fora.operations.utils import generic_package, package_manager
@@ -24,7 +24,7 @@ def _uninstall(package: str, opts: Optional[list[str]] = None) -> None: # pylint
 
 @package_manager(command="apt-get")
 @operation("package")
-def package(package: Union[str, list[str]], # pylint: disable=redefined-outer-name,too-many-statements
+def package(packages: list[str],
             present: bool = True,
             opts: Optional[list[str]] = None,
             name: Optional[str] = None,
@@ -35,8 +35,8 @@ def package(package: Union[str, list[str]], # pylint: disable=redefined-outer-na
 
     Parameters
     ----------
-    package
-        The package or list of packages to modify.
+    packages
+        The packages to modify.
     present
         Whether the given package should be installed or uninstalled.
     opts
@@ -51,9 +51,9 @@ def package(package: Union[str, list[str]], # pylint: disable=redefined-outer-na
         The operation wrapper. Must not be supplied by the user.
     """
     _ = (name, check) # Processed automatically.
-    op.desc(str(package))
+    op.desc(str(packages))
 
-    return generic_package(op, package,
+    return generic_package(op, packages,
             present=present,
             is_installed=_is_installed,
             install=partial(_install, opts=opts),

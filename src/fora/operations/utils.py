@@ -52,7 +52,7 @@ def service_manager(command: str) -> Callable[[Callable], Callable]:
     return operation_wrapper
 
 def generic_package(op: Operation,
-                    package: Union[str, list[str]],
+                    packages: list[str],
                     present: bool,
                     is_installed: Callable[[str], bool],
                     install: Callable[[str], None],
@@ -66,8 +66,8 @@ def generic_package(op: Operation,
     ----------
     op
         The operation wrapper.
-    package
-        The package or list of packages to modify.
+    packages
+        The packages to modify.
     present
         Whether the given package should be installed or uninstalled.
     is_installed
@@ -77,18 +77,15 @@ def generic_package(op: Operation,
     uninstall
         A function that uninstalls the given package on the remote system.
     """
-    if isinstance(package, str):
-        package = [package]
-
     # Examine current state
     installed = set()
-    for p in package:
+    for p in packages:
         if is_installed(p):
             installed.add(p)
 
     # Set initial and target state.
     op.initial_state(installed=sorted(list(installed)))
-    op.final_state(installed=sorted(list(package)) if present else [])
+    op.final_state(installed=sorted(list(packages)) if present else [])
 
     # Return success if nothing needs to be changed
     if op.unchanged():
@@ -97,7 +94,7 @@ def generic_package(op: Operation,
     # Apply actions to reach desired state, but only if we are not doing a dry run
     if not G.args.dry:
         if present:
-            for p in set(package) - installed:
+            for p in set(packages) - installed:
                 install(p)
         else:
             for p in installed:

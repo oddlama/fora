@@ -92,6 +92,7 @@ def main(argv: Optional[list[str]] = None) -> None:
             help="Enable debugging output. Forces verbosity to max value.")
     parser.add_argument('--no-color', dest='no_color', action='store_true',
             help="Disables any color output. Color can also be disabled by setting the NO_COLOR environment variable.")
+    # TODO fora init or --init --> create folder structure in current directory if it is empty.
     parser.add_argument('inventory', type=str, nargs='+',
             help="The inventories on which the script should be run on. A inventory is either a full inventory module file (determined by the presenence of a .py extension, e.g. inventory.py), or a single-host defined in any syntax that is accepted by ssh (e.g. root@localhost or ssh://[user]@host)")
     parser.add_argument('script', type=str,

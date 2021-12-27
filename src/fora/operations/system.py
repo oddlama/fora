@@ -1,6 +1,6 @@
 """Provides operations related to the operating system such as user, group or service management."""
 
-from typing import Optional, Union, cast
+from typing import Optional, cast
 
 from fora import globals as G
 from fora.operations import utils
@@ -50,27 +50,23 @@ def user(user: str, # pylint: disable=redefined-outer-name,too-many-statements
     ```python
     system.user(
         name="Create a new user for some service including a group of the same name",
-        user="testuser"
-    )
+        user="testuser")
 
     system.user(
         name="Create a new user with an existing primary group",
         user="testuser",
-        group="users"
-    )
+        group="users")
 
     system.user(
         name="Add myuser to the video group",
         user="myuser",
         groups=["video"],
-        append_groups=True
-    )
+        append_groups=True)
 
     system.user(
         name="Delete testuser. Will also delete the corresponding primary group if it isn't used for anything else",
         user="testuser",
-        present=False
-    )
+        present=False)
     ```
 
     Parameters
@@ -230,8 +226,7 @@ def group(group: str, # pylint: disable=redefined-outer-name,too-many-statements
     ```python
     system.group(
         name="Create a new group",
-        user="testgroup"
-    )
+        user="testgroup")
     ```
 
     Parameters
@@ -304,7 +299,7 @@ def group(group: str, # pylint: disable=redefined-outer-name,too-many-statements
 
     return op.success()
 
-def package(package: Union[str, list[str]], # pylint: disable=redefined-outer-name,too-many-statements
+def package(packages: list[str],
             present: bool = True,
             name: Optional[str] = None,
             check: bool = True) -> OperationResult:
@@ -317,25 +312,22 @@ def package(package: Union[str, list[str]], # pylint: disable=redefined-outer-na
     ```python
     system.package(
         name="Install htop",
-        package="htop"
-    )
+        packages=["htop"])
 
     system.package(
         name="Install neovim and git",
-        package=["neovim", "git"]
-    )
+        packages=["neovim", "git"])
 
     system.package(
         name="Uninstall nano",
-        package="nano",
-        present=False
-    )
+        packages=["nano"],
+        present=False)
     ```
 
     Parameters
     ----------
-    package
-        The package or list of packages to modify.
+    packages
+        The packages to modify.
     present
         Whether the given package should be installed or uninstalled.
     name
@@ -349,9 +341,9 @@ def package(package: Union[str, list[str]], # pylint: disable=redefined-outer-na
     conn = fora.host.current_host.connection
     package_fn = find_command(conn, utils.package_managers)
     if package_fn is None:
-        raise new_op_fail(op_name="package", name=name, desc=str(package), error=f"No supported package manager was found on the remote system. Searched commands: {utils.package_managers.keys()}")
+        raise new_op_fail(op_name="package", name=name, desc=str(packages), error=f"No supported package manager was found on the remote system. Searched commands: {utils.package_managers.keys()}")
 
-    return cast(OperationResult, package_fn(package=package, present=present, name=name, check=check))
+    return cast(OperationResult, package_fn(packages=packages, present=present, name=name, check=check))
 
 def service(service: str, # pylint: disable=redefined-outer-name
             state: Optional[str] = None,
@@ -369,20 +361,17 @@ def service(service: str, # pylint: disable=redefined-outer-name
         name="Enable sshd to start on boot, and ensure it is started now",
         service="sshd",
         state="started",
-        enable=True
-    )
+        enable=True)
 
     system.service(
         name="Just enable sshd to start on boot, but don't change anything about its current state",
         service="sshd",
-        enable=True
-    )
+        enable=True)
 
     system.service(
         name="Restart the nginx service now",
         service="nginx",
-        state="restarted"
-    )
+        state="restarted")
     ```
 
     Parameters
