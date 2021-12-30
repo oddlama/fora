@@ -15,8 +15,8 @@ def name() -> str:
     """
     Returns the name of the group that is currently being defined.
 
-    Return
-    ----------
+    Returns
+    -------
     str
         The name of the group.
     """

@@ -1,6 +1,5 @@
 """Provides the dynamic module loading utilities."""
 
-import glob
 import inspect
 import os
 import sys
@@ -13,7 +12,7 @@ import fora.group
 import fora.script
 
 from fora import globals as G, logger
-from fora.types import GroupType, HostType, InventoryType, ScriptType
+from fora.types import GroupType, HostType, ScriptType
 from fora.utils import die_error, print_error, load_py_module, rank_sort, CycleError, set_this_group, set_this_host, set_this_script
 from fora.connectors.connector import Connector
 
@@ -31,7 +30,24 @@ class DefaultHost:
     def __getattr__(self, attr: str) -> Any:
         return fora.host.getattr_hierarchical(cast(HostType, self), attr)
 
-def load_inventory(file: str) -> InventoryType:
+class ImmediateInventory:
+    """A temporary inventory just for a single run, without the ability to load host or group module files."""
+    def __init__(self, hosts: list[Union[str, tuple[str, str]]]) -> None:
+        self.hosts = list(hosts)
+
+    @staticmethod
+    def base_dir(inventory: Any) -> str:
+        """An immediate inventory has no base directory."""
+        _ = (inventory)
+        raise RuntimeError("Immediate inventories have no base directory!")
+
+    @staticmethod
+    def available_groups(inventory: Any) -> set[str]:
+        """An immediate inventory has no groups."""
+        _ = (inventory)
+        return set()
+
+def load_inventory(file: str) -> ModuleType:
     """
     Loads and validates the inventory definition from the given module file.
 
@@ -42,15 +58,18 @@ def load_inventory(file: str) -> InventoryType:
 
     Returns
     -------
-    InventoryType
-        The loaded group module
+    ModuleType
+        The loaded inventory module
     """
-    inventory = cast(InventoryType, load_py_module(file))
-    if not hasattr(inventory, 'hosts'):
-        die_error("inventory must define a list of hosts!", loc="inventory.py")
+    inventory = load_py_module(file)
 
-    # Convert hosts to list to ensure list type
-    inventory.hosts = list(inventory.hosts)
+    # Check that the hosts definition is valid.
+    if not hasattr(inventory, 'hosts'):
+        die_error("inventory must define a list of hosts!", loc=file)
+    hosts = getattr(inventory, "hosts")
+    if not isinstance(hosts, list):
+        die_error(f"inventory.hosts must be of type list, not {type(hosts)}!", loc=file)
+
     return inventory
 
 def load_group(module_file: str) -> GroupType:
@@ -232,9 +251,8 @@ def define_special_global_variables(group_all: GroupType) -> None:
 
 def load_groups() -> tuple[dict[str, GroupType], list[str]]:
     """
-    Loads all groups from their definition files in `./groups/`,
-    validates their dependencies and returns the groups and a topological
-    order respecting the dependency declarations.
+    Loads all groups available in the global inventory, validates their dependencies
+    and returns the groups as well as a topological order respecting the dependency declarations.
 
     Parameters
     ----------
@@ -246,33 +264,25 @@ def load_groups() -> tuple[dict[str, GroupType], list[str]]:
     tuple[dict[str, GroupType], list[str]]
         A dictionary of all loaded group modules index by their name, and a valid topological order
     """
-    # Pre-load available group names
-    group_files = list(glob.glob('groups/*.py'))
-    available_groups = []
-    for file in group_files:
-        available_groups.append(os.path.splitext(os.path.basename(file))[0])
-
-    if 'all' not in available_groups:
-        available_groups.append('all')
+    available_groups = G.inventory.available_groups(G.inventory)
+    loaded_groups = {}
 
     # Store available_groups so it can be accessed while groups are actually loaded.
-    G.available_groups = available_groups
+    # The all group is always made available.
+    G.available_groups = available_groups | set(["all"])
 
-    # Load all groups defined in groups/*.py
-    loaded_groups = {}
-    for file in group_files:
-        group = load_group(file)
+    for group_name in available_groups:
+        group = load_group(G.inventory.group_module_file(G.inventory, group_name))
         loaded_groups[group.name] = group
 
-    # Create default all group if it wasn't defined
-    if 'all' not in loaded_groups:
+    # Create default "all" group if it wasn't defined explicitly
+    if "all" not in available_groups:
         default_group = cast(GroupType, DefaultGroup())
-        GroupType(name="all", _loaded_from="__all__internal_group__").transfer(default_group)
-        loaded_groups['all'] = default_group
+        GroupType(name="all", _loaded_from="<internal>").transfer(default_group)
+        loaded_groups["all"] = default_group
 
-    # Define special global variables
-    gall = loaded_groups['all']
-    define_special_global_variables(gall)
+    # Define special global variables such as `{fora_managed` on the all group.
+    define_special_global_variables(loaded_groups["all"])
 
     # Firstly, deduplicate and unify each group's before and after dependencies,
     # and check for any self-dependencies.
@@ -280,7 +290,6 @@ def load_groups() -> tuple[dict[str, GroupType], list[str]]:
 
     # Find a topological order and check the groups for attribute conflicts.
     topological_order = sort_and_validate_groups(loaded_groups)
-
     return (loaded_groups, topological_order)
 
 def resolve_connector(host: HostType) -> None:
@@ -304,37 +313,37 @@ def resolve_connector(host: HostType) -> None:
         else:
             die_error(f"No connector found for schema {schema}", loc=host._loaded_from)
 
-def load_host(name: str, module_file: Optional[str] = None) -> HostType:
+def load_host(name: str, url: str, module_file: Optional[str] = None, requires_module_file: bool = False) -> HostType:
     """
-    Load and validates the host with the given name from the given module file path.
+    Loads the specified host with the given name, url and host module file (if any).
 
     Parameters
     ----------
     name
         The host name of the host to be loaded
+    url
+        The url for the host
     module_file
         The path to the host module file that will be instanciated.
         Pass None to try loading `hosts/{name}.py` and otherwise fall
         back to instanciating a `DefaultHost` if the name is an url scheme `(*:*)`.
+    requires_module_file
+        Whether it is an error if the module file does not exist.
 
     Returns
     -------
     HostType
         The host module
     """
-    requires_module_file = module_file is not None
-    if module_file is None:
-        module_file = f"hosts/{name}.py"
-
-    module_file_exists = os.path.exists(module_file)
-    url = name if ':' in name else f"ssh://{name}"
-    meta = HostType(name=name, _loaded_from=module_file if module_file_exists else "__cmdline__", url=url)
+    module_file_exists = module_file is not None and os.path.exists(module_file)
+    loaded_from = module_file if module_file is not None and module_file_exists else "<internal>"
+    meta = HostType(name=name, _loaded_from=loaded_from, url=url)
 
     with set_this_host(meta) as ctx:
         fora.host.add_group("all")
 
-        # Instanciate module
-        if module_file_exists:
+        # Instanciate host module file if it exists, else return default host definition
+        if module_file is not None and module_file_exists:
             def _pre_exec(module: ModuleType) -> None:
                 meta.transfer(module)
                 ctx.update(module)
@@ -352,7 +361,7 @@ def load_host(name: str, module_file: Optional[str] = None) -> HostType:
 
 def load_hosts() -> dict[str, HostType]:
     """
-    Loads all hosts defined in the inventory from their respective definition file in `./hosts/`.
+    Instanciates all hosts in the global inventory and loads any associated host module files.
 
     Returns
     -------
@@ -360,64 +369,51 @@ def load_hosts() -> dict[str, HostType]:
         A mapping from name to host module
     """
     loaded_hosts = {}
+
     for host in G.inventory.hosts:
         if isinstance(host, str):
-            if host in loaded_hosts:
-                raise ValueError(f"duplicate host: {host}")
-            loaded_hosts[host] = load_host(name=host)
+            (url, module_file, requires_module_file) = (host, None, False)
         elif isinstance(host, tuple):
-            (name, module_py) = host
-            if name in loaded_hosts:
-                raise ValueError(f"duplicate host: {host}")
-            loaded_hosts[name] = load_host(name=name, module_file=module_py)
+            (url, module_file, requires_module_file) = host + (True,)
         else:
-            die_error(f"invalid host '{str(host)}'", loc="inventory.py") # type: ignore[unreachable]
+            die_error(f"invalid host '{str(host)}'", loc=G.inventory.definition_file())
+
+        # First qualify the url (by default this adds ssh:// to "naked" hostnames)
+        url = G.inventory.qualify_url(G.inventory, url)
+        # Next extract the "friendly" hostname which we need to find the module file for the host.
+        name = G.inventory.extract_hostname(G.inventory, url)
+
+        if name in loaded_hosts:
+            die_error(f"duplicate host '{str(host)}'", loc=G.inventory.definition_file())
+        loaded_hosts[name] = load_host(name=name, url=url, module_file=module_file, requires_module_file=requires_module_file)
+
     return loaded_hosts
 
-def load_site(inventories: list[Union[str, tuple[str, str]]]) -> None:
+def load_inventory_from_file_or_url(inventory_or_host_url: str) -> None:
     """
     Loads the whole site and exposes it globally via the corresponding variables
     in the fora module.
 
     Parameters
     ----------
-    inventories
-        A possibly mixed list of inventory definition files (e.g. inventory.py) and single
-        host definitions in any ssh accepted syntax. The .py extension is used to disscern
-        between these cases. If multiple python inventory modules are given, the first will
-        become the main module stored in fora.inventory, and the others will
-        just have their hosts appended to the first module.
+    inventory_or_host_url
+        Either a single host url or an inventory module (`*.py`). If a single host url
+        is given without a connection schema (like `ssh://`), ssh will be used.
     """
-
-    # Separate inventory modules from single host definitions
-    module_files: list[str] = []
-    single_hosts: list[Union[str, tuple[str, str]]] = []
-    for i in inventories:
-        if isinstance(i, str) and i.endswith(".py"):
-            module_files.append(i)
-        else:
-            single_hosts.append(i)
-
-    # Load inventory module
-    if len(module_files) == 0:
-        # Use a default empty inventory
-        G.inventory = InventoryType()
+    inv: Any
+    if inventory_or_host_url.endswith(".py"):
+        # Load inventory from module file
+        inv = load_inventory(inventory_or_host_url)
     else:
-        # Load first inventory module file and append hosts from other inventory modules
-        G.inventory = load_inventory(module_files[0])
-        # Append hosts from other inventory modules
-        for inv in module_files[1:]:
-            G.inventory.hosts.extend(load_inventory(inv).hosts)
+        # Create an immediate inventory with just the given host.
+        inv = ImmediateInventory([inventory_or_host_url])
 
-    # Append single hosts
-    for shost in single_hosts:
-        G.inventory.hosts.append(shost)
+    # The global inventory should now prefer variables from the loaded inventory
+    # and only fall back to the defaults if they weren't specified.
+    G.inventory.wrap(inv)
 
-    # Load all groups from groups/*.py, then sort
-    # groups respecting their declared dependencies
+    # Load all groups and hosts from the global inventory.
     G.groups, G.group_order = load_groups()
-
-    # Load all hosts defined in the inventory
     G.hosts = load_hosts()
 
 def run_script(script: str,

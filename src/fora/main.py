@@ -11,7 +11,7 @@ from typing import NoReturn, Optional
 
 from fora import globals as G, logger
 from fora.connection import open_connection
-from fora.loader import load_site, run_script
+from fora.loader import load_inventory_from_file_or_url, run_script
 from fora.utils import die_error, install_exception_hook, set_current_host
 from fora.version import version
 
@@ -24,7 +24,7 @@ def main_run(args: argparse.Namespace) -> None:
     args
         The parsed arguments
     """
-    load_site(args.inventory)
+    load_inventory_from_file_or_url(args.inventory)
 
     # Deduplicate host selection and check if every host is valid
     host_names = []
@@ -48,7 +48,7 @@ def main_run(args: argparse.Namespace) -> None:
         logger.print_indented(f"{logger.col('[1;34m')}host{logger.col('[m')} {host.name}")
         with open_connection(host):
             with set_current_host(host):
-                run_script(args.script, inspect.getouterframes(inspect.currentframe())[0], name="Commandline argument")
+                run_script(args.script, inspect.getouterframes(inspect.currentframe())[0], name="<command line argument>")
 
         if h != host_names[-1]:
             # Separate hosts by a newline for better visibility
@@ -93,8 +93,8 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser.add_argument('--no-color', dest='no_color', action='store_true',
             help="Disables any color output. Color can also be disabled by setting the NO_COLOR environment variable.")
     # TODO fora init or --init --> create folder structure in current directory if it is empty.
-    parser.add_argument('inventory', type=str, nargs='+',
-            help="The inventories on which the script should be run on. A inventory is either a full inventory module file (determined by the presenence of a .py extension, e.g. inventory.py), or a single-host defined in any syntax that is accepted by ssh (e.g. root@localhost or ssh://[user]@host)")
+    parser.add_argument('inventory', type=str,
+            help="The inventory to run on. Either a single host url or an inventory module (`*.py`). If a single host url is given without a connection schema (like `ssh://`), ssh will be used. Single hosts also do not load any groups or host modules.")
     parser.add_argument('script', type=str,
             help="The user script containing the logic of what should be executed on the inventory.")
     parser.set_defaults(func=main_run)

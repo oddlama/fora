@@ -7,6 +7,8 @@ of the expected contents of the dynamically loaded modules.
 
 from __future__ import annotations
 from dataclasses import dataclass, field
+from glob import glob
+import os
 from types import ModuleType
 from typing import TYPE_CHECKING, Any, Callable, Optional, Union, cast
 
@@ -25,13 +27,59 @@ class MockupType(ModuleType):
     """Provided by the dataclass decorator."""
 
     def __str__(self) -> str:
-        return f"<'{getattr(self, 'name')}' from '{getattr(self, 'loaded_from')}'>"
+        return f"<'{getattr(self, 'name')}' from '{getattr(self, '_loaded_from')}'>"
 
     def transfer(self, module: ModuleType) -> None:
         """Transfers all annotated variables from this object to the given module."""
         for var in self.__annotations__:
             if hasattr(self, var):
                 setattr(module, var, getattr(self, var))
+
+class ModuleWrapper:
+    """
+    A module wrapper, that defaults attribute lookups to this object if the module doesn't define it.
+    Derived classes must be annotated with @dataclass.
+    """
+
+    __annotations__: dict[str, Any]
+    """Provided by the dataclass decorator."""
+
+    module: Optional[ModuleType] = None
+    """The dynamically loaded inventory module"""
+
+    def __getattribute__(self, attr: str) -> Any:
+        """Dynamic lookup will ensure that attributes on the module are used if available."""
+        module = object.__getattribute__(self, "module")
+        if module is None or not hasattr(module, attr):
+            return object.__getattribute__(self, attr)
+        return getattr(module, attr)
+
+    def wrap(self, module: Any) -> None:
+        """
+        Replaces the currently wrapped module (if any) with the given object.
+        The module should be an instance of ModuleType in most cases, but doesn't need to be.
+        Any object is supported.
+
+        Parameters
+        ----------
+        module
+            The new module to wrap.
+        """
+        self.module = module
+
+    def definition_file(self) -> str:
+        """
+        Returns the file from where the associated module has been loaded,
+        or "<unknown>" if no module file is associated with this wrapper.
+
+        Returns
+        -------
+        str
+            The file.
+        """
+        if self.module is None or self.module.__file__ is None:
+            return "<unknown>"
+        return self.module.__file__
 
 @dataclass
 class GroupType(MockupType):
@@ -42,17 +90,17 @@ class GroupType(MockupType):
     actual instanciated module before the module is executed.
 
     When writing a group module, you can use the API exposed in `fora.group`
-    to access/change meta information about your module.
+    to access/change meta information about your group module.
 
-    Example: Using meta information `(groups/webserver.py)`
+    Example: Using meta information `(groups/some_group.py)`
     ----
 
-        from fora import group as this
+        from fora import group
 
         # Require that the 'servers' groups is processed before this group when resolving
         # variables for a host at execution time. This is important to avoid variable
         # definition ambiguity (which would be detected and reported as an error).
-        this.after("server")
+        group.after("server")
     """
 
     name: str
@@ -81,7 +129,7 @@ class HostType(MockupType):
     Example: Using meta information `(hosts/myhost.py)`
     ----
 
-        from fora import host as this
+        from fora import host
 
         # Set the ssh host (useful if it differs from the name)
         ssh_host = "root@localhost"
@@ -89,10 +137,10 @@ class HostType(MockupType):
         url = "ssh://root@localhost"
 
         # The host's name used for instanciation as defined in the inventory
-        print(this.name())
+        print(host.name())
 
         # Add the host to a group
-        this.add_group("desktops")
+        host.add_group("desktops")
     """
 
     name: str
@@ -103,30 +151,177 @@ class HostType(MockupType):
 
     url: str
     """
-    The url to the host. A matching connector for the schema must exist.
-    Defaults to the name if not explicitly specified. Appends ssh:// if
-    no schema is included in the name. Connection details can be given
-    in the url schema or via attributes on the host module.
+    The url for this host. The schema in this url will be used to determine
+    which connector is used to initiate a connection to this host, if the connector
+    has not been explicitly overridden by the host module by specifying a value
+    for the `connector` attribute.
+
+    By default, this field will be set to a value which the inventory provided
+    for this host at load-time by the means of `InventoryWrapper.qualify_url`,
+    or by an overridden implementation of this function from the specific inventory.
     """
 
     groups: set[str] = field(default_factory=set)
     """The set of groups this host belongs to."""
 
     connector: Optional[Callable[[str, HostType], Connector]] = None
-    """The connector class to use. If unset the connector will be determined by the url."""
+    """The connector class to use. If None, the connector will be determined by the schema in the url."""
 
     connection: Connection = cast("Connection", None) # Cast None to ease typechecking in user code.
     """The connection to this host, if it is opened."""
 
 @dataclass
-class InventoryType(MockupType):
+class InventoryWrapper(ModuleWrapper):
     """
-    A mockup type for inventory modules. This is not the actual type of an instanciated
-    module, but will reflect some of it's properties better than ModuleType.
+    A wrapper class for inventory modules. This will wrap any instanciated
+    inventory to provide default attributes and methods for the inventory.
     """
 
+    groups_dir: str = "groups"
+    """The directory where to search for group module files, relative to the inventory."""
+
+    hosts_dir: str = "hosts"
+    """The directory where to search for host module files, relative to the inventory."""
+
     hosts: list[Union[str, tuple[str, str]]] = field(default_factory=list)
-    """The list of hosts that belong to this inventory and have to be loaded."""
+    """
+    A list of hosts in this inventory. Entries are either a single host url,
+    or a tuple of `(url, file)`, where `file` is the module file for that host.
+    Module files are searched relative to the inventory and default to `{hosts_dir}/{name}.py`
+    if not given. Host module files are optional, except when explicitly specified.
+
+    If the host url is given without an connection schema (like `ssh://`),
+    by default `ssh://` will be prepended as each url is passed through `qualify_url`.
+
+    The host's "friendly" name is extracted from the url after qualification
+    by the means of `extract_hostname`. By default the responsible connector
+    will be asked to provide a hostname. This means that both `localhost` and
+    `ssh://root@localhost:22` will result in a host named `localhost`.
+
+    Beware that a host module could possibly overwrite its assigned url
+    or specify an explicit connector in its module file. This means the
+    connector which extracted the hostname before host instanciation could
+    possibly be a different one than the connector used later for the connection.
+    """
+
+    @staticmethod
+    def available_groups(inventory: InventoryWrapper) -> set[str]:
+        """
+        Returns the set of available groups in this inventory.
+        By default each module file in `groups_dir` (relative to the inventory module)
+        creates a group of the same name, disregarding the `.py` extension.
+
+        Note that the `all` group will always be made available, even if it isn't explicitly
+        returned by this function. This function should only return groups that have a
+        corresponding module file.
+
+        Parameters
+        ----------
+        inventory
+            This inventory.
+
+        Returns
+        -------
+        set[str]
+            The available group definitions.
+        """
+        # Find group files relative to the inventory module
+        if inventory.module is None or inventory.module.__file__ is None:
+            raise RuntimeError("Cannot return base directory for an inventory module without an associated module file.")
+
+        group_files_glob = os.path.join(os.path.dirname(inventory.module.__file__), inventory.groups_dir, "*.py")
+        return set(os.path.splitext(os.path.basename(file))[0] for file in glob(group_files_glob))
+
+    @staticmethod
+    def base_dir(inventory: InventoryWrapper) -> str:
+        """
+        Returns absolute path of this inventory's base directory, which
+        is usually its containing folder.
+
+        Raises
+        ------
+        RuntimeError
+            If the inventory has no associated module file.
+
+        Parameters
+        ----------
+        inventory
+            This inventory.
+
+        Returns
+        -------
+        str
+            The absolute base directory path.
+        """
+        if inventory.module is None or inventory.module.__file__ is None:
+            raise RuntimeError("Cannot return base directory for an inventory module without an associated module file.")
+        return os.path.realpath(os.path.dirname(inventory.module.__file__))
+
+    @staticmethod
+    def group_module_file(inventory: InventoryWrapper, name: str) -> str:
+        """
+        Returns the absolute group module file path given the group's name.
+
+        Parameters
+        ----------
+        inventory
+            This inventory.
+        name
+            The group name to return the module file path for.
+
+        Returns
+        -------
+        str
+            The group module file path.
+        """
+        return os.path.join(inventory.base_dir(inventory), inventory.groups_dir, f"{name}.py")
+
+    @staticmethod
+    def host_module_file(inventory: InventoryWrapper, name: str) -> str:
+        """
+        Returns the absolute host module file path given the host's name.
+
+        Parameters
+        ----------
+        inventory
+            This inventory.
+        name
+            The host name to return the module file path for.
+
+        Returns
+        -------
+        str
+            The host module file path.
+        """
+        return os.path.join(inventory.base_dir(inventory), inventory.hosts_dir, f"{name}.py")
+
+    @staticmethod
+    def qualify_url(inventory: InventoryWrapper, url: str) -> str:
+        """
+        Returns a valid url for any given url from the hosts array if possible.
+
+        By default this function selects `ssh://` as the default schema
+        for any url that has no explicit schema.
+
+        Raises
+        ------
+        ValueError
+            The provided url was invalid.
+
+        Parameters
+        ----------
+        inventory
+            This inventory.
+        url
+            The url to qualify.
+
+        Returns
+        -------
+        str
+            The host module file path.
+        """
+        _ = (inventory)
+        return url if ':' in url else f"ssh://{url}"
 
 @dataclass
 class ScriptType(MockupType):

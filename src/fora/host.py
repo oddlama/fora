@@ -13,8 +13,8 @@ def name() -> str:
     """
     Returns the name of the host that is currently being defined.
 
-    Return
-    ----------
+    Returns
+    -------
     str
         The name of the host.
     """
@@ -56,6 +56,7 @@ def _is_normal_var(attr: str, value: Any) -> bool:
     return not attr.startswith("_") \
             and not isinstance(value, ModuleType)
 
+# TODO make private with _, then make wrapper of host in __init__.py so that . is resolved properly.
 def getattr_hierarchical(host: HostType, attr: str) -> Any:
     """
     Looks up and returns the given attribute on the host's hierarchy in the following order:

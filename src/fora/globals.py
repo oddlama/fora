@@ -5,7 +5,7 @@ from typing import Any, cast
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from fora.remote_settings import RemoteSettings
-from fora.types import InventoryType, GroupType, HostType
+from fora.types import InventoryWrapper, GroupType, HostType
 
 class NotYetLoaded:
     """
@@ -23,20 +23,20 @@ that this information is displayed in a proper format and according to the user'
 verbosity preferences.
 """
 
-inventory: InventoryType = cast(InventoryType, NotYetLoaded())
+inventory: InventoryWrapper = InventoryWrapper()
 """
 The inventory module we are operating on.
 This is loaded from the inventory definition file (inventory.py).
 """
 
-available_groups: list[str] = cast(list[str], NotYetLoaded())
+available_groups: set[str] = cast(set[str], NotYetLoaded())
 """
 All groups that will be available after loading. Useful to raise
 errors early when referencing undefined groups.
 """
 
 groups: dict[str, GroupType] = cast(dict[str, GroupType], NotYetLoaded())
-"""A dict containing all group modules loaded from `groups/*.py`, mapped by name."""
+"""A dict containing all group modules loaded from the inventory, indexed by name."""
 
 group_order: list[str] = cast(list[str], NotYetLoaded())
 """A topological order of all groups, with highest precedence first."""
