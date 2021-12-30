@@ -271,16 +271,18 @@ def operation(op_name: str) -> Callable[[Callable], Callable]:
 
                 # Print output of failed command for debugging
                 col_red = logger.col("\033[1;31m")
+                col_yellow = logger.col("\033[1;33m")
                 col_reset = logger.col("\033[m")
                 print_fullwith(["────────[ ",
                     col_red, "command", col_reset, " ",
-                    str(e.cmd),
+                    str(e.cmd), " ",
                     col_red, "failed", col_reset, " ",
                     f"with code {e.returncode} ]"])
-                print_fullwith(["────────[ ", col_red, "stdout", col_reset, " (special characters escaped) ]"])
+                print_fullwith(["────────[ ", col_yellow, "stdout", col_reset, " (special characters escaped) ]"])
                 print(e.stdout.decode("utf-8", errors="backslashreplace"), file=sys.stderr)
-                print_fullwith(["────────[ ", col_red, "stderr", col_reset, " (special characters escaped) ]"])
+                print_fullwith(["────────[ ", col_yellow, "stderr", col_reset, " (special characters escaped) ]"])
                 print(e.stderr.decode("utf-8", errors="backslashreplace"), file=sys.stderr)
+                print_fullwith(["────────[ ", col_yellow, "end", col_reset, " ]"])
 
                 if G.args.debug:
                     raise
