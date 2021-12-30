@@ -72,16 +72,13 @@ class GroupEntry:
     """All the group member's user names"""
 
 class Connector:
-    """
-    The base class for all connectors.
-    """
+    """The base class for all connectors."""
 
     schema: str
     """
     The schema of the connector. Must match the schema used in urls of this connector,
-    such as `ssh` for `ssh://...`. May also appear in log messages.
-
-    Overwrite this in your connector subclass. Must be unique among all connectors.
+    such as `ssh` for `ssh:...`. May also appear in log messages. A schema is the part
+    of the url until (but not including) the first colon. Set by the @connector decorator.
     """
 
     registered_connectors: dict[str, Type[Connector]] = {}
@@ -92,15 +89,11 @@ class Connector:
         self.host = host
 
     def open(self) -> None:
-        """
-        Opens the connection to the remote host.
-        """
+        """Opens the connection to the remote host."""
         raise NotImplementedError("Must be overwritten by subclass.")
 
     def close(self) -> None:
-        """
-        Closes the connection to the remote host.
-        """
+        """Closes the connection to the remote host."""
         raise NotImplementedError("Must be overwritten by subclass.")
 
     def run(self,
@@ -351,6 +344,29 @@ class Connector:
             An error occurred with the connection.
         """
         _ = (self, group)
+        raise NotImplementedError("Must be overwritten by subclass.")
+
+    @classmethod
+    def extract_hostname(cls, url: str) -> str:
+        """
+        Extracts the hostname from a given url where the schema matches this connector.
+
+        Raises
+        ------
+        ValueError
+            The provided url was invalid.
+
+        Parameters
+        ----------
+        url
+            The url to extract the hostname from.
+
+        Returns
+        -------
+        str
+            The extracted hostname.
+        """
+        _ = (url)
         raise NotImplementedError("Must be overwritten by subclass.")
 
 def connector(schema: str) -> Callable[[Type[Connector]], Type[Connector]]:

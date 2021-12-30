@@ -45,3 +45,23 @@ class SshConnector(TunnelConnector):
         command.append(f"env python3 -c \"$(echo '{tunnel_dispatcher_gz_b64}' | base64 -d | openssl zlib -d)\" {param_debug}")
 
         return command
+
+    @classmethod
+    def extract_hostname(cls, url: str) -> str:
+        if not url.startswith(f"{cls.schema}:"):
+            raise ValueError(f"Cannot extract hostname from url without matching schema (expected '{cls.schema}', got '{url}').")
+
+        # currently: [user@]hostname[:port]
+        hostname = url[len(cls.schema) + 1:]
+
+        # Remove user
+        pos = hostname.find("@")
+        if pos >= 0:
+            hostname = hostname[pos + 1:]
+
+        # Remove port
+        pos = hostname.find(":")
+        if pos >= 0:
+            hostname = hostname[:pos]
+
+        return hostname
