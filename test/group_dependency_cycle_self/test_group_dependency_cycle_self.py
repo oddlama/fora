@@ -14,7 +14,7 @@ def test_group_dependency_cycle_self(request):
     os.chdir(request.fspath.dirname)
 
     with pytest.raises(ValueError) as e:
-        fora.loader.load_site(["ssh://dummy@example.com"])
+        fora.loader.load_inventory_from_file_or_url("inventory.py")
         assert "dependency to self" in str(e.value)
 
     os.chdir(request.config.invocation_dir)

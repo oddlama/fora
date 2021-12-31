@@ -5,7 +5,7 @@ import fora.loader
 def test_missing_hosts(request, capsys):
     os.chdir(request.fspath.dirname)
     with pytest.raises(SystemExit):
-        fora.loader.load_site(["mock_inventories/missing_definition.py"])
+        fora.loader.load_inventory_from_file_or_url("mock_inventories/missing_definition.py")
     _, err = capsys.readouterr()
     assert "must define a list of hosts" in err
 

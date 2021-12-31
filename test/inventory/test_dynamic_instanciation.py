@@ -4,11 +4,12 @@ import fora.loader
 
 def test_dynamic_instanciation(request):
     os.chdir(request.fspath.dirname)
-    hosts = ["host1", "host2", ("host3", "hosts/host_templ.py"), ("host4", "hosts/host_templ.py")]
-    expected_files = ["host1.py", "host2.py", "host_templ.py", "host_templ.py"]
 
-    fora.loader.load_site(hosts)
+    fora.loader.load_inventory_from_file_or_url("mock_inventories/simple_test.py")
     assert G.inventory is not None
+
+    hosts = G.inventory.hosts
+    expected_files = ["host1.py", "host2.py", "host_templ.py", "host_templ.py"]
 
     for i in hosts:
         if isinstance(i, tuple):

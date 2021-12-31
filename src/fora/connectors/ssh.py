@@ -51,8 +51,9 @@ class SshConnector(TunnelConnector):
         if not url.startswith(f"{cls.schema}:"):
             raise ValueError(f"Cannot extract hostname from url without matching schema (expected '{cls.schema}', got '{url}').")
 
-        # currently: [user@]hostname[:port]
-        hostname = url[len(cls.schema) + 1:]
+        # strip ssh://
+        # remaining: [user@]hostname[:port]
+        hostname = url[len(cls.schema) + 3:]
 
         # Remove user
         pos = hostname.find("@")

@@ -11,35 +11,21 @@ import fora.host
 import fora.loader
 import fora.script
 from fora.connection import Connection
-from fora.connectors import tunnel_dispatcher as td
-from fora.connectors.connector import connector
-from fora.connectors.tunnel_connector import TunnelConnector
 from fora.connectors.tunnel_dispatcher import RemoteOSError
 from fora.types import HostType, ScriptType
 
-hostname = "coverage:"
 host: HostType = cast(HostType, None)
 connection: Connection = cast(Connection, None)
-
-@connector(schema='coverage')
-class CoverageConnector(TunnelConnector):
-    """A tunnel connector that provides fake remote access (always localhost) via a tunnel dispatcher subprocess."""
-
-    def command(self) -> list[str]:
-        command = ["python3", os.path.realpath(td.__file__)]
-        if G.args.debug:
-            command.append("--debug")
-        return command
 
 def test_init():
     class DefaultArgs:
         debug = False
         diff = False
     G.args = DefaultArgs()
-    fora.loader.load_site([hostname])
+    fora.loader.load_inventory_from_file_or_url("local:")
 
     global host
-    host = G.hosts[hostname]
+    host = G.hosts["localhost"]
     fora.host.current_host = host
     fora.script._this = ScriptType("__internal_test", "__internal_test")
 

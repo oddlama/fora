@@ -6,7 +6,7 @@ import fora.globals as G
 def test_simple_inventory(request):
     os.chdir(request.fspath.dirname)
 
-    fora.loader.load_site(["inventory.py"])
+    fora.loader.load_inventory_from_file_or_url("inventory.py")
     for i in ["host1", "host2", "host3", "host4", "host5"]:
         assert i in G.hosts
 

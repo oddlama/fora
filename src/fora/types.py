@@ -258,9 +258,10 @@ class InventoryWrapper(ModuleWrapper):
         return os.path.realpath(os.path.dirname(inventory.module.__file__))
 
     @staticmethod
-    def group_module_file(inventory: InventoryWrapper, name: str) -> str:
+    def group_module_file(inventory: InventoryWrapper, name: str) -> Optional[str]:
         """
         Returns the absolute group module file path given the group's name.
+        Returning None associates no group module file to the group by default.
 
         Parameters
         ----------
@@ -271,15 +272,16 @@ class InventoryWrapper(ModuleWrapper):
 
         Returns
         -------
-        str
+        Optional[str]
             The group module file path.
         """
         return os.path.join(inventory.base_dir(inventory), inventory.groups_dir, f"{name}.py")
 
     @staticmethod
-    def host_module_file(inventory: InventoryWrapper, name: str) -> str:
+    def host_module_file(inventory: InventoryWrapper, name: str) -> Optional[str]:
         """
         Returns the absolute host module file path given the host's name.
+        Returning None associates no host module file to the host by default.
 
         Parameters
         ----------
@@ -290,7 +292,7 @@ class InventoryWrapper(ModuleWrapper):
 
         Returns
         -------
-        str
+        Optional[str]
             The host module file path.
         """
         return os.path.join(inventory.base_dir(inventory), inventory.hosts_dir, f"{name}.py")
@@ -318,10 +320,42 @@ class InventoryWrapper(ModuleWrapper):
         Returns
         -------
         str
-            The host module file path.
+            The qualified url.
         """
         _ = (inventory)
         return url if ':' in url else f"ssh://{url}"
+
+    @staticmethod
+    def extract_hostname(inventory: InventoryWrapper, url: str) -> str:
+        """
+        Extracts the hostname from a given url. By default
+        this is done via the the responsible connector.
+
+        Raises
+        ------
+        ValueError
+            The provided url was invalid.
+
+        Parameters
+        ----------
+        inventory
+            This inventory.
+        url
+            The url to extract the hostname from.
+
+        Returns
+        -------
+        str
+            The extracted hostname.
+        """
+        _ = (inventory)
+        from fora.connectors.connector import Connector # pylint: disable=import-outside-toplevel
+        if ':' not in url:
+            raise ValueError("The given url doesn't include a schema")
+        schema = url.split(':')[0]
+        if schema not in Connector.registered_connectors:
+            raise ValueError(f"Invalid url schema '{schema}'")
+        return Connector.registered_connectors[schema].extract_hostname(url)
 
 @dataclass
 class ScriptType(MockupType):

@@ -42,6 +42,16 @@ class ImmediateInventory:
         raise RuntimeError("Immediate inventories have no base directory!")
 
     @staticmethod
+    def group_module_file(inventory: Any, name: str) -> Optional[str]:
+        _ = (inventory, name)
+        return None
+
+    @staticmethod
+    def host_module_file(inventory: Any, name: str) -> Optional[str]:
+        _ = (inventory, name)
+        return None
+
+    @staticmethod
     def available_groups(inventory: Any) -> set[str]:
         """An immediate inventory has no groups."""
         _ = (inventory)
@@ -337,6 +347,7 @@ def load_host(name: str, url: str, module_file: Optional[str] = None, requires_m
     """
     module_file_exists = module_file is not None and os.path.exists(module_file)
     loaded_from = module_file if module_file is not None and module_file_exists else "<internal>"
+    print(module_file, module_file_exists)
     meta = HostType(name=name, _loaded_from=loaded_from, url=url)
 
     with set_this_host(meta) as ctx:
@@ -375,6 +386,7 @@ def load_hosts() -> dict[str, HostType]:
             (url, module_file, requires_module_file) = (host, None, False)
         elif isinstance(host, tuple):
             (url, module_file, requires_module_file) = host + (True,)
+            module_file = os.path.join(G.inventory.base_dir(G.inventory), module_file)
         else:
             die_error(f"invalid host '{str(host)}'", loc=G.inventory.definition_file())
 
@@ -383,16 +395,37 @@ def load_hosts() -> dict[str, HostType]:
         # Next extract the "friendly" hostname which we need to find the module file for the host.
         name = G.inventory.extract_hostname(G.inventory, url)
 
+        # Use default module file path if not explicitly given
+        if isinstance(host, str):
+            module_file = G.inventory.host_module_file(G.inventory, name)
+
         if name in loaded_hosts:
             die_error(f"duplicate host '{str(host)}'", loc=G.inventory.definition_file())
         loaded_hosts[name] = load_host(name=name, url=url, module_file=module_file, requires_module_file=requires_module_file)
 
     return loaded_hosts
 
+def load_inventory_object(inventory: Any) -> None:
+    """
+    Loads the global inventory from the given inventory object.
+    in the fora module.
+
+    Parameters
+    ----------
+    inventory
+        The inventory object.
+    """
+    # The global inventory should now prefer variables from the loaded inventory
+    # and only fall back to the defaults if they weren't specified.
+    G.inventory.wrap(inventory)
+
+    # Load all groups and hosts from the global inventory.
+    G.groups, G.group_order = load_groups()
+    G.hosts = load_hosts()
+
 def load_inventory_from_file_or_url(inventory_or_host_url: str) -> None:
     """
-    Loads the whole site and exposes it globally via the corresponding variables
-    in the fora module.
+    Loads the global inventory from the given filename or single-host url.
 
     Parameters
     ----------
@@ -408,13 +441,7 @@ def load_inventory_from_file_or_url(inventory_or_host_url: str) -> None:
         # Create an immediate inventory with just the given host.
         inv = ImmediateInventory([inventory_or_host_url])
 
-    # The global inventory should now prefer variables from the loaded inventory
-    # and only fall back to the defaults if they weren't specified.
-    G.inventory.wrap(inv)
-
-    # Load all groups and hosts from the global inventory.
-    G.groups, G.group_order = load_groups()
-    G.hosts = load_hosts()
+    load_inventory_object(inv)
 
 def run_script(script: str,
                frame: inspect.FrameInfo,

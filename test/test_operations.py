@@ -18,7 +18,6 @@ from fora.operations import local, files, system
 from fora.connection import Connection
 from fora.types import HostType, ScriptType
 
-hostname = "ssh://root@localhost"
 host: HostType = cast(HostType, None)
 connection: Connection = cast(Connection, None)
 
@@ -30,10 +29,10 @@ def test_init():
         changes = True
         verbose = 99
     G.args = DefaultArgs()
-    fora.loader.load_site([hostname])
+    fora.loader.load_inventory_from_file_or_url("ssh://root@localhost")
 
     global host
-    host = G.hosts[hostname]
+    host = G.hosts["localhost"]
     fora.host.current_host = host
     fora.script._this = ScriptType("__internal_test", "__internal_test")
 
