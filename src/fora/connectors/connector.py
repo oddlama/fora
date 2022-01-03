@@ -52,8 +52,8 @@ class UserEntry:
     """The numerical primary group id"""
     groups: list[str]
     """All names of the supplementary groups this user belongs to"""
-    password_hash: str
-    """The password hash from shadow"""
+    password_hash: Optional[str]
+    """The password hash from shadow, if requested."""
     gecos: str
     """The comment (GECOS) field of the user"""
     home: str
@@ -294,7 +294,7 @@ class Connector:
         _ = (self, file)
         raise NotImplementedError("Must be overwritten by subclass.")
 
-    def query_user(self, user: str) -> UserEntry:
+    def query_user(self, user: str, query_password_hash: bool = False) -> UserEntry:
         """
         Queries information about a user on the reomte system.
 
@@ -302,6 +302,8 @@ class Connector:
         ----------
         user
             The username or uid that should be queried.
+        query_password_hash
+            Whether the password hash should also be returned. Requires elevated privileges.
 
         Returns
         -------
@@ -317,7 +319,7 @@ class Connector:
         IOError
             An error occurred with the connection.
         """
-        _ = (self, user)
+        _ = (self, user, query_password_hash)
         raise NotImplementedError("Must be overwritten by subclass.")
 
     def query_group(self, group: str) -> GroupEntry:

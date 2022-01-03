@@ -20,7 +20,7 @@ script_stack: list[tuple[ScriptType, inspect.FrameInfo]] = []
 """A stack of all currently executed scripts ((name, file), frame)."""
 
 class DefaultGroup:
-    """This class will be instanciated for the 'all' group, if it hasn't been defined externally."""
+    """This class will be instanciated for empty groups without associated module files."""
 
 class DefaultHost:
     """
@@ -282,8 +282,13 @@ def load_groups() -> tuple[dict[str, GroupType], list[str]]:
     G.available_groups = available_groups | set(["all"])
 
     for group_name in available_groups:
-        group = load_group(G.inventory.group_module_file(G.inventory, group_name))
-        loaded_groups[group.name] = group
+        group_file = G.inventory.group_module_file(G.inventory, group_name)
+        if group_file is None:
+            group = cast(GroupType, DefaultGroup())
+            GroupType(name=group_name, _loaded_from="<internal>").transfer(group)
+        else:
+            group = load_group(group_file)
+        loaded_groups[group_name] = group
 
     # Create default "all" group if it wasn't defined explicitly
     if "all" not in available_groups:

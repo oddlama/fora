@@ -625,7 +625,7 @@ class PacketUserEntry(NamedTuple):
     """The numerical primary group id"""
     groups: list[str]
     """All names of the supplementary groups this user belongs to"""
-    password_hash: str
+    password_hash: Optional[str]
     """The password hash from shadow"""
     gecos: str
     """The comment (GECOS) field of the user"""
@@ -639,6 +639,8 @@ class PacketQueryUser(NamedTuple):
     """This packet is used to get information about a group via pwd.getpw*."""
     user: str
     """User name or decimal uid"""
+    query_password_hash: bool
+    """Whether the current password hash from shadow should also be returned"""
 
     def handle(self, conn: Connection) -> None:
         """Queries the requested user."""
@@ -652,11 +654,13 @@ class PacketQueryUser(NamedTuple):
                 conn.write_packet(PacketInvalidField("user", "The user does not exist"))
                 return
 
-        try:
-            pw_hash = getspnam(pw.pw_name).sp_pwdp
-        except KeyError:
-            conn.write_packet(PacketInvalidField("user", "The user has no shadow entry, or it is inaccessible."))
-            return
+        pw_hash: Optional[str] = None
+        if self.query_password_hash:
+            try:
+                pw_hash = getspnam(pw.pw_name).sp_pwdp
+            except KeyError:
+                conn.write_packet(PacketInvalidField("user", "The user has no shadow entry, or it is inaccessible."))
+                return
 
         groups = [g.gr_name for g in getgrall() if pw.pw_name in g.gr_mem]
         try:

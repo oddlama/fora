@@ -163,8 +163,8 @@ class TunnelConnector(Connector):
         _expect_response_packet(response, td.PacketResolveResult)
         return cast(td.PacketResolveResult, response).value
 
-    def query_user(self, user: str) -> UserEntry:
-        request = td.PacketQueryUser(user=user)
+    def query_user(self, user: str, query_password_hash: bool = False) -> UserEntry:
+        request = td.PacketQueryUser(user=user, query_password_hash=query_password_hash)
         response = self._request(request)
 
         _expect_response_packet(response, td.PacketUserEntry)

@@ -189,10 +189,10 @@ class Connection:
         except ValueError:
             return default
 
-    def query_user(self, user: str, default: Optional[UserEntry] = None) -> Optional[UserEntry]:
+    def query_user(self, user: str, query_password_hash: bool = False, default: Optional[UserEntry] = None) -> Optional[UserEntry]:
         """See `fora.connectors.connector.Connector.query_user`, but returns the given default in case the user doesn't exist."""
         try:
-            return self.connector.query_user(user=user)
+            return self.connector.query_user(user=user, query_password_hash=query_password_hash)
         except ValueError:
             return default
 

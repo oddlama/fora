@@ -422,7 +422,7 @@ def test_create_user():
     system.group(group="foratest", present=False)
 
     def getpwhash():
-        ue = connection.query_user("foratest")
+        ue = connection.query_user("foratest", query_password_hash=True)
         return ue.password_hash if ue is not None else None
 
     G.args.dry = True

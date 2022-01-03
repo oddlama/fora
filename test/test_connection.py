@@ -239,7 +239,11 @@ def test_query_group():
 
 def test_query_user():
     with pytest.raises(RemoteOSError, match=r"Permission denied"):
-        connection.query_user("nobody")
+        connection.query_user("nobody", query_password_hash=True)
+
+    entry = connection.query_user("nobody")
+    assert entry is not None
+    assert entry.name == "nobody"
 
 def test_close_connection():
     connection.__exit__(None, None, None)

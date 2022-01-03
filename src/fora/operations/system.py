@@ -115,7 +115,7 @@ def user(user: str, # pylint: disable=redefined-outer-name,too-many-statements
         raise ValueError("groups must be a list!")
 
     # Examine current state
-    current = conn.query_user(user=user)
+    current = conn.query_user(user=user, query_password_hash=True)
     if current is None:
         op.initial_state(exists=False, uid=None, group=None, groups=[], comment=None, home=None, shell=None, password_hash=None)
     else:
