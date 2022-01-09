@@ -23,6 +23,12 @@ import fora.script
 from fora.types import GroupType, HostType, ScriptType
 from fora.logger import col
 
+class FatalError(Exception):
+    """An exception type for fatal errors, optionally including a file location."""
+    def __init__(self, msg: str, loc: Optional[str] = None):
+        super().__init__(msg)
+        self.loc = loc
+
 T = TypeVar('T')
 
 # A set of all modules names that are dynamically loaded modules.

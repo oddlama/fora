@@ -12,7 +12,7 @@ from typing import NoReturn, Optional
 from fora import globals as G, logger
 from fora.connection import open_connection
 from fora.loader import load_inventory_from_file_or_url, run_script
-from fora.utils import die_error, install_exception_hook, set_current_host
+from fora.utils import FatalError, die_error, install_exception_hook, set_current_host
 from fora.version import version
 
 def main_run(args: argparse.Namespace) -> None:
@@ -24,7 +24,10 @@ def main_run(args: argparse.Namespace) -> None:
     args
         The parsed arguments
     """
-    load_inventory_from_file_or_url(args.inventory)
+    try:
+        load_inventory_from_file_or_url(args.inventory)
+    except FatalError as e:
+        die_error(str(e), loc=e.loc)
 
     # Deduplicate host selection and check if every host is valid
     host_names = []

@@ -3,6 +3,7 @@ import pytest
 
 import fora.globals as G
 import fora.loader
+from fora.utils import FatalError
 
 def test_init():
     class DefaultArgs:
@@ -10,12 +11,10 @@ def test_init():
         diff = False
     G.args = DefaultArgs()
 
-def test_group_dependency_cycle_complex(request, capsys):
+def test_group_dependency_cycle_complex(request):
     os.chdir(request.fspath.dirname)
 
-    with pytest.raises(SystemExit):
+    with pytest.raises(FatalError, match="cycle"):
         fora.loader.load_inventory_from_file_or_url("inventory.py")
-    _, err = capsys.readouterr()
-    assert "cycle" in err
 
     os.chdir(request.config.invocation_dir)

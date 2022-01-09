@@ -13,7 +13,7 @@ import fora.script
 
 from fora import globals as G, logger
 from fora.types import GroupType, HostType, ScriptType
-from fora.utils import die_error, print_error, load_py_module, rank_sort, CycleError, set_this_group, set_this_host, set_this_script
+from fora.utils import FatalError, print_error, load_py_module, rank_sort, CycleError, set_this_group, set_this_host, set_this_script
 from fora.connectors.connector import Connector
 
 script_stack: list[tuple[ScriptType, inspect.FrameInfo]] = []
@@ -70,15 +70,20 @@ def load_inventory(file: str) -> ModuleType:
     -------
     ModuleType
         The loaded inventory module
+
+    Raises
+    ------
+    FatalError
+        The loaded inventory was invalid.
     """
     inventory = load_py_module(file)
 
     # Check that the hosts definition is valid.
     if not hasattr(inventory, 'hosts'):
-        die_error("inventory must define a list of hosts!", loc=file)
+        raise FatalError("inventory must define a list of hosts!", loc=file)
     hosts = getattr(inventory, "hosts")
     if not isinstance(hosts, list):
-        die_error(f"inventory.hosts must be of type list, not {type(hosts)}!", loc=file)
+        raise FatalError(f"inventory.hosts must be of type list, not {type(hosts)}!", loc=file)
 
     return inventory
 
@@ -185,6 +190,11 @@ def sort_and_validate_groups(groups: dict[str, GroupType]) -> list[str]:
     -------
     list[GroupType]
         The topologically sorted list of groups
+
+    Raises
+    ------
+    ValueError
+        The loaded inventory was invalid.
     """
     # pylint: disable=protected-access
 
@@ -202,14 +212,14 @@ def sort_and_validate_groups(groups: dict[str, GroupType]) -> list[str]:
         ranks_t = rank_sort(gkeys, l_before, l_after) # Top-down
         ranks_b = rank_sort(gkeys, l_after, l_before) # Bottom-up
     except CycleError as e:
-        die_error(f"Dependency cycle detected! The cycle includes {[groups[g]._loaded_from for g in e.cycle]}.")
+        raise ValueError(f"dependency cycle detected! The cycle includes {[groups[g]._loaded_from for g in e.cycle]}.") from None
 
     # Find cycles in dependencies by checking for the existence of any edge that doesn't increase the rank.
     # This is an error.
     for g in groups:
         for c in groups[g]._groups_after:
             if ranks_t[c] <= ranks_t[g]:
-                die_error(f"Dependency cycle detected! The cycle includes '{groups[g]._loaded_from}' and '{groups[c]._loaded_from}'.")
+                raise ValueError(f"dependency cycle detected! The cycle includes '{groups[g]._loaded_from}' and '{groups[c]._loaded_from}'.")
 
     # Find the maximum rank. Both ranking systems have the same number of ranks. This is
     # true because the longest dependency chain determines the amount of ranks, and all dependencies
@@ -304,7 +314,10 @@ def load_groups() -> tuple[dict[str, GroupType], list[str]]:
     merge_group_dependencies(loaded_groups)
 
     # Find a topological order and check the groups for attribute conflicts.
-    topological_order = sort_and_validate_groups(loaded_groups)
+    try:
+        topological_order = sort_and_validate_groups(loaded_groups)
+    except ValueError as e:
+        raise FatalError(str(e))
     return (loaded_groups, topological_order)
 
 def resolve_connector(host: HostType) -> None:
@@ -317,16 +330,21 @@ def resolve_connector(host: HostType) -> None:
     ----------
     host
         The host
+
+    Raises
+    ------
+    FatalError
+        The connector could not resolved because either none was given or the scheme could not be matched against existing connectors.
     """
     # pylint: disable=protected-access
     if host.connector is None:
         if ':' not in host.url:
-            die_error("Url doesn't include a schema and no connector was specified explicitly", loc=host._loaded_from)
+            raise FatalError("url doesn't include a schema and no connector was specified explicitly", loc=host._loaded_from)
         schema = host.url.split(':')[0]
         if schema in Connector.registered_connectors:
             host.connector = Connector.registered_connectors[schema]
         else:
-            die_error(f"No connector found for schema {schema}", loc=host._loaded_from)
+            raise FatalError(f"no connector found for schema {schema}", loc=host._loaded_from)
 
 def load_host(name: str, url: str, module_file: Optional[str] = None, requires_module_file: bool = False) -> HostType:
     """
@@ -383,6 +401,11 @@ def load_hosts() -> dict[str, HostType]:
     -------
     dict[str, HostType]
         A mapping from name to host module
+
+    Raises
+    ------
+    FatalError
+        A duplicate host was defined or an invalid host definition was encountered.
     """
     loaded_hosts = {}
 
@@ -393,7 +416,7 @@ def load_hosts() -> dict[str, HostType]:
             (url, module_file, requires_module_file) = host + (True,)
             module_file = os.path.join(G.inventory.base_dir(G.inventory), module_file)
         else:
-            die_error(f"invalid host '{str(host)}'", loc=G.inventory.definition_file())
+            raise FatalError(f"invalid host '{str(host)}'", loc=G.inventory.definition_file())
 
         # First qualify the url (by default this adds ssh:// to "naked" hostnames)
         url = G.inventory.qualify_url(G.inventory, url)
@@ -405,7 +428,7 @@ def load_hosts() -> dict[str, HostType]:
             module_file = G.inventory.host_module_file(G.inventory, name)
 
         if name in loaded_hosts:
-            die_error(f"duplicate host '{str(host)}'", loc=G.inventory.definition_file())
+            raise FatalError(f"duplicate host '{str(host)}'", loc=G.inventory.definition_file())
         loaded_hosts[name] = load_host(name=name, url=url, module_file=module_file, requires_module_file=requires_module_file)
 
     return loaded_hosts
@@ -437,6 +460,11 @@ def load_inventory_from_file_or_url(inventory_or_host_url: str) -> None:
     inventory_or_host_url
         Either a single host url or an inventory module (`*.py`). If a single host url
         is given without a connection schema (like `ssh://`), ssh will be used.
+
+    Raises
+    ------
+    FatalError
+        The loaded inventory was invalid.
     """
     inv: Any
     if inventory_or_host_url.endswith(".py"):

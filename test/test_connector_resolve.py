@@ -1,3 +1,4 @@
+from fora.utils import FatalError
 import pytest
 from typing import Any, cast
 from fora.connectors.ssh import SshConnector
@@ -24,7 +25,7 @@ def test_explicit_connector():
 
 def test_connector_invalid():
     h = create_host("cannotresolve")
-    with pytest.raises(SystemExit):
+    with pytest.raises(FatalError, match=r"url doesn't include a schema and no connector was specified"):
         fora.loader.resolve_connector(h)
 
 def test_connector_ssh():
@@ -36,5 +37,5 @@ def test_connector_ssh():
 def test_connector_unknown():
     h = cast(Any, create_host("unknown://user@host.localhost"))
 
-    with pytest.raises(SystemExit):
+    with pytest.raises(FatalError, match=r"no connector found for schema"):
         fora.loader.resolve_connector(h)
