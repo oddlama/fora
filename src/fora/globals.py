@@ -5,7 +5,7 @@ from typing import Any, cast
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from fora.remote_settings import RemoteSettings
-from fora.types import InventoryWrapper, GroupType, HostType
+from fora.types import GroupWrapper, InventoryWrapper, HostType
 
 class NotYetLoaded:
     """
@@ -16,17 +16,26 @@ class NotYetLoaded:
     def __contains__(self, _: Any) -> bool:
         return False
 
-args: argparse.Namespace = cast(argparse.Namespace, NotYetLoaded())
+args: argparse.Namespace = cast(argparse.Namespace, None)
 """
 The global logger. Should be used for all user-facing information logging to ensure
 that this information is displayed in a proper format and according to the user's
 verbosity preferences.
 """
 
+# TODO: move to fora main module.
 inventory: InventoryWrapper = InventoryWrapper()
 """
 The inventory module we are operating on.
-This is loaded from the inventory definition file (inventory.py).
+This is loaded from the inventory definition file.
+"""
+
+# TODO: move to fora main module.
+group: GroupWrapper = cast(GroupWrapper, None)
+"""
+This variable wraps the currently loaded group module.
+It must not be accessed anywhere else but inside the
+definition (source) of the actual group module.
 """
 
 available_groups: set[str] = cast(set[str], NotYetLoaded())
@@ -35,7 +44,7 @@ All groups that will be available after loading. Useful to raise
 errors early when referencing undefined groups.
 """
 
-groups: dict[str, GroupType] = cast(dict[str, GroupType], NotYetLoaded())
+groups: dict[str, GroupWrapper] = cast(dict[str, GroupWrapper], NotYetLoaded())
 """A dict containing all group modules loaded from the inventory, indexed by name."""
 
 group_order: list[str] = cast(list[str], NotYetLoaded())
@@ -51,6 +60,7 @@ jinja2_env: Environment = Environment(
     undefined=StrictUndefined)
 """The jinja2 environment used for templating."""
 
+# TODO: this as inventory setting?
 # The as_user, as_group, owner, group attributes will be filled in automatically
 # by the connection, once we know as which user we are operating.
 base_remote_settings = RemoteSettings(

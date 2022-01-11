@@ -7,7 +7,7 @@ from types import ModuleType
 from typing import Any, cast
 
 from fora import globals as G
-from fora.types import GroupType, HostType, ScriptType
+from fora.types import GroupWrapper, HostType, ScriptType
 
 def name() -> str:
     """
@@ -62,7 +62,7 @@ def getattr_hierarchical(host: HostType, attr: str) -> Any:
     Looks up and returns the given attribute on the host's hierarchy in the following order:
 
       1. Host variables
-      2. Group variables (respecting topological order, excluding GroupType variables)
+      2. Group variables (respecting topological order, excluding GroupWrapper variables)
       3. Script variables (excluding ScriptType variables)
       4. raises AttributeError
 
@@ -94,7 +94,7 @@ def getattr_hierarchical(host: HostType, attr: str) -> Any:
             raise AttributeError(attr)
         return vars(host)[attr]
 
-    if attr not in GroupType.__annotations__:
+    if attr not in GroupWrapper.__annotations__:
         # Look up variable on groups
         for g in G.group_order:
             # Only consider a group if the host is in that group
@@ -160,9 +160,9 @@ def vars_hierarchical(host: HostType, include_all_host_variables: bool = False) 
             continue
 
         # Add variables from groups that are neither private
-        # nor part of a group's standard variables (GroupType.__annotations__)
+        # nor part of a group's standard variables (GroupWrapper.__annotations__)
         group = G.groups[g]
-        dvars.update({attr: v for attr,v in vars(group).items() if _is_normal_var(attr, v) and attr not in GroupType.__annotations__})
+        dvars.update({attr: v for attr,v in vars(group).items() if _is_normal_var(attr, v) and attr not in GroupWrapper.__annotations__})
 
     # Lastly add all host variables, as they have the highest priority.
     dvars.update({attr: v for attr,v in vars(host).items() if include_all_host_variables

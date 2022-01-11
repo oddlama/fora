@@ -6,9 +6,10 @@ of the expected contents of the dynamically loaded modules.
 """
 
 from __future__ import annotations
+
+import os
 from dataclasses import dataclass, field
 from glob import glob
-import os
 from types import ModuleType
 from typing import TYPE_CHECKING, Any, Callable, Optional, Union, cast
 
@@ -54,7 +55,7 @@ class ModuleWrapper:
             return object.__getattribute__(self, attr)
         return getattr(module, attr)
 
-    def wrap(self, module: Any) -> None:
+    def wrap(self, module: Any, copy_members: bool = False, copy_functions: bool = False) -> None:
         """
         Replaces the currently wrapped module (if any) with the given object.
         The module should be an instance of ModuleType in most cases, but doesn't need to be.
@@ -64,13 +65,31 @@ class ModuleWrapper:
         ----------
         module
             The new module to wrap.
+        copy_members
+            Copy all current member variables of this wrapper to the wrapped module.
+            Excludes members starting with an underscore (`_`) and members of ModuleWrapper.
+        copy_functions
+            Copy all current member functions of this wrapper to the wrapped module,
+            such that calling module.function(...) is forwarded to this wrapper's self.function(...).
+            Excludes functions starting with an underscore (`_`) and functions of ModuleWrapper.
         """
         self.module = module
+        if copy_members:
+            for attr in self.__annotations__:
+                if attr.startswith("_"):
+                    continue
+                setattr(self.module, attr, getattr(self, attr))
+
+        if copy_functions:
+            for attr,v in type(self).__dict__.items():
+                if attr.startswith("_") or not callable(v):
+                    continue
+                setattr(self.module, attr, getattr(self, attr))
 
     def definition_file(self) -> str:
         """
         Returns the file from where the associated module has been loaded,
-        or "<unknown>" if no module file is associated with this wrapper.
+        or "<internal>" if no module file is associated with this wrapper.
 
         Returns
         -------
@@ -78,42 +97,99 @@ class ModuleWrapper:
             The file.
         """
         if self.module is None or self.module.__file__ is None:
-            return "<unknown>"
+            return "<internal>"
         return self.module.__file__
 
 @dataclass
-class GroupType(MockupType):
+class GroupWrapper(ModuleWrapper):
     """
-    A mockup type for group modules. This is not the actual type of an instanciated
-    module, but will reflect some of it's properties better than ModuleType. While this
-    class is mainly used to aid type-checking, its properties are transferred to the
-    actual instanciated module before the module is executed.
+    A wrapper class for group modules. This will wrap any instanciated
+    group to provide default attributes and methods for the group.
 
-    When writing a group module, you can use the API exposed in `fora.group`
-    to access/change meta information about your group module.
+    All functions and members from this wrapper will be implicitly available
+    on the wrapped group module. This means you can do the following
 
-    Example: Using meta information `(groups/some_group.py)`
-    ----
+        after("desktops") # Higher precedence than desktops
+        print(name)       # Access this group's name
 
-        from fora import group
+    instead of having to first import the wrapper API:
 
-        # Require that the 'servers' groups is processed before this group when resolving
-        # variables for a host at execution time. This is important to avoid variable
-        # definition ambiguity (which would be detected and reported as an error).
-        group.after("server")
+        from fora import group as this
+
+        this.after("desktops")
+        print(this.name)
     """
 
     name: str
     """The name of the group. Must not be changed."""
-
-    _loaded_from: str
-    """The original file path of the instanciated module."""
 
     _groups_before: set[str] = field(default_factory=set)
     """This group will be loaded before this set of other groups."""
 
     _groups_after: set[str] = field(default_factory=set)
     """This group will be loaded after this set of other groups."""
+
+    def before(self, group: str) -> None:
+        """
+        Adds a reverse-dependency on the given group.
+
+        Parameters
+        ----------
+        group
+            The group that must be loaded before this group.
+        """
+        from fora import globals as G
+        if G.group is not self:
+            raise RuntimeError("This function may only be called inside a group module definition.")
+        if group not in G.available_groups:
+            raise ValueError(f"Referenced invalid group '{group}'!")
+        if group == self.name:
+            raise ValueError("Cannot add reverse-dependency to self!")
+
+        self._groups_before.add(group)
+
+    def before_all(self, groups: list[str]) -> None:
+        """
+        Adds a reverse-dependency on all given groups.
+
+        Parameters
+        ----------
+        groups
+            The groups
+        """
+        for g in groups:
+            self.before(g)
+
+    def after(self, group: str) -> None:
+        """
+        Adds a dependency on the given group.
+
+        Parameters
+        ----------
+        group
+            The group that must be loaded after this group.
+        """
+        from fora import globals as G
+        if G.group is not self:
+            raise RuntimeError("This function may only be called inside a group module definition.")
+        if group not in G.available_groups:
+            raise ValueError(f"Referenced invalid group '{group}'!")
+        if group == self.name:
+            raise ValueError("Cannot add dependency to self!")
+
+        self._groups_after.add(group)
+
+    def after_all(self, groups: list[str]) -> None:
+        """
+        Adds a dependency on all given groups.
+
+        Parameters
+        ----------
+        groups
+            The groups
+        """
+        for g in groups:
+            self.after(g)
 
 @dataclass
 class HostType(MockupType):

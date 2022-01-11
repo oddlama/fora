@@ -79,6 +79,9 @@ def generic_package(op: Operation,
     """
     # Examine current state
     installed = set()
+    if not isinstance(packages, list):
+        raise ValueError("'packages' must be a list!")
+
     for p in packages:
         if is_installed(p):
             installed.add(p)

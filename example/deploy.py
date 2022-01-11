@@ -13,8 +13,8 @@ local.script(name="Run script",
              params=dict(filename="tolll"))
 
 system.package("neovim")
-system.service("chronyd", enabled=False)
-system.service("chronyd", enabled=True)
+#system.service("chronyd", enabled=False)
+#system.service("chronyd", enabled=True)
 
 # git.repo(name="Clone some wierd repo",
 #          url="https://github.com/oddlama/fora",

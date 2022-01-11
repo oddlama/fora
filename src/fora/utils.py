@@ -16,11 +16,10 @@ import uuid
 from types import ModuleType, TracebackType
 from typing import Any, NoReturn, Type, TypeVar, Callable, Iterable, Optional, Union
 
-import fora.group
 import fora.host
 import fora.script
 
-from fora.types import GroupType, HostType, ScriptType
+from fora.types import HostType, ScriptType
 from fora.logger import col
 
 class FatalError(Exception):
@@ -79,10 +78,6 @@ def die_error(msg: str, loc: Optional[str] = None, status_code: int = 1) -> NoRe
     """Prints a message with a colored 'error: ' prefix, and exit with the given status code afterwards."""
     print_error(msg, loc=loc)
     sys.exit(status_code)
-
-def set_this_group(value: GroupType) -> SetVariableContextManager:
-    """A context manager to temporarily set `fora.group._this` to the given value."""
-    return SetVariableContextManager(fora.group, '_this', value)
 
 def set_this_host(value: HostType) -> SetVariableContextManager:
     """A context manager to temporarily set `fora.host._this` to the given value."""

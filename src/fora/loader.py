@@ -8,12 +8,11 @@ from types import ModuleType
 from typing import Union, cast, Any, Optional
 
 import fora.host
-import fora.group
 import fora.script
 
 from fora import globals as G, logger
-from fora.types import GroupType, HostType, ScriptType
-from fora.utils import FatalError, print_error, load_py_module, rank_sort, CycleError, set_this_group, set_this_host, set_this_script
+from fora.types import GroupWrapper, HostType, ScriptType
+from fora.utils import FatalError, print_error, load_py_module, rank_sort, CycleError, set_this_host, set_this_script
 from fora.connectors.connector import Connector
 
 script_stack: list[tuple[ScriptType, inspect.FrameInfo]] = []
@@ -87,37 +86,51 @@ def load_inventory(file: str) -> ModuleType:
 
     return inventory
 
-def load_group(module_file: str) -> GroupType:
+def load_group(wrapper: GroupWrapper, module_file: str) -> None:
     """
     Loads and validates a group definition from the given file.
 
     Parameters
     ----------
+    wrapper
+        The wrapper to wrap the loaded module in.
     module_file
         The path to the file containing to the group definition
+    """
+    # Instanciate module
+    def _pre_exec(module: ModuleType) -> None:
+        G.group = wrapper
+        wrapper.wrap(module, copy_members=True, copy_functions=True)
+
+        # Normal groups always have a dependency on the global 'all' group.
+        if not wrapper.name == "all":
+            wrapper.after("all")
+
+    load_py_module(module_file, pre_exec=_pre_exec)
+    G.group = cast(GroupWrapper, None)
+
+def get_group_variables(group: GroupWrapper) -> set[str]:
+    """
+    Returns the list of all user-defined attributes for a group.
+
+    Parameters
+    ----------
+    group
+        The group module.
 
     Returns
     -------
-    GroupType
-        The loaded group module
+    set[str]
+        The user-defined attributes for the given group
     """
+    module_vars = set(attr for attr in dir(group) if
+                        not callable(getattr(group, attr)) and
+                        not attr.startswith("_") and
+                        not isinstance(getattr(group, attr), ModuleType))
+    module_vars -= set(GroupWrapper.__annotations__)
+    return module_vars
 
-    name = os.path.splitext(os.path.basename(module_file))[0]
-    meta = GroupType(name=name, _loaded_from=module_file)
-
-    # Instanciate module
-    with set_this_group(meta) as ctx:
-        # Normal groups have a dependency on the global 'all' group.
-        if not name == 'all':
-            fora.group.after("all")
-
-        def _pre_exec(module: ModuleType) -> None:
-            meta.transfer(module)
-            ctx.update(module)
-        ret = cast(GroupType, load_py_module(module_file, pre_exec=_pre_exec))
-    return ret
-
-def check_modules_for_conflicts(a: GroupType, b: GroupType) -> bool:
+def check_modules_for_conflicts(a: GroupWrapper, b: GroupWrapper) -> bool:
     """
     Asserts that two modules don't contain conflicting attributes.
     Exits with an error in case any conflicts are detected.
@@ -135,7 +148,7 @@ def check_modules_for_conflicts(a: GroupType, b: GroupType) -> bool:
         True when at least one conflicting attribute was found
     """
     # pylint: disable=protected-access
-    conflicts = list(fora.group.get_variables(a) & fora.group.get_variables(b))
+    conflicts = list(get_group_variables(a) & get_group_variables(b))
     had_conflicts = False
     for conflict in conflicts:
         if not had_conflicts:
@@ -144,7 +157,7 @@ def check_modules_for_conflicts(a: GroupType, b: GroupType) -> bool:
         print_error(f"Definition of '{conflict}' is in conflict with definition at '{b._loaded_from}", loc=a._loaded_from)
     return had_conflicts
 
-def merge_group_dependencies(groups: dict[str, GroupType]) -> None:
+def merge_group_dependencies(groups: dict[str, GroupWrapper]) -> None:
     """
     Merges the dependencies of a group module.
     This means that before and after dependencies are duplicated to the referenced group,
@@ -176,7 +189,7 @@ def merge_group_dependencies(groups: dict[str, GroupType]) -> None:
     for _,group in groups.items():
         group._groups_before = set(group._groups_before)
 
-def sort_and_validate_groups(groups: dict[str, GroupType]) -> list[str]:
+def sort_and_validate_groups(groups: dict[str, GroupWrapper]) -> list[str]:
     """
     Topologically sorts a dictionary of group modules (indexed by name), by their declared dependencies.
     Also validates that the dependencies don't contain any cycles and don't contain any conflicting assignments.
@@ -188,7 +201,7 @@ def sort_and_validate_groups(groups: dict[str, GroupType]) -> list[str]:
 
     Returns
     -------
-    list[GroupType]
+    list[GroupWrapper]
         The topologically sorted list of groups
 
     Raises
@@ -261,7 +274,7 @@ def sort_and_validate_groups(groups: dict[str, GroupType]) -> list[str]:
     # Return a topological order based on the top-rank
     return sorted(list(g for g in groups.keys()), key=lambda g: ranks_min[g])
 
-def define_special_global_variables(group_all: GroupType) -> None:
+def define_special_global_variables(group_all: GroupWrapper) -> None:
     """
     Defines special global variables on the given all group.
     Respects if the corresponding variable is already set.
@@ -269,7 +282,7 @@ def define_special_global_variables(group_all: GroupType) -> None:
     if not hasattr(group_all, 'fora_managed'):
         setattr(group_all, 'fora_managed', "This file is managed by fora.")
 
-def load_groups() -> tuple[dict[str, GroupType], list[str]]:
+def load_groups() -> tuple[dict[str, GroupWrapper], list[str]]:
     """
     Loads all groups available in the global inventory, validates their dependencies
     and returns the groups as well as a topological order respecting the dependency declarations.
@@ -281,7 +294,7 @@ def load_groups() -> tuple[dict[str, GroupType], list[str]]:
 
     Returns
     -------
-    tuple[dict[str, GroupType], list[str]]
+    tuple[dict[str, GroupWrapper], list[str]]
         A dictionary of all loaded group modules index by their name, and a valid topological order
     """
     available_groups = G.inventory.available_groups(G.inventory)
@@ -292,19 +305,19 @@ def load_groups() -> tuple[dict[str, GroupType], list[str]]:
     G.available_groups = available_groups | set(["all"])
 
     for group_name in available_groups:
+        wrapper = GroupWrapper(group_name)
         group_file = G.inventory.group_module_file(G.inventory, group_name)
         if group_file is None:
-            group = cast(GroupType, DefaultGroup())
-            GroupType(name=group_name, _loaded_from="<internal>").transfer(group)
+            wrapper.wrap(DefaultGroup())
         else:
-            group = load_group(group_file)
-        loaded_groups[group_name] = group
+            load_group(wrapper, group_file)
+        loaded_groups[group_name] = wrapper
 
     # Create default "all" group if it wasn't defined explicitly
     if "all" not in available_groups:
-        default_group = cast(GroupType, DefaultGroup())
-        GroupType(name="all", _loaded_from="<internal>").transfer(default_group)
-        loaded_groups["all"] = default_group
+        all_wrapper = GroupWrapper("all")
+        all_wrapper.wrap(DefaultGroup())
+        loaded_groups["all"] = all_wrapper
 
     # Define special global variables such as `{fora_managed` on the all group.
     define_special_global_variables(loaded_groups["all"])
@@ -370,7 +383,6 @@ def load_host(name: str, url: str, module_file: Optional[str] = None, requires_m
     """
     module_file_exists = module_file is not None and os.path.exists(module_file)
     loaded_from = module_file if module_file is not None and module_file_exists else "<internal>"
-    print(module_file, module_file_exists)
     meta = HostType(name=name, _loaded_from=loaded_from, url=url)
 
     with set_this_host(meta) as ctx:
