@@ -138,8 +138,9 @@ class GroupWrapper(ModuleWrapper):
         group
             The group that must be loaded before this group.
         """
+        import fora
         from fora import globals as G
-        if G.group is not self:
+        if fora.group is not self:
             raise RuntimeError("This function may only be called inside a group module definition.")
         if group not in G.available_groups:
             raise ValueError(f"Referenced invalid group '{group}'!")
@@ -169,8 +170,9 @@ class GroupWrapper(ModuleWrapper):
         group
             The group that must be loaded after this group.
         """
+        import fora
         from fora import globals as G
-        if G.group is not self:
+        if fora.group is not self:
             raise RuntimeError("This function may only be called inside a group module definition.")
         if group not in G.available_groups:
             raise ValueError(f"Referenced invalid group '{group}'!")
@@ -280,8 +282,7 @@ class InventoryWrapper(ModuleWrapper):
     possibly be a different one than the connector used later for the connection.
     """
 
-    @staticmethod
-    def available_groups(inventory: InventoryWrapper) -> set[str]:
+    def available_groups(self) -> set[str]:
         """
         Returns the set of available groups in this inventory.
         By default each module file in `groups_dir` (relative to the inventory module)
@@ -291,25 +292,19 @@ class InventoryWrapper(ModuleWrapper):
         returned by this function. This function should only return groups that have a
         corresponding module file.
 
-        Parameters
-        ----------
-        inventory
-            This inventory.
-
         Returns
         -------
         set[str]
             The available group definitions.
         """
         # Find group files relative to the inventory module
-        if inventory.module is None or inventory.module.__file__ is None:
+        if self.module is None or self.module.__file__ is None:
             raise RuntimeError("Cannot return base directory for an inventory module without an associated module file.")
 
-        group_files_glob = os.path.join(os.path.dirname(inventory.module.__file__), inventory.groups_dir, "*.py")
+        group_files_glob = os.path.join(os.path.dirname(self.module.__file__), self.groups_dir, "*.py")
         return set(os.path.splitext(os.path.basename(file))[0] for file in glob(group_files_glob))
 
-    @staticmethod
-    def base_dir(inventory: InventoryWrapper) -> str:
+    def base_dir(self) -> str:
         """
         Returns absolute path of this inventory's base directory, which
         is usually its containing folder.
@@ -319,30 +314,22 @@ class InventoryWrapper(ModuleWrapper):
         RuntimeError
             If the inventory has no associated module file.
 
-        Parameters
-        ----------
-        inventory
-            This inventory.
-
         Returns
         -------
         str
             The absolute base directory path.
         """
-        if inventory.module is None or inventory.module.__file__ is None:
+        if self.module is None or self.module.__file__ is None:
             raise RuntimeError("Cannot return base directory for an inventory module without an associated module file.")
-        return os.path.realpath(os.path.dirname(inventory.module.__file__))
+        return os.path.realpath(os.path.dirname(self.module.__file__))
 
-    @staticmethod
-    def group_module_file(inventory: InventoryWrapper, name: str) -> Optional[str]:
+    def group_module_file(self, name: str) -> Optional[str]:
         """
         Returns the absolute group module file path given the group's name.
         Returning None associates no group module file to the group by default.
 
         Parameters
         ----------
-        inventory
-            This inventory.
         name
             The group name to return the module file path for.
 
@@ -351,18 +338,15 @@ class InventoryWrapper(ModuleWrapper):
         Optional[str]
             The group module file path.
         """
-        return os.path.join(inventory.base_dir(inventory), inventory.groups_dir, f"{name}.py")
+        return os.path.join(self.base_dir(), self.groups_dir, f"{name}.py")
 
-    @staticmethod
-    def host_module_file(inventory: InventoryWrapper, name: str) -> Optional[str]:
+    def host_module_file(self, name: str) -> Optional[str]:
         """
         Returns the absolute host module file path given the host's name.
         Returning None associates no host module file to the host by default.
 
         Parameters
         ----------
-        inventory
-            This inventory.
         name
             The host name to return the module file path for.
 
@@ -371,10 +355,9 @@ class InventoryWrapper(ModuleWrapper):
         Optional[str]
             The host module file path.
         """
-        return os.path.join(inventory.base_dir(inventory), inventory.hosts_dir, f"{name}.py")
+        return os.path.join(self.base_dir(), self.hosts_dir, f"{name}.py")
 
-    @staticmethod
-    def qualify_url(inventory: InventoryWrapper, url: str) -> str:
+    def qualify_url(self, url: str) -> str:
         """
         Returns a valid url for any given url from the hosts array if possible.
 
@@ -388,8 +371,6 @@ class InventoryWrapper(ModuleWrapper):
 
         Parameters
         ----------
-        inventory
-            This inventory.
         url
             The url to qualify.
 
@@ -398,11 +379,10 @@ class InventoryWrapper(ModuleWrapper):
         str
             The qualified url.
         """
-        _ = (inventory)
+        _ = (self)
         return url if ':' in url else f"ssh://{url}"
 
-    @staticmethod
-    def extract_hostname(inventory: InventoryWrapper, url: str) -> str:
+    def extract_hostname(self, url: str) -> str:
         """
         Extracts the hostname from a given url. By default
         this is done via the the responsible connector.
@@ -414,8 +394,6 @@ class InventoryWrapper(ModuleWrapper):
 
         Parameters
         ----------
-        inventory
-            This inventory.
         url
             The url to extract the hostname from.
 
@@ -424,7 +402,7 @@ class InventoryWrapper(ModuleWrapper):
         str
             The extracted hostname.
         """
-        _ = (inventory)
+        _ = (self)
         from fora.connectors.connector import Connector # pylint: disable=import-outside-toplevel
         if ':' not in url:
             raise ValueError("The given url doesn't include a schema")

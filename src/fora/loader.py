@@ -7,6 +7,7 @@ from itertools import combinations
 from types import ModuleType
 from typing import Union, cast, Any, Optional
 
+import fora
 import fora.host
 import fora.script
 
@@ -34,26 +35,22 @@ class ImmediateInventory:
     def __init__(self, hosts: list[Union[str, tuple[str, str]]]) -> None:
         self.hosts = list(hosts)
 
-    @staticmethod
-    def base_dir(inventory: Any) -> str:
+    def base_dir(self) -> str:
         """An immediate inventory has no base directory."""
-        _ = (inventory)
+        _ = (self)
         raise RuntimeError("Immediate inventories have no base directory!")
 
-    @staticmethod
-    def group_module_file(inventory: Any, name: str) -> Optional[str]:
-        _ = (inventory, name)
+    def group_module_file(self, name: str) -> Optional[str]:
+        _ = (self, name)
         return None
 
-    @staticmethod
-    def host_module_file(inventory: Any, name: str) -> Optional[str]:
-        _ = (inventory, name)
+    def host_module_file(self, name: str) -> Optional[str]:
+        _ = (self, name)
         return None
 
-    @staticmethod
-    def available_groups(inventory: Any) -> set[str]:
+    def available_groups(self) -> set[str]:
         """An immediate inventory has no groups."""
-        _ = (inventory)
+        _ = (self)
         return set()
 
 def load_inventory(file: str) -> ModuleType:
@@ -99,7 +96,7 @@ def load_group(wrapper: GroupWrapper, module_file: str) -> None:
     """
     # Instanciate module
     def _pre_exec(module: ModuleType) -> None:
-        G.group = wrapper
+        fora.group = wrapper
         wrapper.wrap(module, copy_members=True, copy_functions=True)
 
         # Normal groups always have a dependency on the global 'all' group.
@@ -107,7 +104,7 @@ def load_group(wrapper: GroupWrapper, module_file: str) -> None:
             wrapper.after("all")
 
     load_py_module(module_file, pre_exec=_pre_exec)
-    G.group = cast(GroupWrapper, None)
+    fora.group = cast(GroupWrapper, None)
 
 def get_group_variables(group: GroupWrapper) -> set[str]:
     """
@@ -154,7 +151,7 @@ def check_modules_for_conflicts(a: GroupWrapper, b: GroupWrapper) -> bool:
         if not had_conflicts:
             print_error("Found group variables with ambiguous evaluation order, insert group dependency or remove one definition.")
             had_conflicts = True
-        print_error(f"Definition of '{conflict}' is in conflict with definition at '{b._loaded_from}", loc=a._loaded_from)
+        print_error(f"Definition of '{conflict}' is in conflict with definition at '{b.definition_file()}", loc=a.definition_file())
     return had_conflicts
 
 def merge_group_dependencies(groups: dict[str, GroupWrapper]) -> None:
@@ -225,14 +222,14 @@ def sort_and_validate_groups(groups: dict[str, GroupWrapper]) -> list[str]:
         ranks_t = rank_sort(gkeys, l_before, l_after) # Top-down
         ranks_b = rank_sort(gkeys, l_after, l_before) # Bottom-up
     except CycleError as e:
-        raise ValueError(f"dependency cycle detected! The cycle includes {[groups[g]._loaded_from for g in e.cycle]}.") from None
+        raise ValueError(f"dependency cycle detected! The cycle includes {[groups[g].definition_file() for g in e.cycle]}.") from None
 
     # Find cycles in dependencies by checking for the existence of any edge that doesn't increase the rank.
     # This is an error.
     for g in groups:
         for c in groups[g]._groups_after:
             if ranks_t[c] <= ranks_t[g]:
-                raise ValueError(f"dependency cycle detected! The cycle includes '{groups[g]._loaded_from}' and '{groups[c]._loaded_from}'.")
+                raise ValueError(f"dependency cycle detected! The cycle includes '{groups[g].definition_file()}' and '{groups[c].definition_file()}'.")
 
     # Find the maximum rank. Both ranking systems have the same number of ranks. This is
     # true because the longest dependency chain determines the amount of ranks, and all dependencies
@@ -297,7 +294,7 @@ def load_groups() -> tuple[dict[str, GroupWrapper], list[str]]:
     tuple[dict[str, GroupWrapper], list[str]]
         A dictionary of all loaded group modules index by their name, and a valid topological order
     """
-    available_groups = G.inventory.available_groups(G.inventory)
+    available_groups = fora.inventory.available_groups()
     loaded_groups = {}
 
     # Store available_groups so it can be accessed while groups are actually loaded.
@@ -306,7 +303,7 @@ def load_groups() -> tuple[dict[str, GroupWrapper], list[str]]:
 
     for group_name in available_groups:
         wrapper = GroupWrapper(group_name)
-        group_file = G.inventory.group_module_file(G.inventory, group_name)
+        group_file = fora.inventory.group_module_file(group_name)
         if group_file is None:
             wrapper.wrap(DefaultGroup())
         else:
@@ -319,7 +316,7 @@ def load_groups() -> tuple[dict[str, GroupWrapper], list[str]]:
         all_wrapper.wrap(DefaultGroup())
         loaded_groups["all"] = all_wrapper
 
-    # Define special global variables such as `{fora_managed` on the all group.
+    # Define special global variables such as `fora_managed` on the all group.
     define_special_global_variables(loaded_groups["all"])
 
     # Firstly, deduplicate and unify each group's before and after dependencies,
@@ -421,26 +418,26 @@ def load_hosts() -> dict[str, HostType]:
     """
     loaded_hosts = {}
 
-    for host in G.inventory.hosts:
+    for host in fora.inventory.hosts:
         if isinstance(host, str):
             (url, module_file, requires_module_file) = (host, None, False)
         elif isinstance(host, tuple):
             (url, module_file, requires_module_file) = host + (True,)
-            module_file = os.path.join(G.inventory.base_dir(G.inventory), module_file)
+            module_file = os.path.join(fora.inventory.base_dir(), module_file)
         else:
-            raise FatalError(f"invalid host '{str(host)}'", loc=G.inventory.definition_file())
+            raise FatalError(f"invalid host '{str(host)}'", loc=fora.inventory.definition_file())
 
         # First qualify the url (by default this adds ssh:// to "naked" hostnames)
-        url = G.inventory.qualify_url(G.inventory, url)
+        url = fora.inventory.qualify_url(url)
         # Next extract the "friendly" hostname which we need to find the module file for the host.
-        name = G.inventory.extract_hostname(G.inventory, url)
+        name = fora.inventory.extract_hostname(url)
 
         # Use default module file path if not explicitly given
         if isinstance(host, str):
-            module_file = G.inventory.host_module_file(G.inventory, name)
+            module_file = fora.inventory.host_module_file(name)
 
         if name in loaded_hosts:
-            raise FatalError(f"duplicate host '{str(host)}'", loc=G.inventory.definition_file())
+            raise FatalError(f"duplicate host '{str(host)}'", loc=fora.inventory.definition_file())
         loaded_hosts[name] = load_host(name=name, url=url, module_file=module_file, requires_module_file=requires_module_file)
 
     return loaded_hosts
@@ -457,7 +454,7 @@ def load_inventory_object(inventory: Any) -> None:
     """
     # The global inventory should now prefer variables from the loaded inventory
     # and only fall back to the defaults if they weren't specified.
-    G.inventory.wrap(inventory)
+    fora.inventory.wrap(inventory)
 
     # Load all groups and hosts from the global inventory.
     G.groups, G.group_order = load_groups()

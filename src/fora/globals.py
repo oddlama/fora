@@ -23,21 +23,6 @@ that this information is displayed in a proper format and according to the user'
 verbosity preferences.
 """
 
-# TODO: move to fora main module.
-inventory: InventoryWrapper = InventoryWrapper()
-"""
-The inventory module we are operating on.
-This is loaded from the inventory definition file.
-"""
-
-# TODO: move to fora main module.
-group: GroupWrapper = cast(GroupWrapper, None)
-"""
-This variable wraps the currently loaded group module.
-It must not be accessed anywhere else but inside the
-definition (source) of the actual group module.
-"""
-
 available_groups: set[str] = cast(set[str], NotYetLoaded())
 """
 All groups that will be available after loading. Useful to raise
