@@ -1,4 +1,4 @@
-import fora.group as this
+from fora import group as this
 
 this.before("desktops")
 this.before_all(["desktops"])
@@ -23,6 +23,7 @@ except ValueError as e:
     if not "dependency to self" in str(e):
         raise
 
-assert this.name() == "only34"
+assert name == "only34"
+assert this.name == "only34"
 
 overwrite_group = "only34"

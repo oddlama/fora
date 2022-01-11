@@ -1,2 +1,2 @@
-import fora.group as this
+from fora import group as this
 this.after("group2")

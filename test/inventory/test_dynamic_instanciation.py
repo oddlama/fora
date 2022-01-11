@@ -1,4 +1,5 @@
 import os
+import fora
 import fora.globals as G
 import fora.loader
 
@@ -6,9 +7,9 @@ def test_dynamic_instanciation(request):
     os.chdir(request.fspath.dirname)
 
     fora.loader.load_inventory_from_file_or_url("mock_inventories/simple_test.py")
-    assert G.inventory is not None
+    assert fora.inventory is not None
 
-    hosts = G.inventory.hosts
+    hosts = fora.inventory.hosts
     expected_files = ["host1.py", "host2.py", "host_templ.py", "host_templ.py"]
 
     for i in hosts:

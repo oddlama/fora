@@ -1,4 +1,4 @@
-import fora.group as this
+from fora import group as this
 
 this.after("desktops")
 overwrite_group = "somehosts"

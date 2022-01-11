@@ -1,8 +1,8 @@
 import pytest
 
 from fora.main import main
+import fora
 import fora.globals as G
-import fora.group
 import fora.host
 import fora.loader
 
@@ -22,16 +22,7 @@ def test_load_host_from_file():
     assert getattr(h, 'pyfile') == "host1.py"
 
 def test_group_functions_from_outside_definition():
-    with pytest.raises(RuntimeError, match="may only be called inside a group module definition"):
-        fora.group.name()
-    with pytest.raises(RuntimeError, match="may only be called inside a group module definition"):
-        fora.group.before("")
-    with pytest.raises(RuntimeError, match="may only be called inside a group module definition"):
-        fora.group.before_all([""])
-    with pytest.raises(RuntimeError, match="may only be called inside a group module definition"):
-        fora.group.after("")
-    with pytest.raises(RuntimeError, match="may only be called inside a group module definition"):
-        fora.group.after_all([""])
+    assert fora.group is None
 
 def test_host_functions_from_outside_definition():
     with pytest.raises(RuntimeError, match="may only be called inside a host module definition"):
