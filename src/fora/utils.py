@@ -334,11 +334,6 @@ def host_vars_hierarchical(host: HostWrapper, include_all_host_variables: bool =
     if fora.script is not None:
         # Add variables from the script that are neither private
         # nor part of a script's standard variables (ScriptWrapper.__annotations__)
-        print(fora.script.module)
-        print(vars(fora.script.module))
-        print("++++++++++++++++++++++++++++++")
-        print(vars(fora.script))
-        print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
         dvars.update({attr: v for attr,v in vars(fora.script.module).items() if _is_normal_var(attr, v) and attr not in ScriptWrapper.__annotations__})
 
     # Add variable from groups (reverse order so that the highest-priority
