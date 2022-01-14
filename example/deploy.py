@@ -12,7 +12,7 @@ local.script(name="Run script",
              script="deploy2.py",
              params=dict(filename="tolll"))
 
-system.package("neovim")
+#system.package("neovim")
 #system.service("chronyd", enabled=False)
 #system.service("chronyd", enabled=True)
 
@@ -26,3 +26,5 @@ system.package("neovim")
 
 if "desktops" in host.groups:
     print("is desktop")
+
+local.script(name="CCCCCCCCCC", script="sub/deploy.py")

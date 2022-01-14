@@ -6,35 +6,37 @@ of the expected contents of the dynamically loaded modules.
 """
 
 from __future__ import annotations
+import inspect
 
 import os
 from dataclasses import dataclass, field
 from glob import glob
-from types import ModuleType
-from typing import TYPE_CHECKING, Any, Callable, Optional, Union, cast
+from types import ModuleType, TracebackType
+from typing import TYPE_CHECKING, Any, Callable, Optional, Type, TypeVar, Union, cast
 
-from fora.remote_settings import RemoteSettings
+T = TypeVar('T')
+
+from fora.remote_settings import RemoteSettings, ResolvedRemoteSettings
 if TYPE_CHECKING:
     from fora.connection import Connection
     from fora.connectors.connector import Connector
 
-class MockupType(ModuleType):
-    """
-    A base class for all module mockup types, which allow a
-    transfer of variables to a real dynamically loaded module.
-    """
+class RemoteDefaultsContext:
+    """A context manager to overlay remote defaults on a stack of defaults."""
+    def __init__(self, obj: ScriptWrapper, new_defaults: RemoteSettings):
+        self.obj = obj
+        self.new_defaults = new_defaults
 
-    __annotations__: dict[str, Any]
-    """Provided by the dataclass decorator."""
+    def __enter__(self) -> ResolvedRemoteSettings:
+        # pylint: disable=import-outside-toplevel,cyclic-import
+        import fora
+        self.new_defaults = fora.host.connection.resolve_defaults(self.new_defaults)
+        self.obj._defaults_stack.append(self.new_defaults)
+        return cast(ResolvedRemoteSettings, fora.host.connection.base_settings.overlay(self.new_defaults))
 
-    def __str__(self) -> str:
-        return f"<'{getattr(self, 'name')}' from '{getattr(self, '_loaded_from')}'>"
-
-    def transfer(self, module: ModuleType) -> None:
-        """Transfers all annotated variables from this object to the given module."""
-        for var in self.__annotations__:
-            if hasattr(self, var):
-                setattr(module, var, getattr(self, var))
+    def __exit__(self, exc_type: Optional[Type[BaseException]], exc: Optional[BaseException], traceback: Optional[TracebackType]) -> None:
+        _ = (exc_type, exc, traceback)
+        self.obj._defaults_stack.pop()
 
 class ModuleWrapper:
     """
@@ -61,7 +63,6 @@ class ModuleWrapper:
         if attr.startswith("__") or module is None or not hasattr(module, attr):
             object.__setattr__(self, attr, value)
         else:
-            print("set self: ", attr, value)
             module.__setattr__(attr, value)
 
     def wrap(self, module: Any, copy_members: bool = False, copy_functions: bool = False) -> None:
@@ -490,7 +491,7 @@ class InventoryWrapper(ModuleWrapper):
         return Connector.registered_connectors[schema].extract_hostname(url)
 
 @dataclass
-class ScriptType(MockupType):
+class ScriptWrapper(ModuleWrapper):
     """
     A mockup type for script modules. This is not the actual type of an instanciated
     module, but will reflect some of it's properties better than ModuleType. While this
@@ -504,14 +505,103 @@ class ScriptType(MockupType):
     name: str
     """The name of the script. Must not be changed."""
 
-    _loaded_from: str
-    """The original file path of the instanciated module."""
-
-    _params: dict[str, Any] = field(default_factory=dict)
-    """Parameters passed to the script (only set if the script isn't the main script)."""
-
     _defaults_stack: list[RemoteSettings] = field(default_factory=lambda: [RemoteSettings()])
     """
     The stack of remote execution defaults. The stack must only be changed by using
     the context manager returned in `fora.script.defaults`.
     """
+
+    def defaults(self,
+                 as_user: Optional[str] = None,
+                 as_group: Optional[str] = None,
+                 owner: Optional[str] = None,
+                 group: Optional[str] = None,
+                 file_mode: Optional[str] = None,
+                 dir_mode: Optional[str] = None,
+                 umask: Optional[str] = None,
+                 cwd: Optional[str] = None) -> RemoteDefaultsContext:
+        """
+        Returns a context manager to incrementally change the remote execution defaults.
+
+        This function is implicitly available on the wrapped script module.
+        This means you can do the following
+
+            with defaults(owner="root", file_mode="644", dir_mode="755"):
+                # ... execute some operations
+
+        instead of having to first import the wrapper API:
+
+            from fora import script
+            with script.defaults(owner="root", file_mode="644", dir_mode="755"):
+                # ... execute some operations
+        """
+        def canonicalize_mode(mode: Optional[str]) -> Optional[str]:
+            return None if mode is None else oct(int(mode, 8))[2:]
+
+        requested_defaults = RemoteSettings(
+                as_user=as_user,
+                as_group=as_group,
+                owner=owner,
+                group=group,
+                file_mode=canonicalize_mode(file_mode),
+                dir_mode=canonicalize_mode(dir_mode),
+                umask=canonicalize_mode(umask),
+                cwd=cwd)
+
+        # pylint: disable=import-outside-toplevel,cyclic-import
+        import fora
+
+        new_defaults = fora.host.connection.base_settings
+        new_defaults = new_defaults.overlay(self.current_defaults())
+        new_defaults = new_defaults.overlay(requested_defaults)
+        return RemoteDefaultsContext(self, new_defaults)
+
+    def current_defaults(self) -> RemoteSettings:
+        """
+        Returns the fully resolved currently active defaults.
+
+        Returns
+        -------
+        RemoteSettings
+            The currently active remote defaults.
+        """
+        return self._defaults_stack[-1]
+
+    def Params(self, params_cls: Type[T]) -> Type[T]:
+        """
+        Decorator used to declare script parameters.
+
+        This function is implicitly available on the wrapped script module.
+        This means you can do the following
+
+            @Params
+            class params:
+                my_parameter: str
+
+        instead of having to first import the wrapper API:
+
+            from fora import script
+
+            @script.Params
+            class params:
+                my_parameter: str
+        """
+        # Find the calling site's module and get the passed parameters from there
+        fi = inspect.stack()[1]
+        params_dict: Optional[dict[str, Any]] = fi.frame.f_globals.get('_params', None)
+
+        for param in params_cls.__annotations__:
+            has_default = hasattr(params_cls, param)
+
+            # Get the given parameter value, or the default value if none was supplied.
+            # Raise an exception if no value was given but the parameter is required.
+            if params_dict is None or param not in params_dict:
+                if not has_default:
+                    raise RuntimeError(f"This script requires parameter '{param}', but no such parameter was given.")
+                value = getattr(params_cls, param)
+            else:
+                value = params_dict[param]
+
+            setattr(params_cls, param, value)
+
+        return params_cls

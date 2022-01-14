@@ -8,13 +8,12 @@ from types import ModuleType
 from typing import Union, cast, Any, Optional
 
 import fora
-import fora.script
 
 from fora import globals as G, logger
-from fora.types import GroupWrapper, HostWrapper, ScriptType
-from fora.utils import FatalError, print_error, load_py_module, rank_sort, CycleError, set_this_script
+from fora.types import GroupWrapper, HostWrapper, ScriptWrapper
+from fora.utils import FatalError, print_error, load_py_module, rank_sort, CycleError
 
-script_stack: list[tuple[ScriptType, inspect.FrameInfo]] = []
+script_stack: list[tuple[ScriptWrapper, inspect.FrameInfo]] = []
 """A stack of all currently executed scripts ((name, file), frame)."""
 
 class DefaultGroup:
@@ -463,18 +462,30 @@ def run_script(script: str,
         if name is None:
             name = os.path.splitext(os.path.basename(script))[0]
 
-        meta = ScriptType(name, script)
-        script_stack.append((meta, frame))
+        wrapper = ScriptWrapper(name)
+        script_stack.append((wrapper, frame))
         try:
-            with set_this_script(meta) as ctx:
-                # New script instance starts with fresh set of default values.
-                # Use defaults() here to start with the connections base settings.
-                with fora.script.defaults():
+            previous_script = fora.script
+            previous_working_directory = os.getcwd()
+            canonical_script = os.path.realpath(script)
+
+            # Change into script's containing directory, so a script
+            # can reliably use relative paths while it is executed.
+            new_working_directory = os.path.dirname(canonical_script)
+            os.chdir(new_working_directory)
+
+            try:
+                fora.script = wrapper
+                # New script instance should start with a fresh set of default values.
+                # Therefore, we use defaults() here to apply the connection's base settings.
+                with wrapper.defaults():
                     def _pre_exec(module: ModuleType) -> None:
-                        meta.transfer(module)
-                        ctx.update(module)
+                        wrapper.wrap(module, copy_members=True, copy_functions=True)
                         setattr(module, '_params', params or {})
-                    load_py_module(script, pre_exec=_pre_exec)
+                    load_py_module(canonical_script, pre_exec=_pre_exec)
+            finally:
+                os.chdir(previous_working_directory)
+                fora.script = previous_script
         except Exception as e:
             # Save the current script_stack in any exception thrown from this context
             # for later use in any exception handler.

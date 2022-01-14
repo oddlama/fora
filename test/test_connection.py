@@ -9,10 +9,9 @@ from typing import cast
 import fora.globals as G
 import fora
 import fora.loader
-import fora.script
 from fora.connection import Connection
 from fora.connectors.tunnel_dispatcher import RemoteOSError
-from fora.types import HostWrapper, ScriptType
+from fora.types import HostWrapper, ScriptWrapper
 
 host: HostWrapper = cast(HostWrapper, None)
 connection: Connection = cast(Connection, None)
@@ -27,7 +26,10 @@ def test_init():
     global host
     host = G.hosts["localhost"]
     fora.host = host
-    fora.script._this = ScriptType("__internal_test", "__internal_test")
+    fora.script = ScriptWrapper("__internal_test")
+    class Empty:
+        pass
+    fora.script.wrap(Empty())
 
 def current_test_user():
     return pwd.getpwuid(os.getuid()).pw_name

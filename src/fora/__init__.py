@@ -1,7 +1,7 @@
 """The main module of fora."""
 
 from typing import cast
-from fora.types import GroupWrapper, HostWrapper, InventoryWrapper
+from fora.types import GroupWrapper, HostWrapper, InventoryWrapper, ScriptWrapper
 
 inventory: InventoryWrapper = InventoryWrapper()
 """
@@ -22,3 +22,6 @@ This variable wraps the currently loaded hosts module (in case a host is just be
 or the currently active host while executing a script. It must not be used anywhere else
 but inside the definition (source) of the actual module or inside of a script.
 """
+
+script: ScriptWrapper = cast(ScriptWrapper, None) # Cast None to ease typechecking in user code.
+"""This variable wraps the currently executed script module (if any)."""

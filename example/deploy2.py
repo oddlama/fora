@@ -1,7 +1,7 @@
 from fora.operations import files
-from fora.script import defaults, script_params
+from fora import script
 
-@script_params
+@script.Params
 class params:
     filename: str
 
@@ -9,7 +9,9 @@ class params:
 #local.script(name="Run script",
 #             script="deploy.py")
 
-with defaults():
+print(params.filename)
+
+with script.defaults():
     pass
 
 files.upload_content(name=params.filename,

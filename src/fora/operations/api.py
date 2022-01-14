@@ -8,9 +8,9 @@ from functools import wraps
 from typing import Callable, cast, Any, Optional
 from types import TracebackType, FrameType
 
-import fora.script
+import fora
 from fora import globals as G, logger
-from fora.script import RemoteDefaultsContext
+from fora.types import RemoteDefaultsContext
 
 class OperationError(Exception):
     """An exception that indicates an error while executing an operation."""
@@ -97,7 +97,7 @@ class Operation:
             print()
 
     def defaults(self, *args: Any, **kwargs: Any) -> RemoteDefaultsContext:
-        """Sets defaults on the current script. See `fora.types.ScriptType.defaults`."""
+        """Sets defaults on the current script. See `fora.types.ScriptWrapper.defaults`."""
         _ = (self)
         return fora.script.defaults(*args, **kwargs)
 

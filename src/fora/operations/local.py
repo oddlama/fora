@@ -1,6 +1,4 @@
-""" Provides operations that are related to the local system on which the
-fora scripts are executed.
-"""
+"""Provides operations that are related to the local system on which the fora scripts are executed."""
 
 import inspect
 import os
@@ -21,9 +19,7 @@ def script(script: str, # pylint: disable=redefined-outer-name
     by annotating them. (The annotation then transparently extracts the
     value from a separately passed global variable).
 
-        from fora.script import params
-
-        @params
+        @Params
         class params:
             username: str
             website_title: str = "Default website title."
@@ -44,9 +40,9 @@ def script(script: str, # pylint: disable=redefined-outer-name
     """
     # Asserts that the call is not recursive, if not explicitly allowed
     if not recursive:
-        for meta, _ in script_stack:
+        for wrapper, _ in script_stack:
             # pylint: disable=protected-access
-            if os.path.samefile(script, meta._loaded_from):
+            if os.path.samefile(script, wrapper.definition_file()):
                 raise ValueError(f"invalid recursive call to script '{script}'. Use recursive=True to allow this.")
 
     outer_frame = inspect.getouterframes(inspect.currentframe())[1]

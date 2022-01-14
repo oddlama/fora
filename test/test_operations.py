@@ -12,11 +12,10 @@ from fora.connection import Connection
 from fora.main import main
 from fora.operations import local, files, system
 from fora.operations.api import OperationError
-from fora.types import HostWrapper, HostWrapper, ScriptType
+from fora.types import HostWrapper, HostWrapper, ScriptWrapper
 import fora
 import fora.globals as G
 import fora.loader
-import fora.script
 
 host: HostWrapper = cast(HostWrapper, None)
 connection: Connection = cast(Connection, None)
@@ -34,7 +33,10 @@ def test_init():
     global host
     host = G.hosts["localhost"]
     fora.host = host
-    fora.script._this = ScriptType("__internal_test", "__internal_test")
+    fora.script = ScriptWrapper("__internal_test")
+    class Empty:
+        pass
+    fora.script.wrap(Empty())
 
 def test_open_connection():
     global connection

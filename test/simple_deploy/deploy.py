@@ -1,8 +1,7 @@
 from fora import host
 from fora.operations import files
-from fora.script import script_params
 
-@script_params
+@Params
 class params:
     filename: str = "def"
 

@@ -8,7 +8,7 @@ from __future__ import annotations
 from types import TracebackType
 from typing import Type, cast, Optional
 
-import fora.script
+import fora
 from fora import globals as G, logger
 from fora.connectors.connector import Connector, CompletedRemoteCommand, GroupEntry, StatResult, UserEntry
 from fora.remote_settings import RemoteSettings
@@ -68,7 +68,7 @@ class Connection:
             The resolved settings
         """
         # pylint: disable=protected-access
-        if fora.script._this is None:
+        if fora.script is None:
             raise RuntimeError("Cannot resolve defaults, when no script is currently running.")
 
         # Overlay settings on top of defaults

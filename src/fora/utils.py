@@ -18,7 +18,7 @@ from typing import Any, NoReturn, Type, TypeVar, Callable, Iterable, Optional, U
 
 from fora import globals as G
 
-from fora.types import GroupWrapper, HostWrapper, ScriptType
+from fora.types import GroupWrapper, HostWrapper, ScriptWrapper
 from fora.logger import col
 
 class FatalError(Exception):
@@ -41,28 +41,6 @@ class CycleError(ValueError):
         super().__init__(msg)
         self.cycle = cycle
 
-# TODO: delete
-class SetVariableContextManager:
-    """A context manager that sets a variable on enter and resets it to the previous value on exit."""
-    def __init__(self, obj: object, var: str, value: Any):
-        self.obj: object = obj
-        self.var: str = var
-        self.value: Any = value
-        self.old_value: Any = getattr(self.obj, self.var)
-
-    def __enter__(self) -> SetVariableContextManager:
-        setattr(self.obj, self.var, self.value)
-        return self
-
-    def __exit__(self, exc_type: Optional[Type[BaseException]], exc: Optional[BaseException], tb: Optional[TracebackType]) -> None:
-        _ = (exc_type, exc, tb)
-        setattr(self.obj, self.var, self.old_value)
-
-    def update(self, value: Any) -> None:
-        """Updates the stored variable while the context manager is active."""
-        self.value = value
-        setattr(self.obj, self.var, self.value)
-
 def print_warning(msg: str) -> None:
     """Prints a message with a (possibly colored) 'warning: ' prefix."""
     print(f"{col('[1;33m')}warning:{col('[m')} {msg}")
@@ -78,11 +56,6 @@ def die_error(msg: str, loc: Optional[str] = None, status_code: int = 1) -> NoRe
     """Prints a message with a colored 'error: ' prefix, and exit with the given status code afterwards."""
     print_error(msg, loc=loc)
     sys.exit(status_code)
-
-def set_this_script(value: ScriptType) -> SetVariableContextManager:
-    """A context manager to temporarily set `fora.script._this` to the given value."""
-    import fora.script
-    return SetVariableContextManager(fora.script, '_this', value)
 
 def load_py_module(file: str, pre_exec: Optional[Callable[[ModuleType], None]] = None) -> ModuleType:
     """
@@ -178,7 +151,7 @@ def rank_sort(vertices: Iterable[T], preds_of: Callable[[T], Iterable[T]], child
 
     return ranks
 
-def script_trace(script_stack: list[tuple[ScriptType, inspect.FrameInfo]],
+def script_trace(script_stack: list[tuple[ScriptWrapper, inspect.FrameInfo]],
                  include_root: bool = False) -> str:
     """
     Creates a script trace similar to a python backtrace.
@@ -274,7 +247,7 @@ def host_getattr_hierarchical(host: HostWrapper, attr: str) -> Any:
 
       1. Host variables
       2. Group variables (respecting topological order, excluding GroupWrapper variables)
-      3. Script variables (excluding ScriptType variables)
+      3. Script variables (excluding ScriptWrapper variables)
       4. raises AttributeError
 
     If the attribute starts with an underscore, the lookup will always be from the host object
@@ -320,13 +293,13 @@ def host_getattr_hierarchical(host: HostWrapper, attr: str) -> Any:
                 if _is_normal_var(attr, value):
                     return value
 
-    if attr not in ScriptType.__annotations__:
+    if attr not in ScriptWrapper.__annotations__:
         # Look up variable on current script
         # pylint: disable=protected-access,import-outside-toplevel,cyclic-import
-        import fora.script
-        if fora.script._this is not None:
-            if hasattr(fora.script._this, attr):
-                value = getattr(fora.script._this, attr)
+        import fora
+        if fora.script is not None:
+            if hasattr(fora.script, attr):
+                value = getattr(fora.script, attr)
                 if _is_normal_var(attr, value):
                     return value
 
@@ -357,11 +330,16 @@ def host_vars_hierarchical(host: HostWrapper, include_all_host_variables: bool =
 
     # First, add all variable from the current script
     # pylint: disable=protected-access,import-outside-toplevel,cyclic-import
-    import fora.script
-    if fora.script._this is not None:
+    import fora
+    if fora.script is not None:
         # Add variables from the script that are neither private
-        # nor part of a script's standard variables (ScriptType.__annotations__)
-        dvars.update({attr: v for attr,v in vars(fora.script._this).items() if _is_normal_var(attr, v) and attr not in ScriptType.__annotations__})
+        # nor part of a script's standard variables (ScriptWrapper.__annotations__)
+        print(fora.script.module)
+        print(vars(fora.script.module))
+        print("++++++++++++++++++++++++++++++")
+        print(vars(fora.script))
+        print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+        dvars.update({attr: v for attr,v in vars(fora.script.module).items() if _is_normal_var(attr, v) and attr not in ScriptWrapper.__annotations__})
 
     # Add variable from groups (reverse order so that the highest-priority
     # group overwrites variables from lower priorities.
