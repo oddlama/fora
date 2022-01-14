@@ -14,7 +14,7 @@ def test_group_variable_conflict(request, capsys):
     os.chdir(request.fspath.dirname)
 
     with pytest.raises(SystemExit):
-        fora.loader.load_inventory_from_file_or_url("inventory.py")
+        fora.loader.load_inventory("inventory.py")
     _, err = capsys.readouterr()
     assert "conflict" in err
 

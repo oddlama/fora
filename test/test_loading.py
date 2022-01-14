@@ -7,7 +7,7 @@ import fora.loader
 def test_init():
     # This function is needed to init fora global state,
     # which we will test and need for testing.
-    fora.loader.load_inventory_from_file_or_url("local:")
+    fora.loader.load_inventory("local:")
 
 def test_load_host_url():
     h = fora.loader.load_host("some.localhost", "ssh://user@some.localhost")

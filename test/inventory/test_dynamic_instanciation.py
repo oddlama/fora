@@ -6,7 +6,7 @@ import fora.loader
 def test_dynamic_instanciation(request):
     os.chdir(request.fspath.dirname)
 
-    fora.loader.load_inventory_from_file_or_url("mock_inventories/simple_test.py")
+    fora.loader.load_inventory("mock_inventories/simple_test.py")
     assert fora.inventory is not None
 
     hosts = fora.inventory.hosts

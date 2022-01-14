@@ -56,6 +56,7 @@ def repo(url: str,
     op
         The operation wrapper. Must not be supplied by the user.
     """
+    # pylint: disable=too-many-return-statements,too-many-branches,too-many-statements
     _ = (name, check) # Processed automatically.
     check_absolute_path(path)
     op.desc(f"{path} [{url}]")

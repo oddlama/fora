@@ -67,16 +67,15 @@ def indent() -> IndentationContext:
 
 def indent_prefix() -> str:
     """Returns the indentation prefix for the current indentation level."""
-    if use_color():
-        ret = ""
-        for i in range(state.indentation_level):
-            if i % 2 == 0:
-                ret += "[90m│[m "
-            else:
-                ret += "[90m╵[m "
-        return ret
-    else:
+    if not use_color():
         return "  " * state.indentation_level
+    ret = ""
+    for i in range(state.indentation_level):
+        if i % 2 == 0:
+            ret += "[90m│[m "
+        else:
+            ret += "[90m╵[m "
+    return ret
 
 def debug(msg: str) -> None:
     """Prints the given message only in debug mode."""

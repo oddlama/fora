@@ -4,7 +4,7 @@ import fora.loader
 
 def test_empty(request):
     os.chdir(request.fspath.dirname)
-    fora.loader.load_inventory_from_file_or_url("mock_inventories/empty.py")
+    fora.loader.load_inventory("mock_inventories/empty.py")
     assert fora.inventory is not None
     assert fora.inventory.hosts == []
 

@@ -28,7 +28,7 @@ def test_init():
         changes = True
         verbose = 99
     G.args = DefaultArgs()
-    fora.loader.load_inventory_from_file_or_url("ssh://root@localhost")
+    fora.loader.load_inventory("ssh://root@localhost")
 
     global host
     host = G.hosts["localhost"]

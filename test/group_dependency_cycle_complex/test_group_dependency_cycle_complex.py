@@ -15,6 +15,6 @@ def test_group_dependency_cycle_complex(request):
     os.chdir(request.fspath.dirname)
 
     with pytest.raises(FatalError, match="cycle"):
-        fora.loader.load_inventory_from_file_or_url("inventory.py")
+        fora.loader.load_inventory("inventory.py")
 
     os.chdir(request.config.invocation_dir)

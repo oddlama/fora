@@ -5,6 +5,10 @@ types also help the static type checker, as it then has a better understanding
 of the expected contents of the dynamically loaded modules.
 """
 
+# This warning is too noisy, as it also triggers when importing
+# inside functions below, which is done explicitly to avoid cyclic imports.
+# pylint: disable=import-outside-toplevel,cyclic-import
+
 from __future__ import annotations
 import inspect
 
@@ -13,13 +17,13 @@ from dataclasses import dataclass, field
 from glob import glob
 from types import ModuleType, TracebackType
 from typing import TYPE_CHECKING, Any, Callable, Optional, Type, TypeVar, Union, cast
-
-T = TypeVar('T')
-
 from fora.remote_settings import RemoteSettings, ResolvedRemoteSettings
+
 if TYPE_CHECKING:
     from fora.connection import Connection
     from fora.connectors.connector import Connector
+
+T = TypeVar('T')
 
 class RemoteDefaultsContext:
     """A context manager to overlay remote defaults on a stack of defaults."""
@@ -317,11 +321,10 @@ class HostWrapper(ModuleWrapper):
 
         if ':' not in self.url:
             raise FatalError("url doesn't include a schema and no connector was specified explicitly", loc=self.definition_file())
-        schema = self.url.split(':')[0]
-        if schema in Connector.registered_connectors:
-            return Connector.registered_connectors[schema](self.url, self)
-        else:
+        schema = self.url.split(':', maxsplit=1)[0]
+        if schema not in Connector.registered_connectors:
             raise FatalError(f"no connector found for schema '{schema}'", loc=self.definition_file())
+        return Connector.registered_connectors[schema](self.url, self)
 
     def __getattr__(self, attr: str) -> Any:
         from fora.utils import host_getattr_hierarchical
@@ -586,6 +589,7 @@ class ScriptWrapper(ModuleWrapper):
             class params:
                 my_parameter: str
         """
+        _ = (self)
         # Find the calling site's module and get the passed parameters from there
         fi = inspect.stack()[1]
         params_dict: Optional[dict[str, Any]] = fi.frame.f_globals.get('_params', None)

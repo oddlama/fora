@@ -10,7 +10,7 @@ from typing import Union, cast, Any, Optional
 import fora
 
 from fora import globals as G, logger
-from fora.types import GroupWrapper, HostWrapper, ScriptWrapper
+from fora.types import GroupWrapper, HostWrapper, InventoryWrapper, ScriptWrapper
 from fora.utils import FatalError, print_error, load_py_module, rank_sort, CycleError
 
 script_stack: list[tuple[ScriptWrapper, inspect.FrameInfo]] = []
@@ -35,11 +35,13 @@ class ImmediateInventory:
         _ = (self)
         raise RuntimeError("Immediate inventories have no base directory!")
 
-    def group_module_file(self, name: str) -> Optional[str]:
+    def group_module_file(self, name: str) -> Optional[str]: # pylint: disable=useless-return
+        """An immediate inventory has no group modules."""
         _ = (self, name)
         return None
 
-    def host_module_file(self, name: str) -> Optional[str]:
+    def host_module_file(self, name: str) -> Optional[str]: # pylint: disable=useless-return
+        """An immediate inventory has no host modules."""
         _ = (self, name)
         return None
 
@@ -47,36 +49,6 @@ class ImmediateInventory:
         """An immediate inventory has no groups."""
         _ = (self)
         return set()
-
-def load_inventory(file: str) -> ModuleType:
-    """
-    Loads and validates the inventory definition from the given module file.
-
-    Parameters
-    ----------
-    file
-        The inventory module file to load
-
-    Returns
-    -------
-    ModuleType
-        The loaded inventory module
-
-    Raises
-    ------
-    FatalError
-        The loaded inventory was invalid.
-    """
-    inventory = load_py_module(file)
-
-    # Check that the hosts definition is valid.
-    if not hasattr(inventory, 'hosts'):
-        raise FatalError("inventory must define a list of hosts!", loc=file)
-    hosts = getattr(inventory, "hosts")
-    if not isinstance(hosts, list):
-        raise FatalError(f"inventory.hosts must be of type list, not {type(hosts)}!", loc=file)
-
-    return inventory
 
 def load_group(name: str, module_file: Optional[str]) -> GroupWrapper:
     """
@@ -104,7 +76,7 @@ def load_group(name: str, module_file: Optional[str]) -> GroupWrapper:
         wrapper.wrap(module, copy_members=True, copy_functions=True)
 
         # Normal groups always have a dependency on the global 'all' group.
-        if not wrapper.name == "all":
+        if wrapper.name != "all":
             wrapper.after("all")
 
     # Instanciate module
@@ -307,7 +279,7 @@ def load_groups() -> tuple[dict[str, GroupWrapper], list[str]]:
     try:
         topological_order = sort_and_validate_groups(loaded_groups)
     except ValueError as e:
-        raise FatalError(str(e))
+        raise FatalError(str(e)) from e
     return (loaded_groups, topological_order)
 
 def load_host(name: str, url: str, module_file: Optional[str] = None, requires_module_file: bool = False) -> HostWrapper:
@@ -392,32 +364,15 @@ def load_hosts() -> dict[str, HostWrapper]:
 
     return loaded_hosts
 
-def load_inventory_object(inventory: Any) -> None:
+def load_inventory(inventory_file_or_host_url: str) -> None:
     """
-    Loads the global inventory from the given inventory object.
-    in the fora module.
+    Loads the global inventory from the given filename or single-host url
+    and validates the definintions.
 
     Parameters
     ----------
-    inventory
-        The inventory object.
-    """
-    # The global inventory should now prefer variables from the loaded inventory
-    # and only fall back to the defaults if they weren't specified.
-    fora.inventory.wrap(inventory)
-
-    # Load all groups and hosts from the global inventory.
-    G.groups, G.group_order = load_groups()
-    G.hosts = load_hosts()
-
-def load_inventory_from_file_or_url(inventory_or_host_url: str) -> None:
-    """
-    Loads the global inventory from the given filename or single-host url.
-
-    Parameters
-    ----------
-    inventory_or_host_url
-        Either a single host url or an inventory module (`*.py`). If a single host url
+    inventory_file_or_host_url
+        Either a single host url or an inventory module file (`*.py`). If a single host url
         is given without a connection schema (like `ssh://`), ssh will be used.
 
     Raises
@@ -425,15 +380,29 @@ def load_inventory_from_file_or_url(inventory_or_host_url: str) -> None:
     FatalError
         The loaded inventory was invalid.
     """
-    inv: Any
-    if inventory_or_host_url.endswith(".py"):
+    wrapper = InventoryWrapper()
+    fora.inventory = wrapper
+
+    if inventory_file_or_host_url.endswith(".py"):
         # Load inventory from module file
-        inv = load_inventory(inventory_or_host_url)
+        def _pre_exec(module: ModuleType) -> None:
+            wrapper.wrap(module)
+
+        inv = load_py_module(inventory_file_or_host_url, pre_exec=_pre_exec)
+
+        # Check that the hosts definition is valid.
+        if not hasattr(inv, 'hosts'):
+            raise FatalError("inventory must define a list of hosts!", loc=wrapper.definition_file())
+        hosts = getattr(inv, "hosts")
+        if not isinstance(hosts, list):
+            raise FatalError(f"inventory.hosts must be of type list, not {type(hosts)}!", loc=wrapper.definition_file())
     else:
         # Create an immediate inventory with just the given host.
-        inv = ImmediateInventory([inventory_or_host_url])
+        wrapper.wrap(ImmediateInventory([inventory_file_or_host_url]))
 
-    load_inventory_object(inv)
+    # Load all groups and hosts from the global inventory.
+    G.groups, G.group_order = load_groups()
+    G.hosts = load_hosts()
 
 def run_script(script: str,
                frame: inspect.FrameInfo,

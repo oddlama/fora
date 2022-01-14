@@ -12,7 +12,7 @@ from typing import NoReturn, Optional, cast
 import fora
 from fora import globals as G, logger
 from fora.connection import open_connection
-from fora.loader import load_inventory_from_file_or_url, run_script
+from fora.loader import load_inventory, run_script
 from fora.types import HostWrapper
 from fora.utils import FatalError, die_error, install_exception_hook
 from fora.version import version
@@ -27,7 +27,7 @@ def main_run(args: argparse.Namespace) -> None:
         The parsed arguments
     """
     try:
-        load_inventory_from_file_or_url(args.inventory)
+        load_inventory(args.inventory)
     except FatalError as e:
         die_error(str(e), loc=e.loc)
 

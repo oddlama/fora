@@ -21,7 +21,7 @@ def test_init():
         debug = False
         diff = False
     G.args = DefaultArgs()
-    fora.loader.load_inventory_from_file_or_url("local:")
+    fora.loader.load_inventory("local:")
 
     global host
     host = G.hosts["localhost"]
