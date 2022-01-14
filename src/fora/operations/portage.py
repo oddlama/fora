@@ -2,14 +2,14 @@
 
 from functools import partial
 from typing import Optional
-import fora.host
+import fora
 from fora.operations.api import Operation, OperationResult, operation
 from fora.operations.utils import generic_package, package_manager
 
 def _is_installed(package: str, opts: Optional[list[str]] = None) -> bool: # pylint: disable=redefined-outer-name
     """Checks whether a package is installed with portage on the remote host."""
     opts = opts or []
-    ret = fora.host.current_host.connection.run(["emerge", "--info"] + opts + ["--", package])
+    ret = fora.host.connection.run(["emerge", "--info"] + opts + ["--", package])
     return ret.stdout is not None and b"was built with the following" in ret.stdout
 
 def _install(package: str, opts: Optional[list[str]] = None, oneshot: bool = False) -> None: # pylint: disable=redefined-outer-name
@@ -17,12 +17,12 @@ def _install(package: str, opts: Optional[list[str]] = None, oneshot: bool = Fal
     opts = opts or []
     if oneshot:
         opts = ["--oneshot"] + opts
-    fora.host.current_host.connection.run(["emerge", "--color=y", "--verbose"] + opts + ["--", package])
+    fora.host.connection.run(["emerge", "--color=y", "--verbose"] + opts + ["--", package])
 
 def _uninstall(package: str, opts: Optional[list[str]] = None) -> None: # pylint: disable=redefined-outer-name
     """Uninstalls a package with portage on the remote host."""
     opts = opts or []
-    fora.host.current_host.connection.run(["emerge", "--color=y", "--verbose", "--depclean"] + opts + ["--", package])
+    fora.host.connection.run(["emerge", "--color=y", "--verbose", "--depclean"] + opts + ["--", package])
 
 @package_manager(command="emerge")
 @operation("package")

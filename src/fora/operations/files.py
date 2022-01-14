@@ -1,6 +1,4 @@
-"""
-Provides operations related to creating and modifying files and directories.
-"""
+"""Provides operations related to creating and modifying files and directories."""
 
 import os
 from os.path import join, relpath, normpath
@@ -9,10 +7,11 @@ from typing import Optional, Union
 from jinja2 import Template
 from jinja2.exceptions import TemplateNotFound, UndefinedError
 
-import fora.host
+import fora
 from fora import globals as G, logger
 from fora.operations.api import Operation, OperationResult, operation
 from fora.operations.utils import check_absolute_path, save_content
+from fora.utils import host_vars_hierarchical
 
 def _render_template(templ: Template, context: Optional[dict]) -> bytes:
     """
@@ -33,16 +32,16 @@ def _render_template(templ: Template, context: Optional[dict]) -> bytes:
         The utf-8 encoded rendered template.
     """
 
-    dvars = fora.host.vars_hierarchical(fora.host.current_host)
+    dvars = host_vars_hierarchical(fora.host)
 
-    # Add context and 'host'
+    # Add context and "host"
     if context is None:
         context = {}
-    if 'host' not in context:
-        context['host'] = fora.host.current_host
+    if "host" not in context:
+        context["host"] = fora.host
     dvars.update(context)
 
-    return templ.render(dvars).encode('utf-8')
+    return templ.render(dvars).encode("utf-8")
 
 @operation("dir")
 def directory(path: str,
@@ -87,7 +86,7 @@ def directory(path: str,
     check_absolute_path(path)
     op.desc(path)
 
-    conn = fora.host.current_host.connection
+    conn = fora.host.connection
     with op.defaults(dir_mode=mode, owner=owner, group=group) as attr:
         if present:
             op.final_state(exists=True, mode=attr.dir_mode, owner=attr.owner, group=attr.group, touched=touch)
@@ -176,7 +175,7 @@ def file(path: str,
     check_absolute_path(path)
     op.desc(path)
 
-    conn = fora.host.current_host.connection
+    conn = fora.host.connection
     with op.defaults(file_mode=mode, owner=owner, group=group) as attr:
         if present:
             op.final_state(exists=True, mode=attr.file_mode, owner=attr.owner, group=attr.group, touched=touch)
@@ -265,7 +264,7 @@ def link(path: str,
         raise ValueError("link target cannot be empty")
     op.desc(path)
 
-    conn = fora.host.current_host.connection
+    conn = fora.host.connection
     with op.defaults(owner=owner, group=group) as attr:
         if present:
             op.final_state(exists=True, owner=attr.owner, group=attr.group, touched=touch)

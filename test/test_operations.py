@@ -8,17 +8,17 @@ from typing import cast
 import pytest
 from fora import utils
 
-import fora.globals as G
-import fora.host
-import fora.loader
-from fora.operations.api import OperationError
-import fora.script
+from fora.connection import Connection
 from fora.main import main
 from fora.operations import local, files, system
-from fora.connection import Connection
-from fora.types import HostType, ScriptType
+from fora.operations.api import OperationError
+from fora.types import HostWrapper, HostWrapper, ScriptType
+import fora
+import fora.globals as G
+import fora.loader
+import fora.script
 
-host: HostType = cast(HostType, None)
+host: HostWrapper = cast(HostWrapper, None)
 connection: Connection = cast(Connection, None)
 
 def test_init():
@@ -33,7 +33,7 @@ def test_init():
 
     global host
     host = G.hosts["localhost"]
-    fora.host.current_host = host
+    fora.host = host
     fora.script._this = ScriptType("__internal_test", "__internal_test")
 
 def test_open_connection():
@@ -394,29 +394,6 @@ def test_files_upload_dir_rename():
 def test_files_upload_dir_rename_2():
     files_upload_dir(dest="/tmp/__pytest_fora/simple_inventory_renamed")
 
-def test_full_deploy(request):
-    os.chdir("test/simple_deploy")
-    main(["inventory.py", "deploy.py"])
-    os.chdir(request.config.invocation_dir)
-
-def test_full_deploy_bad(request):
-    os.chdir("test/simple_deploy")
-    G.args.debug = False
-    with pytest.raises(ValueError, match="path must be absolute"):
-        main(["inventory.py", "deploy_bad.py"])
-    G.args.debug = True
-    os.chdir(request.config.invocation_dir)
-
-def test_full_deploy_bad_recursive_test_script_traceback(request):
-    os.chdir("test/simple_deploy")
-    G.args.debug = False
-    with pytest.raises(ValueError, match="invalid recursive call to") as e:
-        main(["inventory.py", "deploy_bad_recursive.py"])
-    utils.print_exception(e.type, e.value, e.tb)
-    utils.script_trace([(None, inspect.getouterframes(inspect.currentframe())[0])], include_root=True)
-    G.args.debug = True
-    os.chdir(request.config.invocation_dir)
-
 def test_create_user():
     system.user(user="foratest", present=False)
     system.group(group="foratest", present=False)
@@ -617,6 +594,38 @@ def test_create_group():
     assert ret.changed
     with pytest.raises(KeyError):
         grp.getgrnam("foratest")
+
+def test_full_deploy(request):
+    os.chdir("test/simple_deploy")
+    try:
+        main(["inventory.py", "deploy.py"])
+    finally:
+        fora.host = host
+        os.chdir(request.config.invocation_dir)
+
+def test_full_deploy_bad(request):
+    os.chdir("test/simple_deploy")
+    try:
+        G.args.debug = False
+        with pytest.raises(ValueError, match="path must be absolute"):
+            main(["inventory.py", "deploy_bad.py"])
+        G.args.debug = True
+    finally:
+        fora.host = host
+        os.chdir(request.config.invocation_dir)
+
+def test_full_deploy_bad_recursive_test_script_traceback(request):
+    os.chdir("test/simple_deploy")
+    try:
+        G.args.debug = False
+        with pytest.raises(ValueError, match="invalid recursive call to") as e:
+            main(["inventory.py", "deploy_bad_recursive.py"])
+        utils.print_exception(e.type, e.value, e.tb)
+        utils.script_trace([(None, inspect.getouterframes(inspect.currentframe())[0])], include_root=True)
+        G.args.debug = True
+    finally:
+        fora.host = host
+        os.chdir(request.config.invocation_dir)
 
 def test_cleanup_directory():
     files.directory("/tmp/__pytest_fora", present=False)

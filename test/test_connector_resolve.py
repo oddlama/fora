@@ -1,41 +1,39 @@
+from dataclasses import dataclass
 from fora.utils import FatalError
 import pytest
 from typing import Any, cast
 from fora.connectors.ssh import SshConnector
 
 import fora.loader
-from fora.types import HostType
+from fora.types import HostWrapper
 
 def create_host(name: str):
-    ret = cast(HostType, fora.loader.DefaultHost())
-    meta = HostType(name=name, _loaded_from="__test_internal__", url=name)
-    meta.transfer(ret)
-    return ret
+    wrapper = HostWrapper(name=name, url=name)
+    wrapper.wrap(fora.loader.DefaultHost())
+    return wrapper
 
 def test_explicit_connector():
+    @dataclass
     class TestConnector:
-        pass
-    test_connector = TestConnector()
+        name: str
+        url: str
 
     h = cast(Any, create_host("ssh://red@herring.sea"))
-    h.connector = test_connector
+    h.connector = TestConnector
 
-    fora.loader.resolve_connector(h)
-    assert h.connector is test_connector
+    assert isinstance(h.create_connector(), TestConnector)
 
 def test_connector_invalid():
     h = create_host("cannotresolve")
     with pytest.raises(FatalError, match=r"url doesn't include a schema and no connector was specified"):
-        fora.loader.resolve_connector(h)
+        h.create_connector()
 
 def test_connector_ssh():
     h = cast(Any, create_host("ssh://user@host.localhost"))
-
-    fora.loader.resolve_connector(h)
-    assert h.connector is SshConnector
+    assert isinstance(h.create_connector(), SshConnector)
 
 def test_connector_unknown():
     h = cast(Any, create_host("unknown://user@host.localhost"))
 
     with pytest.raises(FatalError, match=r"no connector found for schema"):
-        fora.loader.resolve_connector(h)
+        h.create_connector()

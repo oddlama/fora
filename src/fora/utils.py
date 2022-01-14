@@ -16,10 +16,9 @@ import uuid
 from types import ModuleType, TracebackType
 from typing import Any, NoReturn, Type, TypeVar, Callable, Iterable, Optional, Union
 
-import fora.host
-import fora.script
+from fora import globals as G
 
-from fora.types import HostType, ScriptType
+from fora.types import GroupWrapper, HostWrapper, ScriptType
 from fora.logger import col
 
 class FatalError(Exception):
@@ -42,6 +41,7 @@ class CycleError(ValueError):
         super().__init__(msg)
         self.cycle = cycle
 
+# TODO: delete
 class SetVariableContextManager:
     """A context manager that sets a variable on enter and resets it to the previous value on exit."""
     def __init__(self, obj: object, var: str, value: Any):
@@ -79,17 +79,10 @@ def die_error(msg: str, loc: Optional[str] = None, status_code: int = 1) -> NoRe
     print_error(msg, loc=loc)
     sys.exit(status_code)
 
-def set_this_host(value: HostType) -> SetVariableContextManager:
-    """A context manager to temporarily set `fora.host._this` to the given value."""
-    return SetVariableContextManager(fora.host, '_this', value)
-
 def set_this_script(value: ScriptType) -> SetVariableContextManager:
     """A context manager to temporarily set `fora.script._this` to the given value."""
+    import fora.script
     return SetVariableContextManager(fora.script, '_this', value)
-
-def set_current_host(host: HostType) -> SetVariableContextManager:
-    """A context manager to temporarily set `fora.host.current_host` to the given value."""
-    return SetVariableContextManager(fora.host, 'current_host', host)
 
 def load_py_module(file: str, pre_exec: Optional[Callable[[ModuleType], None]] = None) -> ModuleType:
     """
@@ -269,3 +262,120 @@ def import_submodules(package: Union[str, ModuleType], recursive: bool = False) 
         if recursive and is_pkg:
             results.update(import_submodules(results[full_name]))
     return results
+
+def _is_normal_var(attr: str, value: Any) -> bool:
+    """Returns True if the attribute doesn't start with an underscore, and is not a module."""
+    return not attr.startswith("_") \
+            and not isinstance(value, ModuleType)
+
+def host_getattr_hierarchical(host: HostWrapper, attr: str) -> Any:
+    """
+    Looks up and returns the given attribute on the host's hierarchy in the following order:
+
+      1. Host variables
+      2. Group variables (respecting topological order, excluding GroupWrapper variables)
+      3. Script variables (excluding ScriptType variables)
+      4. raises AttributeError
+
+    If the attribute starts with an underscore, the lookup will always be from the host object
+    itself, and won't be propagated hierarchically. The same is True for any variable that
+    is a module (so imported modules in group/script definitions will not be visible).
+
+    Parameters
+    ----------
+    host
+        The host for which the attribute should be retrieved.
+    attr
+        The attribute to retrieve.
+
+    Returns
+    -------
+    Any
+        The attribute's value if it was found.
+
+    Raises
+    ------
+    AttributeError
+        The given attribute was not found.
+    """
+    # While getattr implicitly does a local lookup before calling this function,
+    # we still need this block to force certain variables to always be looked up locally.
+    if attr.startswith("_") or attr in HostWrapper.__annotations__:
+        if attr not in vars(host):
+            raise AttributeError(attr)
+        return vars(host)[attr]
+
+    if attr not in GroupWrapper.__annotations__:
+        # Look up variable on groups
+        for g in G.group_order:
+            # Only consider a group if the host is in that group
+            if g not in vars(host)["groups"]:
+                continue
+
+            # Return the attribute if it is set on the group,
+            # and if it is a normal variable
+            group = G.groups[g]
+            if hasattr(group, attr):
+                value = getattr(group, attr)
+                if _is_normal_var(attr, value):
+                    return value
+
+    if attr not in ScriptType.__annotations__:
+        # Look up variable on current script
+        # pylint: disable=protected-access,import-outside-toplevel,cyclic-import
+        import fora.script
+        if fora.script._this is not None:
+            if hasattr(fora.script._this, attr):
+                value = getattr(fora.script._this, attr)
+                if _is_normal_var(attr, value):
+                    return value
+
+    raise AttributeError(attr)
+
+def host_vars_hierarchical(host: HostWrapper, include_all_host_variables: bool = False) -> dict[str, Any]:
+    """
+    Functions similarly to a hierarchical equivalent of `vars()`, just as
+    `host_getattr_hierarchical` is the hierarchical equivalent of `getattr`.
+    The same constraints as for `host_getattr_hierarchical` apply, but never raises
+    an AttributeError.
+
+    Parameters
+    ----------
+    host
+        The host for which all variables should be collected.
+    include_all_host_variables
+        Whether to include all host variables that `var(host)` yields (also hidden and special variables such as __getattr__, or imported modules).
+
+    Returns
+    -------
+    dict[str, Any]
+        A dictionary containing all currently accessible variables.
+    """
+    # We will add variables from bottom-up so that low-priority
+    # variables can be overwritten as expected.
+    dvars = {}
+
+    # First, add all variable from the current script
+    # pylint: disable=protected-access,import-outside-toplevel,cyclic-import
+    import fora.script
+    if fora.script._this is not None:
+        # Add variables from the script that are neither private
+        # nor part of a script's standard variables (ScriptType.__annotations__)
+        dvars.update({attr: v for attr,v in vars(fora.script._this).items() if _is_normal_var(attr, v) and attr not in ScriptType.__annotations__})
+
+    # Add variable from groups (reverse order so that the highest-priority
+    # group overwrites variables from lower priorities.
+    for g in reversed(G.group_order):
+        # Only consider a group if the host is in that group
+        if g not in vars(host)["groups"]:
+            continue
+
+        # Add variables from groups that are neither private
+        # nor part of a group's standard variables (GroupWrapper.__annotations__)
+        group = G.groups[g]
+        dvars.update({attr: v for attr,v in vars(group).items() if _is_normal_var(attr, v) and attr not in GroupWrapper.__annotations__})
+
+    # Lastly add all host variables, as they have the highest priority.
+    dvars.update({attr: v for attr,v in vars(host).items() if include_all_host_variables
+        or (_is_normal_var(attr, v) and attr not in HostWrapper.__annotations__)})
+    return dvars

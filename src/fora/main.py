@@ -7,12 +7,14 @@ import argparse
 import inspect
 import os
 import sys
-from typing import NoReturn, Optional
+from typing import NoReturn, Optional, cast
 
+import fora
 from fora import globals as G, logger
 from fora.connection import open_connection
 from fora.loader import load_inventory_from_file_or_url, run_script
-from fora.utils import FatalError, die_error, install_exception_hook, set_current_host
+from fora.types import HostWrapper
+from fora.utils import FatalError, die_error, install_exception_hook
 from fora.version import version
 
 def main_run(args: argparse.Namespace) -> None:
@@ -50,8 +52,9 @@ def main_run(args: argparse.Namespace) -> None:
 
         logger.print_indented(f"{logger.col('[1;34m')}host{logger.col('[m')} {host.name}")
         with open_connection(host):
-            with set_current_host(host):
-                run_script(args.script, inspect.getouterframes(inspect.currentframe())[0], name="<command line argument>")
+            fora.host = host
+            run_script(args.script, inspect.getouterframes(inspect.currentframe())[0], name="<command line argument>")
+            fora.host = cast(HostWrapper, None)
 
         if h != host_names[-1]:
             # Separate hosts by a newline for better visibility

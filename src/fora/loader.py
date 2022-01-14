@@ -8,13 +8,11 @@ from types import ModuleType
 from typing import Union, cast, Any, Optional
 
 import fora
-import fora.host
 import fora.script
 
 from fora import globals as G, logger
-from fora.types import GroupWrapper, HostType, ScriptType
-from fora.utils import FatalError, print_error, load_py_module, rank_sort, CycleError, set_this_host, set_this_script
-from fora.connectors.connector import Connector
+from fora.types import GroupWrapper, HostWrapper, ScriptType
+from fora.utils import FatalError, print_error, load_py_module, rank_sort, CycleError, set_this_script
 
 script_stack: list[tuple[ScriptType, inspect.FrameInfo]] = []
 """A stack of all currently executed scripts ((name, file), frame)."""
@@ -27,8 +25,6 @@ class DefaultHost:
     This class will be instanciated for each host that has not been defined by a corresponding
     host module file, and is used to represent a host with no special configuration.
     """
-    def __getattr__(self, attr: str) -> Any:
-        return fora.host.getattr_hierarchical(cast(HostType, self), attr)
 
 class ImmediateInventory:
     """A temporary inventory just for a single run, without the ability to load host or group module files."""
@@ -83,18 +79,27 @@ def load_inventory(file: str) -> ModuleType:
 
     return inventory
 
-def load_group(wrapper: GroupWrapper, module_file: str) -> None:
+def load_group(name: str, module_file: Optional[str]) -> GroupWrapper:
     """
     Loads and validates a group definition from the given file.
 
     Parameters
     ----------
-    wrapper
-        The wrapper to wrap the loaded module in.
+    name
+        The name of the group to load.
     module_file
-        The path to the file containing to the group definition
+        The path to the file containing to the group definition, or None to instanciate a DefaultGroup (similar to an empty module).
+
+    Returns
+    -------
+    GroupWrapper
+        The loaded group.
     """
-    # Instanciate module
+    wrapper = GroupWrapper(name)
+    if module_file is None:
+        wrapper.wrap(DefaultGroup())
+        return wrapper
+
     def _pre_exec(module: ModuleType) -> None:
         fora.group = wrapper
         wrapper.wrap(module, copy_members=True, copy_functions=True)
@@ -103,29 +108,10 @@ def load_group(wrapper: GroupWrapper, module_file: str) -> None:
         if not wrapper.name == "all":
             wrapper.after("all")
 
+    # Instanciate module
     load_py_module(module_file, pre_exec=_pre_exec)
     fora.group = cast(GroupWrapper, None)
-
-def get_group_variables(group: GroupWrapper) -> set[str]:
-    """
-    Returns the list of all user-defined attributes for a group.
-
-    Parameters
-    ----------
-    group
-        The group module.
-
-    Returns
-    -------
-    set[str]
-        The user-defined attributes for the given group
-    """
-    module_vars = set(attr for attr in dir(group) if
-                        not callable(getattr(group, attr)) and
-                        not attr.startswith("_") and
-                        not isinstance(getattr(group, attr), ModuleType))
-    module_vars -= set(GroupWrapper.__annotations__)
-    return module_vars
+    return wrapper
 
 def check_modules_for_conflicts(a: GroupWrapper, b: GroupWrapper) -> bool:
     """
@@ -145,7 +131,7 @@ def check_modules_for_conflicts(a: GroupWrapper, b: GroupWrapper) -> bool:
         True when at least one conflicting attribute was found
     """
     # pylint: disable=protected-access
-    conflicts = list(get_group_variables(a) & get_group_variables(b))
+    conflicts = list(a.group_variables() & b.group_variables())
     had_conflicts = False
     for conflict in conflicts:
         if not had_conflicts:
@@ -301,14 +287,9 @@ def load_groups() -> tuple[dict[str, GroupWrapper], list[str]]:
     # The all group is always made available.
     G.available_groups = available_groups | set(["all"])
 
+    # Load all groups that were defined by the inventory
     for group_name in available_groups:
-        wrapper = GroupWrapper(group_name)
-        group_file = fora.inventory.group_module_file(group_name)
-        if group_file is None:
-            wrapper.wrap(DefaultGroup())
-        else:
-            load_group(wrapper, group_file)
-        loaded_groups[group_name] = wrapper
+        loaded_groups[group_name] = load_group(group_name, fora.inventory.group_module_file(group_name))
 
     # Create default "all" group if it wasn't defined explicitly
     if "all" not in available_groups:
@@ -330,33 +311,7 @@ def load_groups() -> tuple[dict[str, GroupWrapper], list[str]]:
         raise FatalError(str(e))
     return (loaded_groups, topological_order)
 
-def resolve_connector(host: HostType) -> None:
-    """
-    Resolves the connector for a host, if it hasn't been set manually.
-    We'll try to figure out which connector to use by detecting presence of their
-    configuration options on the host module.
-
-    Parameters
-    ----------
-    host
-        The host
-
-    Raises
-    ------
-    FatalError
-        The connector could not resolved because either none was given or the scheme could not be matched against existing connectors.
-    """
-    # pylint: disable=protected-access
-    if host.connector is None:
-        if ':' not in host.url:
-            raise FatalError("url doesn't include a schema and no connector was specified explicitly", loc=host._loaded_from)
-        schema = host.url.split(':')[0]
-        if schema in Connector.registered_connectors:
-            host.connector = Connector.registered_connectors[schema]
-        else:
-            raise FatalError(f"no connector found for schema {schema}", loc=host._loaded_from)
-
-def load_host(name: str, url: str, module_file: Optional[str] = None, requires_module_file: bool = False) -> HostType:
+def load_host(name: str, url: str, module_file: Optional[str] = None, requires_module_file: bool = False) -> HostWrapper:
     """
     Loads the specified host with the given name, url and host module file (if any).
 
@@ -375,40 +330,36 @@ def load_host(name: str, url: str, module_file: Optional[str] = None, requires_m
 
     Returns
     -------
-    HostType
+    HostWrapper
         The host module
     """
     module_file_exists = module_file is not None and os.path.exists(module_file)
-    loaded_from = module_file if module_file is not None and module_file_exists else "<internal>"
-    meta = HostType(name=name, _loaded_from=loaded_from, url=url)
+    wrapper = HostWrapper(name, url)
+    # All hosts implicitly belong to the "all" group
+    wrapper.groups.add("all")
 
-    with set_this_host(meta) as ctx:
-        fora.host.add_group("all")
+    # Instanciate host module file if it exists, else return default host definition
+    if module_file is None or not module_file_exists:
+        if requires_module_file:
+            raise ValueError(f"required module file '{module_file}' for host '{name}' does not exist")
+        wrapper.wrap(DefaultHost())
+    else:
+        def _pre_exec(module: ModuleType) -> None:
+            fora.host = wrapper
+            wrapper.wrap(module, copy_members=True, copy_functions=True)
 
-        # Instanciate host module file if it exists, else return default host definition
-        if module_file is not None and module_file_exists:
-            def _pre_exec(module: ModuleType) -> None:
-                meta.transfer(module)
-                ctx.update(module)
-            ret = cast(HostType, load_py_module(module_file, pre_exec=_pre_exec))
-            setattr(ret, '__getattr__', lambda attr, ret=ret: fora.host.getattr_hierarchical(ret, attr))
-        else:
-            if requires_module_file:
-                raise ValueError(f"module file '{module_file}' for host '{name}' doesn't exist")
-            # Instanciate default module
-            ret = cast(HostType, DefaultHost())
-            meta.transfer(ret)
+        load_py_module(module_file, pre_exec=_pre_exec)
+        fora.host = cast(HostWrapper, None)
 
-    resolve_connector(ret)
-    return ret
+    return wrapper
 
-def load_hosts() -> dict[str, HostType]:
+def load_hosts() -> dict[str, HostWrapper]:
     """
     Instanciates all hosts in the global inventory and loads any associated host module files.
 
     Returns
     -------
-    dict[str, HostType]
+    dict[str, HostWrapper]
         A mapping from name to host module
 
     Raises

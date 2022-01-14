@@ -5,7 +5,7 @@ from typing import Optional
 from fora import globals as G
 from fora.operations.api import Operation, OperationResult, operation
 from fora.operations.utils import service_manager
-import fora.host
+import fora
 
 @operation("systemctl")
 def daemon_reload(user_mode: bool = False,
@@ -30,7 +30,7 @@ def daemon_reload(user_mode: bool = False,
     """
     _ = (name, check) # Processed automatically.
     op.desc("daemon_reload")
-    conn = fora.host.current_host.connection
+    conn = fora.host.connection
 
     # This operation has no dynamic state.
     op.initial_state(reloaded=False)
@@ -78,7 +78,7 @@ def service(service: str, # pylint: disable=redefined-outer-name
     """
     _ = (name, check) # Processed automatically.
     op.desc(service)
-    conn = fora.host.current_host.connection
+    conn = fora.host.connection
 
     state_actions: dict[str, str] = {
         "started": "start",

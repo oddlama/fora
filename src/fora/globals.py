@@ -5,7 +5,7 @@ from typing import Any, cast
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from fora.remote_settings import RemoteSettings
-from fora.types import GroupWrapper, InventoryWrapper, HostType
+from fora.types import GroupWrapper, HostWrapper
 
 class NotYetLoaded:
     """
@@ -35,7 +35,7 @@ groups: dict[str, GroupWrapper] = cast(dict[str, GroupWrapper], NotYetLoaded())
 group_order: list[str] = cast(list[str], NotYetLoaded())
 """A topological order of all groups, with highest precedence first."""
 
-hosts: dict[str, HostType] = cast(dict[str, HostType], NotYetLoaded())
+hosts: dict[str, HostWrapper] = cast(dict[str, HostWrapper], NotYetLoaded())
 """A dict containing all host definitions, mapped by host_id."""
 
 

@@ -2,6 +2,6 @@
 
 import os
 from typing import Optional
-import fora.host
+import fora
 from fora.operations.api import Operation, OperationResult, operation
 from fora.operations.utils import check_absolute_path

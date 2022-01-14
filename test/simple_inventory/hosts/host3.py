@@ -1,5 +1,5 @@
-import fora.host as this
+from fora import host
 
-this.add_group("only34")
-this.add_group("desktops")
+host.add_group("only34")
+host.add_group("desktops")
 overwrite_host = "host3"

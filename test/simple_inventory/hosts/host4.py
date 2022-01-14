@@ -1,4 +1,4 @@
-import fora.host as this
+from fora import host as this
 
 this.add_group("only34")
 this.add_group("somehosts")

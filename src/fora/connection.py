@@ -12,7 +12,7 @@ import fora.script
 from fora import globals as G, logger
 from fora.connectors.connector import Connector, CompletedRemoteCommand, GroupEntry, StatResult, UserEntry
 from fora.remote_settings import RemoteSettings
-from fora.types import HostType
+from fora.types import HostWrapper
 
 class Connection:
     """
@@ -22,11 +22,9 @@ class Connection:
     for the commands executed on the remote system.
     """
 
-    def __init__(self, host: HostType):
+    def __init__(self, host: HostWrapper):
         self.host = host
-        if self.host.connector is None:
-            raise ValueError("host.connector must be set")
-        self.connector: Connector = self.host.connector(host.url, host)
+        self.connector: Connector = self.host.create_connector()
         self.base_settings: RemoteSettings = G.base_remote_settings
 
     def __enter__(self) -> Connection:
@@ -203,7 +201,7 @@ class Connection:
         except ValueError:
             return default
 
-def open_connection(host: HostType) -> Connection:
+def open_connection(host: HostWrapper) -> Connection:
     """
     Returns a connection (context manager) that opens the connection when it is entered and
     closes it when it is exited. The connection can be obtained via host.connection,

@@ -51,9 +51,18 @@ class ModuleWrapper:
     def __getattribute__(self, attr: str) -> Any:
         """Dynamic lookup will ensure that attributes on the module are used if available."""
         module = object.__getattribute__(self, "module")
-        if module is None or not hasattr(module, attr):
+        if attr.startswith("__") or module is None or not hasattr(module, attr):
             return object.__getattribute__(self, attr)
         return getattr(module, attr)
+
+    def __setattr__(self, attr: str, value: Any) -> None:
+        """Ensure that attributes are set on the wrapped module, if the module already has a corresponding attribute."""
+        module = object.__getattribute__(self, "module")
+        if attr.startswith("__") or module is None or not hasattr(module, attr):
+            object.__setattr__(self, attr, value)
+        else:
+            print("set self: ", attr, value)
+            module.__setattr__(attr, value)
 
     def wrap(self, module: Any, copy_members: bool = False, copy_functions: bool = False) -> None:
         """
@@ -96,7 +105,7 @@ class ModuleWrapper:
         str
             The file.
         """
-        if self.module is None or self.module.__file__ is None:
+        if self.module is None or not hasattr(self.module, '__file__') or self.module.__file__ is None:
             return "<internal>"
         return self.module.__file__
 
@@ -193,39 +202,47 @@ class GroupWrapper(ModuleWrapper):
         for g in groups:
             self.after(g)
 
+    def group_variables(self) -> set[str]:
+        """
+        Returns the list of all user-defined attributes for this group.
+
+        Returns
+        -------
+        set[str]
+            The user-defined attributes for this group
+        """
+        print("-------------------------", self)
+        module_vars = set(attr for attr in dir(self.module) if
+                            not callable(getattr(self.module, attr)) and
+                            not attr.startswith("_") and
+                            not isinstance(getattr(self.module, attr), ModuleType))
+        module_vars -= set(GroupWrapper.__annotations__)
+        print(module_vars)
+        return module_vars
+
 @dataclass
-class HostType(MockupType):
+class HostWrapper(ModuleWrapper):
     """
-    A mockup type for host modules. This is not the actual type of an instanciated
-    module, but will reflect some of it's properties better than ModuleType. While this
-    class is mainly used to aid type-checking, its properties are transferred to the
-    actual instanciated module before the module is executed.
+    A wrapper class for host modules. This will wrap any instanciated
+    host to provide default attributes and methods for the host.
 
-    When writing a host module, you can use the API exposed in `fora.host`
-    to access/change meta information about your module.
+    All functions and members from this wrapper will be implicitly available
+    on the wrapped host module. This means you can do the following
 
-    Example: Using meta information `(hosts/myhost.py)`
-    ----
+        url = "ssh://root@localhost" # Use this url to connect
+        print(name)                  # Access this hosts's name
+        add_group("desktops")        # Add to desktops group
 
-        from fora import host
+    instead of having to first import the wrapper API:
 
-        # Set the ssh host (useful if it differs from the name)
-        ssh_host = "root@localhost"
-        # Alternatively define a url, which allows to select a specific connection mechanism.
-        url = "ssh://root@localhost"
+        from fora import group as this
 
-        # The host's name used for instanciation as defined in the inventory
-        print(host.name())
-
-        # Add the host to a group
-        host.add_group("desktops")
+        this.after("desktops")
+        print(this.name)
     """
 
     name: str
     """The corresponding host name as defined in the inventory. Must not be changed."""
-
-    _loaded_from: str
-    """The original file path of the instanciated module."""
 
     url: str
     """
@@ -242,11 +259,72 @@ class HostType(MockupType):
     groups: set[str] = field(default_factory=set)
     """The set of groups this host belongs to."""
 
-    connector: Optional[Callable[[str, HostType], Connector]] = None
-    """The connector class to use. If None, the connector will be determined by the schema in the url."""
+    connector: Optional[Callable[[str, HostWrapper], Connector]] = None
+    """The connector class to use. If None, the connector will be determined by the schema in the url when needed."""
 
     connection: Connection = cast("Connection", None) # Cast None to ease typechecking in user code.
     """The connection to this host, if it is opened."""
+
+    def add_group(self, group: str) -> None:
+        """
+        Adds a this host to the specified group.
+
+        Parameters
+        ----------
+        group
+            The group
+        """
+        import fora
+        from fora import globals as G
+        if fora.host is not self:
+            raise RuntimeError("This function may only be called inside a host module definition.")
+        if group not in G.groups:
+            raise ValueError(f"Referenced invalid group '{group}'!")
+        self.groups.add(group)
+
+    def add_groups(self, groups: list[str]) -> None:
+        """
+        Adds a this host to the specified list of groups.
+
+        Parameters
+        ----------
+        groups
+            The groups
+        """
+        for g in groups:
+            self.add_group(g)
+
+    def create_connector(self) -> Connector:
+        """
+        Creates a connector for this host.
+
+        Raises
+        ------
+        FatalError
+            The connector could not resolved because either an invalid connector was specified
+            or the scheme could not be matched against existing connectors.
+
+        Returns
+        -------
+        Connector
+            A connector for this host
+        """
+        from fora.utils import FatalError
+        from fora.connectors.connector import Connector
+        if self.connector is not None:
+            return self.connector(self.url, self)
+
+        if ':' not in self.url:
+            raise FatalError("url doesn't include a schema and no connector was specified explicitly", loc=self.definition_file())
+        schema = self.url.split(':')[0]
+        if schema in Connector.registered_connectors:
+            return Connector.registered_connectors[schema](self.url, self)
+        else:
+            raise FatalError(f"no connector found for schema '{schema}'", loc=self.definition_file())
+
+    def __getattr__(self, attr: str) -> Any:
+        from fora.utils import host_getattr_hierarchical
+        return host_getattr_hierarchical(self, attr)
 
 @dataclass
 class InventoryWrapper(ModuleWrapper):

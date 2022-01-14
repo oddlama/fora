@@ -28,12 +28,6 @@ def test_simple_inventory(request):
     assert not hasattr(G.hosts["host4"], 'bullshit')
     assert not hasattr(G.hosts["host5"], 'bullshit')
 
-    assert getattr(G.hosts["host1"], '_loaded_from') is not None
-    assert getattr(G.hosts["host2"], '_loaded_from') is not None
-    assert getattr(G.hosts["host3"], '_loaded_from') is not None
-    assert getattr(G.hosts["host4"], '_loaded_from') is not None
-    assert getattr(G.hosts["host5"], '_loaded_from') is not None
-
     assert hasattr(G.hosts["host1"], 'value_from_all')
     assert hasattr(G.hosts["host2"], 'value_from_all')
     assert hasattr(G.hosts["host3"], 'value_from_all')

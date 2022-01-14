@@ -6,7 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Optional, Type, Union
 
-from fora.types import HostType
+from fora.types import HostWrapper
 
 @dataclass
 class CompletedRemoteCommand:
@@ -84,7 +84,7 @@ class Connector:
     registered_connectors: dict[str, Type[Connector]] = {}
     """The list of all registered connectors."""
 
-    def __init__(self, url: Optional[str], host: HostType):
+    def __init__(self, url: Optional[str], host: HostWrapper):
         self.url = url
         self.host = host
 

@@ -2,7 +2,7 @@
 
 import os
 from typing import Optional
-import fora.host
+import fora
 from fora import globals as G
 from fora.operations.api import Operation, OperationResult, operation
 from fora.operations.utils import check_absolute_path
@@ -60,7 +60,7 @@ def repo(url: str,
     check_absolute_path(path)
     op.desc(f"{path} [{url}]")
 
-    conn = fora.host.current_host.connection
+    conn = fora.host.connection
 
     stat_path = conn.stat(path)
     if stat_path is None:

@@ -7,14 +7,14 @@ import subprocess
 from typing import cast
 
 import fora.globals as G
-import fora.host
+import fora
 import fora.loader
 import fora.script
 from fora.connection import Connection
 from fora.connectors.tunnel_dispatcher import RemoteOSError
-from fora.types import HostType, ScriptType
+from fora.types import HostWrapper, ScriptType
 
-host: HostType = cast(HostType, None)
+host: HostWrapper = cast(HostWrapper, None)
 connection: Connection = cast(Connection, None)
 
 def test_init():
@@ -26,7 +26,7 @@ def test_init():
 
     global host
     host = G.hosts["localhost"]
-    fora.host.current_host = host
+    fora.host = host
     fora.script._this = ScriptType("__internal_test", "__internal_test")
 
 def current_test_user():

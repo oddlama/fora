@@ -7,7 +7,7 @@ from typing import Any, Optional, Type, cast
 from fora import logger
 from fora.connectors import tunnel_dispatcher as td
 from fora.connectors.connector import CompletedRemoteCommand, Connector, GroupEntry, StatResult, UserEntry
-from fora.types import HostType
+from fora.types import HostWrapper
 
 def _expect_response_packet(packet: Any, expected_type: Type) -> None:
     """
@@ -27,7 +27,7 @@ class TunnelConnector(Connector):
     """A connector that handles requests via an externally supplied subprocess running a tunnel dispatcher.
     Any subclass must override command()."""
 
-    def __init__(self, url: Optional[str], host: HostType):
+    def __init__(self, url: Optional[str], host: HostWrapper):
         super().__init__(url, host)
 
         self.process: Optional[subprocess.Popen] = None

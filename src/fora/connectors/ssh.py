@@ -8,13 +8,13 @@ from fora import globals as G
 from fora.connectors import tunnel_dispatcher as td
 from fora.connectors.connector import connector
 from fora.connectors.tunnel_connector import TunnelConnector
-from fora.types import HostType
+from fora.types import HostWrapper
 
 @connector(schema='ssh')
 class SshConnector(TunnelConnector):
     """A tunnel connector that provides remote access via SSH."""
 
-    def __init__(self, url: Optional[str], host: HostType):
+    def __init__(self, url: Optional[str], host: HostWrapper):
         super().__init__(url, host)
 
         self.ssh_opts: list[str] = getattr(host, 'ssh_opts') if hasattr(host, 'ssh_opts') else []

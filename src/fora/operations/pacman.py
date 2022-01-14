@@ -2,24 +2,24 @@
 
 from functools import partial
 from typing import Optional
-import fora.host
+import fora
 from fora.operations.api import Operation, OperationResult, operation
 from fora.operations.utils import generic_package, package_manager
 
 def _is_installed(package: str, opts: Optional[list[str]] = None) -> bool: # pylint: disable=redefined-outer-name
     """Checks whether a package is installed with pacman on the remote host."""
     opts = opts or []
-    return fora.host.current_host.connection.run(["pacman", "-Ql"] + opts + ["--", package], check=False).returncode == 0
+    return fora.host.connection.run(["pacman", "-Ql"] + opts + ["--", package], check=False).returncode == 0
 
 def _install(package: str, opts: Optional[list[str]] = None) -> None: # pylint: disable=redefined-outer-name
     """Installs a package with pacman on the remote host."""
     opts = opts or []
-    fora.host.current_host.connection.run(["pacman", "--color", "always", "--noconfirm", "-S"] + opts + ["--", package])
+    fora.host.connection.run(["pacman", "--color", "always", "--noconfirm", "-S"] + opts + ["--", package])
 
 def _uninstall(package: str, opts: Optional[list[str]] = None) -> None: # pylint: disable=redefined-outer-name
     """Uninstalls a package with pacman on the remote host."""
     opts = opts or []
-    fora.host.current_host.connection.run(["pacman", "--color", "always", "--noconfirm", "-Rns"] + opts + ["--", package])
+    fora.host.connection.run(["pacman", "--color", "always", "--noconfirm", "-Rns"] + opts + ["--", package])
 
 @package_manager(command="pacman")
 @operation("package")

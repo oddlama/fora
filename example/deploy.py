@@ -1,4 +1,4 @@
-from fora.host import current_host as host
+from fora import host
 from fora.operations import local, system, git
 
 somedefault = 134

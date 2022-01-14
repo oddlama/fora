@@ -6,7 +6,7 @@ from fora import globals as G
 from fora.operations import utils
 from fora.operations.api import Operation, OperationResult, operation
 from fora.operations.utils import find_command, new_op_fail
-import fora.host
+import fora
 
 @operation("user")
 def user(user: str, # pylint: disable=redefined-outer-name,too-many-statements
@@ -109,7 +109,7 @@ def user(user: str, # pylint: disable=redefined-outer-name,too-many-statements
     # pylint: disable=too-many-branches
     _ = (name, check) # Processed automatically.
     op.desc(user)
-    conn = fora.host.current_host.connection
+    conn = fora.host.connection
 
     if groups is not None and not isinstance(groups, list):
         raise ValueError("groups must be a list!")
@@ -251,7 +251,7 @@ def group(group: str, # pylint: disable=redefined-outer-name,too-many-statements
     # pylint: disable=too-many-branches
     _ = (name, check) # Processed automatically.
     op.desc(group)
-    conn = fora.host.current_host.connection
+    conn = fora.host.connection
 
     # Examine current state
     current = conn.query_group(group=group)
@@ -338,7 +338,7 @@ def package(packages: list[str],
         be caught and `op.failure()` will be returned with the given message while continuing execution.
     """
     # Find package manager module
-    conn = fora.host.current_host.connection
+    conn = fora.host.connection
     package_fn = find_command(conn, utils.package_managers)
     if package_fn is None:
         raise new_op_fail(op_name="package", name=name, desc=str(packages), error=f"No supported package manager was found on the remote system. Searched commands: {utils.package_managers.keys()}")
@@ -391,7 +391,7 @@ def service(service: str, # pylint: disable=redefined-outer-name
         be caught and `op.failure()` will be returned with the given message while continuing execution.
     """
     # Find service manager module
-    conn = fora.host.current_host.connection
+    conn = fora.host.connection
     service_fn = find_command(conn, utils.service_managers)
     if service_fn is None:
         raise new_op_fail(op_name="service", name=name, desc=str(service), error=f"No supported service manager was found on the remote system. Searched commands: {utils.service_managers.keys()}")

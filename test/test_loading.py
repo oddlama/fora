@@ -2,8 +2,6 @@ import pytest
 
 from fora.main import main
 import fora
-import fora.globals as G
-import fora.host
 import fora.loader
 
 def test_init():
@@ -25,12 +23,7 @@ def test_group_functions_from_outside_definition():
     assert fora.group is None
 
 def test_host_functions_from_outside_definition():
-    with pytest.raises(RuntimeError, match="may only be called inside a host module definition"):
-        fora.host.name()
-    with pytest.raises(RuntimeError, match="may only be called inside a host module definition"):
-        fora.host.add_group("")
-    with pytest.raises(RuntimeError, match="may only be called inside a host module definition"):
-        fora.host.add_groups([""])
+    assert fora.host is None
 
 def test_help_output():
     with pytest.raises(SystemExit) as e:

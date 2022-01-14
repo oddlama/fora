@@ -19,10 +19,10 @@ class RemoteDefaultsContext:
 
     def __enter__(self) -> ResolvedRemoteSettings:
         # pylint: disable=import-outside-toplevel,cyclic-import
-        import fora.host
-        self.new_defaults = fora.host.current_host.connection.resolve_defaults(self.new_defaults)
+        import fora
+        self.new_defaults = fora.host.connection.resolve_defaults(self.new_defaults)
         self.obj._defaults_stack.append(self.new_defaults)
-        return cast(ResolvedRemoteSettings, fora.host.current_host.connection.base_settings.overlay(self.new_defaults))
+        return cast(ResolvedRemoteSettings, fora.host.connection.base_settings.overlay(self.new_defaults))
 
     def __exit__(self, exc_type: Optional[Type[BaseException]], exc: Optional[BaseException], traceback: Optional[TracebackType]) -> None:
         _ = (exc_type, exc, traceback)
@@ -59,9 +59,9 @@ def defaults(as_user: Optional[str] = None,
             cwd=cwd)
 
     # pylint: disable=import-outside-toplevel,cyclic-import
-    import fora.host
+    import fora
 
-    new_defaults = fora.host.current_host.connection.base_settings
+    new_defaults = fora.host.connection.base_settings
     new_defaults = new_defaults.overlay(current_defaults())
     new_defaults = new_defaults.overlay(requested_defaults)
     return RemoteDefaultsContext(_this, new_defaults)
