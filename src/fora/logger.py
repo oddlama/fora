@@ -22,14 +22,15 @@ class State:
 state: State = State()
 """The global logger state."""
 
+def use_color() -> bool:
+    """Returns true if color should be used."""
+    if not isinstance(cast(Any, G.args), argparse.Namespace):
+        return os.getenv("NO_COLOR") is None
+    return not G.args.no_color
+
 def col(color_code: str) -> str:
     """Returns the given argument only if color is enabled."""
-    if not isinstance(cast(Any, G.args), argparse.Namespace):
-        use_color = os.getenv("NO_COLOR") is None
-    else:
-        use_color = not G.args.no_color
-
-    return color_code if use_color else ""
+    return color_code if use_color() else ""
 
 class IndentationContext:
     """A context manager to modify the indentation level."""
@@ -66,7 +67,16 @@ def indent() -> IndentationContext:
 
 def indent_prefix() -> str:
     """Returns the indentation prefix for the current indentation level."""
-    return "  " * state.indentation_level
+    if use_color():
+        ret = ""
+        for i in range(state.indentation_level):
+            if i % 2 == 0:
+                ret += "[90m│[m "
+            else:
+                ret += "[90m╵[m "
+        return ret
+    else:
+        return "  " * state.indentation_level
 
 def debug(msg: str) -> None:
     """Prints the given message only in debug mode."""
@@ -265,7 +275,7 @@ def _operation_state_infos(result: Any) -> list[str]:
 def print_operation(op: Any, result: Any) -> None:
     """Prints the operation summary after it has finished execution."""
     if result.success:
-        title_color = col("[1;32m") if result.changed else col("[1m")
+        title_color = col("[1;32m") if result.changed else col("[1;90m")
     else:
         title_color = col("[1;31m")
 
