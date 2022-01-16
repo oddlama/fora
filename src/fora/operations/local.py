@@ -5,6 +5,7 @@ import os
 from typing import Any, Optional
 
 from fora.loader import script_stack, run_script
+from fora.utils import check_host_active
 
 def script(script: str, # pylint: disable=redefined-outer-name
            recursive: bool = False,
@@ -38,6 +39,8 @@ def script(script: str, # pylint: disable=redefined-outer-name
     name
         The name for the script execution (used for logging).
     """
+    check_host_active()
+
     # Asserts that the call is not recursive, if not explicitly allowed
     if not recursive:
         for wrapper, _ in script_stack:

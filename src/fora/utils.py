@@ -16,8 +16,8 @@ import uuid
 from types import ModuleType, TracebackType
 from typing import Any, NoReturn, Type, TypeVar, Callable, Iterable, Optional, Union
 
+import fora
 from fora import globals as G
-
 from fora.types import GroupWrapper, HostWrapper, ScriptWrapper
 from fora.logger import col
 
@@ -296,7 +296,6 @@ def host_getattr_hierarchical(host: HostWrapper, attr: str) -> Any:
     if attr not in ScriptWrapper.__annotations__:
         # Look up variable on current script
         # pylint: disable=protected-access,import-outside-toplevel,cyclic-import
-        import fora
         if fora.script is not None:
             if hasattr(fora.script, attr):
                 value = getattr(fora.script, attr)
@@ -330,7 +329,6 @@ def host_vars_hierarchical(host: HostWrapper, include_all_host_variables: bool =
 
     # First, add all variable from the current script
     # pylint: disable=protected-access,import-outside-toplevel,cyclic-import
-    import fora
     if fora.script is not None:
         # Add variables from the script that are neither private
         # nor part of a script's standard variables (ScriptWrapper.__annotations__)
@@ -352,3 +350,10 @@ def host_vars_hierarchical(host: HostWrapper, include_all_host_variables: bool =
     dvars.update({attr: v for attr,v in vars(host).items() if include_all_host_variables
         or (_is_normal_var(attr, v) and attr not in HostWrapper.__annotations__)})
     return dvars
+
+def check_host_active() -> None:
+    """Asserts that an inventory has been loaded and a host is active."""
+    if not G.inventory_loaded:
+        raise FatalError("invalid attempt to call operation before inventory was loaded! Did you maybe swap the inventory and deploy file on the command line?")
+    if fora.host is None:
+        raise FatalError("invalid attempt to call operation while no host is active!")

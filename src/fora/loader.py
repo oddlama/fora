@@ -380,6 +380,7 @@ def load_inventory(inventory_file_or_host_url: str) -> None:
     FatalError
         The loaded inventory was invalid.
     """
+    G.inventory_loaded = False
     wrapper = InventoryWrapper()
     fora.inventory = wrapper
 
@@ -403,6 +404,7 @@ def load_inventory(inventory_file_or_host_url: str) -> None:
     # Load all groups and hosts from the global inventory.
     G.groups, G.group_order = load_groups()
     G.hosts = load_hosts()
+    G.inventory_loaded = True
 
 def run_script(script: str,
                frame: inspect.FrameInfo,

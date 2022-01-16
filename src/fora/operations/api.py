@@ -11,6 +11,7 @@ from types import TracebackType, FrameType
 import fora
 from fora import globals as G, logger
 from fora.types import RemoteDefaultsContext
+from fora.utils import check_host_active
 
 class OperationError(Exception):
     """An exception that indicates an error while executing an operation."""
@@ -248,6 +249,8 @@ def operation(op_name: str) -> Callable[[Callable], Callable]:
     def operation_wrapper(function: Callable) -> Callable:
         @wraps(function)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
+            check_host_active()
+
             op = Operation(op_name=op_name, name=kwargs.get("name", None))
             check = kwargs.get("check", True)
 

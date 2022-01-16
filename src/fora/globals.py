@@ -20,6 +20,9 @@ All groups that will be available after loading. Useful to raise
 errors early when referencing undefined groups.
 """
 
+inventory_loaded: bool = False
+"""Indicates whether the inventory is fully loaded. Used to detect argument confusion errors."""
+
 groups: dict[str, GroupWrapper] = {}
 """A dict containing all group modules loaded from the inventory, indexed by name."""
 
