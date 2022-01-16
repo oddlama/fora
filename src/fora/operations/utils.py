@@ -179,7 +179,7 @@ def save_content(op: Operation,
 
         return op.success()
 
-def check_absolute_path(path: str) -> None:
+def check_absolute_path(path: str, path_desc: str) -> None:
     """
     Asserts that a given path is non empty and absolute.
 
@@ -187,11 +187,13 @@ def check_absolute_path(path: str) -> None:
     ----------
     path
         The path to check.
+    path_desc
+        Will be printed in case of error as a substitute for the invalid variable
     """
     if not path:
-        raise ValueError("path must be non-empty")
+        raise ValueError(f"path {path_desc} must be non-empty")
     if path[0] != "/":
-        raise ValueError("path must be absolute")
+        raise ValueError(f"path {path_desc} must be absolute")
 
 def new_op_fail(op_name: str, name: Optional[str], desc: str, error: str) -> OperationError:
     """

@@ -83,7 +83,7 @@ def directory(path: str,
     """
     # pylint: disable=too-many-branches
     _ = (name, check) # Processed automatically.
-    check_absolute_path(path)
+    check_absolute_path(path, f"{path=}")
     op.desc(path)
 
     conn = fora.host.connection
@@ -172,7 +172,7 @@ def file(path: str,
         The operation wrapper. Must not be supplied by the user.
     """
     _ = (name, check) # Processed automatically.
-    check_absolute_path(path)
+    check_absolute_path(path, f"{path=}")
     op.desc(path)
 
     conn = fora.host.connection
@@ -259,7 +259,7 @@ def link(path: str,
     """
     # pylint: disable=too-many-branches
     _ = (name, check) # Processed automatically.
-    check_absolute_path(path)
+    check_absolute_path(path, f"{path=}")
     if not target:
         raise ValueError("link target cannot be empty")
     op.desc(path)
@@ -342,7 +342,7 @@ def upload_content(content: Union[str, bytes],
         The operation wrapper. Must not be supplied by the user.
     """
     _ = (name, check) # Processed automatically.
-    check_absolute_path(dest)
+    check_absolute_path(dest, f"{dest=}")
     op.desc(dest)
     return save_content(op, content, dest, mode, owner, group)
 
@@ -380,7 +380,7 @@ def upload(src: str,
         The operation wrapper. Must not be supplied by the user.
     """
     _ = (name, check) # Processed automatically.
-    check_absolute_path(dest)
+    check_absolute_path(dest, f"{dest=}")
     op.desc(dest)
     with open(src, 'rb') as f:
         return save_content(op, f.read(), dest, mode, owner, group)
@@ -443,7 +443,7 @@ def upload_dir(src: str,
     _ = (name, check) # Processed automatically.
     op.nested(True)
 
-    check_absolute_path(dest)
+    check_absolute_path(dest, f"{dest=}")
     if not os.path.isdir(src):
         raise ValueError(f"{src=} must be a directory")
 
@@ -513,7 +513,7 @@ def template_content(content: str,
         The operation wrapper. Must not be supplied by the user.
     """
     _ = (name, check) # Processed automatically.
-    check_absolute_path(dest)
+    check_absolute_path(dest, f"{dest=}")
     op.desc(dest)
 
     try:
@@ -564,7 +564,7 @@ def template(src: str,
         The operation wrapper. Must not be supplied by the user.
     """
     _ = (name, check) # Processed automatically.
-    check_absolute_path(dest)
+    check_absolute_path(dest, f"{dest=}")
     op.desc(dest)
 
     try:

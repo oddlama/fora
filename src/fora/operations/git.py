@@ -58,7 +58,7 @@ def repo(url: str,
     """
     # pylint: disable=too-many-return-statements,too-many-branches,too-many-statements
     _ = (name, check) # Processed automatically.
-    check_absolute_path(path)
+    check_absolute_path(path, f"{path=}")
     op.desc(f"{path} [{url}]")
 
     conn = fora.host.connection
