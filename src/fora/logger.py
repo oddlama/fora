@@ -103,12 +103,12 @@ def print_indented(msg: str, **kwargs: Any) -> None:
 
 def connection_init(connector: Any) -> None:
     """Prints connection initialization information."""
-    print_indented(f"{col('[1;34m')}{connector.schema}{col('[m')} connecting... ", end="", flush=True)
+    print_indented(f"{col('[1;34m')}host{col('[m')} {connector.host.name} via {col('[1;33m')}{connector.host.url}{col('[m')} ... ", end="", flush=True)
 
 def connection_failed(error_msg: str) -> None:
     """Signals that an error has occurred while establishing the connection."""
     print(col("[1;31m") + "ERR" + col("[m"))
-    print_indented(f" {col('[37m')}└{col('[m')} " + f"{col('[31m')}{error_msg}{col('[m')}")
+    print_indented(f" {col('[90m')}└{col('[m')} " + f"{col('[31m')}{error_msg}{col('[m')}")
 
 def connection_established() -> None:
     """Signals that the connection has been successfully established."""
@@ -118,14 +118,14 @@ def connection_established() -> None:
 def run_script(script: str, name: Optional[str] = None) -> None:
     """Prints the script file and name that is being executed next."""
     if name is not None:
-        print_indented(f"{col('[33;1m')}script{col('[m')} {script} {col('[37m')}({name}){col('[m')}")
+        print_indented(f"{col('[33;1m')}script{col('[m')} {script} {col('[90m')}({name}){col('[m')}")
     else:
         print_indented(f"{col('[33;1m')}script{col('[m')} {script}")
 
 def print_operation_title(op: Any, title_color: str, end: str = "\n") -> None:
     """Prints the operation title and description."""
-    name_if_given = (" " + col('[37m') + f"({op.name})" + col('[m')) if op.name is not None else ""
-    dry_run_info = f" {col('[37m')}(dry){col('[m')}" if G.args.dry else ""
+    name_if_given = (" " + col('[90m') + f"({op.name})" + col('[m')) if op.name is not None else ""
+    dry_run_info = f" {col('[90m')}(dry){col('[m')}" if G.args.dry else ""
     print_indented(f"{title_color}{op.op_name}{col('[m')}{dry_run_info} {op.description}{name_if_given}", end=end, flush=True)
 
 def print_operation_early(op: Any) -> None:
@@ -229,7 +229,7 @@ def diff(filename: str, old: Optional[bytes], new: Optional[bytes], color: bool 
                 '-': '[31m',
                 '@': '[34m',
             }
-            return linecolor.get(line[0], '[37m') + line + '[m'
+            return linecolor.get(line[0], '[90m') + line + '[m'
         # Apply color to diff
         difflines = map(apply_color, difflines)
         # Apply color to header
@@ -261,7 +261,7 @@ def _operation_state_infos(result: Any) -> list[str]:
         if initial_v == final_v:
             if G.args.verbose >= 1:
                 # TODO = instead of : for better readability
-                entry_str = f"{col('[37m')}{k}: {str_initial_v}{col('[m')}"
+                entry_str = f"{col('[90m')}{k}: {str_initial_v}{col('[m')}"
                 state_infos.append(entry_str)
         else:
             if initial_v is None:
@@ -283,7 +283,7 @@ def print_operation(op: Any, result: Any) -> None:
     print_operation_title(op, title_color)
 
     if not result.success:
-        print_indented(f" {col('[37m')}└{col('[m')} " + f"{col('[31m')}{result.failure_message}{col('[m')}")
+        print_indented(f" {col('[90m')}└{col('[m')} " + f"{col('[31m')}{result.failure_message}{col('[m')}")
         return
 
     if not G.args.changes:
@@ -296,7 +296,7 @@ def print_operation(op: Any, result: Any) -> None:
     # Print "key: value" pairs with changes
     state_infos = _operation_state_infos(result)
     if len(state_infos) > 0:
-        print_indented(f"{col('[37m')}{box_char}{col('[m')} " + f"{col('[37m')},{col('[m')} ".join(state_infos))
+        print_indented(f"{col('[90m')}{box_char}{col('[m')} " + f"{col('[90m')},{col('[m')} ".join(state_infos))
 
     if G.args.diff:
         diff_lines = []
