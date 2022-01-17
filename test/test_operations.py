@@ -609,7 +609,7 @@ def test_full_deploy_bad(request):
     os.chdir("test/simple_deploy")
     try:
         G.args.debug = False
-        with pytest.raises(ValueError, match="path must be absolute"):
+        with pytest.raises(ValueError, match="must be absolute"):
             main(["inventory.py", "deploy_bad.py"])
         G.args.debug = True
     finally:
