@@ -7,11 +7,12 @@ import argparse
 import inspect
 import os
 import sys
-from typing import NoReturn, Optional, cast
+from typing import Any, Callable, NoReturn, Optional, cast
 
 import fora
-from fora import globals as G, logger
+from fora import globals as G
 from fora.connection import open_connection
+from fora.example_deploys import init_deploy_structure
 from fora.loader import load_inventory, run_script
 from fora.types import HostWrapper
 from fora.utils import FatalError, die_error, install_exception_hook
@@ -50,10 +51,9 @@ def main_run(args: argparse.Namespace) -> None:
     for h in host_names:
         host = G.hosts[h]
 
-        logger.print_indented(f"{logger.col('[1;34m')}host{logger.col('[m')} {host.name}")
         with open_connection(host):
             fora.host = host
-            run_script(args.script, inspect.getouterframes(inspect.currentframe())[0], name="<command line argument>")
+            run_script(args.script, inspect.getouterframes(inspect.currentframe())[0], name="cmdline")
             fora.host = cast(HostWrapper, None)
 
         if h != host_names[-1]:
@@ -70,6 +70,16 @@ class ThrowingArgumentParser(argparse.ArgumentParser):
         """Raises an exception on error."""
         raise ArgumentParserError(message)
 
+class ActionImmediateFunction(argparse.Action):
+    """An action that calls a function immediately when the argument is encountered."""
+    def __init__(self, option_strings: Any, func: Callable[[Any], Any], *args: Any, **kwargs: Any):
+        self.func = func
+        super().__init__(option_strings=option_strings, *args, **kwargs)
+
+    def __call__(self, parser: argparse.ArgumentParser, namespace: argparse.Namespace, values: Any, option_string: Any = None) -> None:
+        _ = (parser, namespace, values, option_string)
+        self.func(values)
+
 def main(argv: Optional[list[str]] = None) -> None:
     """
     The main program entry point. This will parse arguments, load inventory and task
@@ -80,10 +90,12 @@ def main(argv: Optional[list[str]] = None) -> None:
     parser = ThrowingArgumentParser(description="Runs a fora script.")
 
     # General options
-    parser.add_argument('--version', action='version',
+    parser.add_argument('-V', '--version', action='version',
             version=f"%(prog)s version {version}")
 
     # Run script options
+    parser.add_argument('--init', action=ActionImmediateFunction, func=init_deploy_structure, choices=["minimal", "flat", "dotfiles", "modular", "staging_prod"],
+            help="Initialize the current directory with a default deploy structure and exit. The various choices are explained in-depth in the documentation. As a rule of thumb, 'minimal' is the most basic starting point, 'flat' is well-suited for small and simple deploys, 'dotfiles' is explicitly intended for dotfile deploys, 'modular' is the most versatile layout intended to be used with modular sub-tasks, and 'staging_prod' is the modular layout with two separate inventories.")
     parser.add_argument('-H', '--hosts', dest='hosts', default=None, type=str,
             help="Specifies a comma separated list of hosts to run on. By default all hosts are selected. Duplicates will be ignored.")
     parser.add_argument('--dry', '--dry-run', '--pretend', dest='dry', action='store_true',
@@ -98,7 +110,6 @@ def main(argv: Optional[list[str]] = None) -> None:
             help="Enable debugging output. Forces verbosity to max value.")
     parser.add_argument('--no-color', dest='no_color', action='store_true',
             help="Disables any color output. Color can also be disabled by setting the NO_COLOR environment variable.")
-    # TODO fora init or --init --> create folder structure in current directory if it is empty.
     parser.add_argument('inventory', type=str,
             help="The inventory to run on. Either a single host url or an inventory module (`*.py`). If a single host url is given without a connection schema (like `ssh://`), ssh will be used. Single hosts also do not load any groups or host modules.")
     parser.add_argument('script', type=str,

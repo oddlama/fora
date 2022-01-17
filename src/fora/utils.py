@@ -41,6 +41,10 @@ class CycleError(ValueError):
         super().__init__(msg)
         self.cycle = cycle
 
+def print_status(status: str, msg: str) -> None:
+    """Prints a message with a (possibly colored) status prefix."""
+    print(f"{col('[1;32m')}{status}{col('[m')} {msg}")
+
 def print_warning(msg: str) -> None:
     """Prints a message with a (possibly colored) 'warning: ' prefix."""
     print(f"{col('[1;33m')}warning:{col('[m')} {msg}")
