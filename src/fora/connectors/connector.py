@@ -348,6 +348,32 @@ class Connector:
         _ = (self, group)
         raise NotImplementedError("Must be overwritten by subclass.")
 
+    def getenv(self, key: str) -> Optional[str]:
+        """
+        Return's an environment variable from the remote host.
+
+        Parameters
+        ----------
+        key
+            The variable to get.
+
+        Returns
+        -------
+        str
+            The corresponding variable if found, None otherwise.
+
+        Raises
+        ------
+        ValueError
+            If the user could not be resolved.
+        fora.connectors.tunnel_dispatcher.RemoteOSError
+            If the remote command fails because of an remote OSError.
+        IOError
+            An error occurred with the connection.
+        """
+        _ = (self, key)
+        raise NotImplementedError("Must be overwritten by subclass.")
+
     @classmethod
     def extract_hostname(cls, url: str) -> str:
         """

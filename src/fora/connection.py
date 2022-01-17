@@ -121,12 +121,12 @@ class Connection:
             umask=umask if umask is not None else defaults.umask,
             cwd=cwd if cwd is not None else defaults.cwd)
 
-    def resolve_user(self, user: Optional[str]) -> Optional[str]:
+    def resolve_user(self, user: Optional[str]) -> str:
         """See `fora.connectors.connector.Connector.resolve_user`."""
         logger.debug_args("Connection.resolve_user", locals())
         return self.connector.resolve_user(user)
 
-    def resolve_group(self, group: Optional[str]) -> Optional[str]:
+    def resolve_group(self, group: Optional[str]) -> str:
         """See `fora.connectors.connector.Connector.resolve_group`."""
         logger.debug_args("Connection.resolve_group", locals())
         return self.connector.resolve_group(group)
@@ -189,6 +189,7 @@ class Connection:
 
     def query_user(self, user: str, query_password_hash: bool = False, default: Optional[UserEntry] = None) -> Optional[UserEntry]:
         """See `fora.connectors.connector.Connector.query_user`, but returns the given default in case the user doesn't exist."""
+        logger.debug_args("Connection.query_user", locals())
         try:
             return self.connector.query_user(user=user, query_password_hash=query_password_hash)
         except ValueError:
@@ -196,10 +197,46 @@ class Connection:
 
     def query_group(self, group: str, default: Optional[GroupEntry] = None) -> Optional[GroupEntry]:
         """See `fora.connectors.connector.Connector.query_group`, but returns the given default in case the group doesn't exist."""
+        logger.debug_args("Connection.query_group", locals())
         try:
             return self.connector.query_group(group=group)
         except ValueError:
             return default
+
+    def home_dir(self, user: Optional[str] = None) -> str:
+        """
+        Return's the home directory of the given user. If the user is None,
+        it defaults to the current user.
+
+        Parameters
+        ----------
+        user
+            The user.
+
+        Returns
+        -------
+        str
+            The home directory of the requested user.
+
+        Raises
+        ------
+        ValueError
+            If the user could not be resolved.
+        fora.connectors.tunnel_dispatcher.RemoteOSError
+            If the remote command fails because of an remote OSError.
+        IOError
+            An error occurred with the connection.
+        """
+        logger.debug_args("Connection.home_dir", locals())
+        if user is None:
+            user = self.resolve_user(None)
+        return self.connector.query_user(user=user).home
+
+    def getenv(self, key: str, default: str = None) -> Optional[str]:
+        """See `fora.connectors.connector.Connector.getenv`, but returns the given default in case the key doesn't exist."""
+        logger.debug_args("Connection.getenv", locals())
+        val = self.connector.getenv(key=key)
+        return default if val is None else val
 
 def open_connection(host: HostWrapper) -> Connection:
     """

@@ -189,6 +189,13 @@ class TunnelConnector(Connector):
             gid=response.gid,
             members=response.members)
 
+    def getenv(self, key: str) -> Optional[str]:
+        request = td.PacketGetenv(key=key)
+        response = self._request(request)
+
+        _expect_response_packet(response, td.PacketEnvironVar)
+        return response.value
+
     def upload(self,
             file: str,
             content: bytes,

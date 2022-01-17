@@ -709,6 +709,22 @@ class PacketQueryGroup(NamedTuple):
         # Send response
         conn.write_packet(PacketGroupEntry(name=gr.gr_name, gid=i64(gr.gr_gid), members=gr.gr_mem))
 
+@Packet(type='response')
+class PacketEnvironVar(NamedTuple):
+    """This packet is used to return an environment variable."""
+    value: Optional[str]
+    """The value of the environment variable, if it was set."""
+
+@Packet(type='request')
+class PacketGetenv(NamedTuple):
+    """This packet is used to get an environment variable."""
+    key: str
+    """The environment variable to retrieve"""
+
+    def handle(self, conn: Connection) -> None:
+        """Gets the requested environment variable."""
+        conn.write_packet(PacketEnvironVar(value=os.getenv(self.key)))
+
 def receive_packet(conn: Connection, request: Any = None) -> Any:
     """
     Receives the next packet from the given connection.
