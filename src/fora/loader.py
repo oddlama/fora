@@ -75,8 +75,12 @@ def load_group(name: str, module_file: Optional[str]) -> GroupWrapper:
         fora.group = wrapper
         wrapper.wrap(module, copy_members=True, copy_functions=True)
 
-        # Normal groups always have a dependency on the global 'all' group.
-        if wrapper.name != "all":
+        if wrapper.name == "all":
+            # Add per-inventory global variables to the "all" group
+            for key,val in fora.inventory.global_variables():
+                setattr(module, key, val)
+        else:
+            # Normal groups always have a dependency on the global "all" group.
             wrapper.after("all")
 
     # Instanciate module

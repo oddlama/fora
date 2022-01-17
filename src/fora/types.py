@@ -364,6 +364,19 @@ class InventoryWrapper(ModuleWrapper):
     possibly be a different one than the connector used later for the connection.
     """
 
+    def global_variables(self) -> dict[str, Any]:
+        """
+        Returns a list of global variables to implicitly add to the 'all' group
+        (before it is actually loaded). Useful to provide global per-inventory
+        variables.
+
+        Returns
+        -------
+        dict[str, Any]
+            Global variables for this inventory
+        """
+        return dict()
+
     def available_groups(self) -> set[str]:
         """
         Returns the set of available groups in this inventory.
