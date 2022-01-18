@@ -74,7 +74,7 @@ class ActionImmediateFunction(argparse.Action):
     """An action that calls a function immediately when the argument is encountered."""
     def __init__(self, option_strings: Any, func: Callable[[Any], Any], *args: Any, **kwargs: Any):
         self.func = func
-        super().__init__(option_strings=option_strings, *args, **kwargs)
+        super().__init__(option_strings, *args, **kwargs)
 
     def __call__(self, parser: argparse.ArgumentParser, namespace: argparse.Namespace, values: Any, option_string: Any = None) -> None:
         _ = (parser, namespace, values, option_string)

@@ -232,7 +232,7 @@ class Connection:
             user = self.resolve_user(None)
         return self.connector.query_user(user=user).home
 
-    def getenv(self, key: str, default: str = None) -> Optional[str]:
+    def getenv(self, key: str, default: Optional[str] = None) -> Optional[str]:
         """See `fora.connectors.connector.Connector.getenv`, but returns the given default in case the key doesn't exist."""
         logger.debug_args("Connection.getenv", locals())
         val = self.connector.getenv(key=key)

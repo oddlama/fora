@@ -194,7 +194,7 @@ class TunnelConnector(Connector):
         response = self._request(request)
 
         _expect_response_packet(response, td.PacketEnvironVar)
-        return response.value
+        return cast(td.PacketEnvironVar, response).value
 
     def upload(self,
             file: str,
