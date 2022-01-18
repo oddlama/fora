@@ -247,6 +247,15 @@ def test_query_user():
     assert entry is not None
     assert entry.name == "nobody"
 
+def test_home_dir():
+    assert connection.home_dir() == pwd.getpwuid(os.getuid()).pw_dir
+
+def test_getenv():
+    assert connection.getenv("HOME") == os.getenv("HOME")
+    assert connection.getenv("PATH") == os.getenv("PATH")
+    assert connection.getenv("_nonexistent") is None
+
 def test_close_connection():
     connection.__exit__(None, None, None)
     assert host.connection is None
+
