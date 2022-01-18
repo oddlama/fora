@@ -76,9 +76,8 @@ def load_group(name: str, module_file: Optional[str]) -> GroupWrapper:
         wrapper.wrap(module, copy_members=True, copy_functions=True)
 
         if wrapper.name == "all":
-            # Add per-inventory global variables to the "all" group
-            for key,val in fora.inventory.global_variables():
-                setattr(module, key, val)
+            # Add predefined global variables before the "all" group module is instanciated
+            add_predefined_global_variables(wrapper)
         else:
             # Normal groups always have a dependency on the global "all" group.
             wrapper.after("all")
@@ -232,13 +231,14 @@ def sort_and_validate_groups(groups: dict[str, GroupWrapper]) -> list[str]:
     # Return a topological order based on the top-rank
     return sorted(list(g for g in groups.keys()), key=lambda g: ranks_min[g])
 
-def define_special_global_variables(group_all: GroupWrapper) -> None:
+def add_predefined_global_variables(group_all: GroupWrapper) -> None:
     """
-    Defines special global variables on the given all group.
-    Respects if the corresponding variable is already set.
+    Predefines global variables on the given all group. This includes
+    variables set by the inventory, as they can be overridden by the "all" group.
     """
-    if not hasattr(group_all, 'fora_managed'):
-        setattr(group_all, 'fora_managed', "This file is managed by fora.")
+    setattr(group_all, 'fora_managed', "This file is managed by fora.")
+    for key, val in fora.inventory.global_variables().items():
+        setattr(group_all, key, val)
 
 def load_groups() -> tuple[dict[str, GroupWrapper], list[str]]:
     """
@@ -270,10 +270,8 @@ def load_groups() -> tuple[dict[str, GroupWrapper], list[str]]:
     if "all" not in available_groups:
         all_wrapper = GroupWrapper("all")
         all_wrapper.wrap(DefaultGroup())
+        add_predefined_global_variables(all_wrapper)
         loaded_groups["all"] = all_wrapper
-
-    # Define special global variables such as `fora_managed` on the all group.
-    define_special_global_variables(loaded_groups["all"])
 
     # Firstly, deduplicate and unify each group's before and after dependencies,
     # and check for any self-dependencies.
