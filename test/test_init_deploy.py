@@ -1,9 +1,8 @@
-from genericpath import exists
 import os
-from pathlib import Path
-import shutil
-from typing import Any, cast
 import pytest
+import shutil
+from pathlib import Path
+from typing import Any, cast
 
 from fora import example_deploys
 

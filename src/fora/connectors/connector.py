@@ -245,7 +245,7 @@ class Connector:
                owner: Optional[str] = None,
                group: Optional[str] = None) -> None:
         """
-        Uploads the given content to the remote system and saves it under the given file path.
+        Uploads the given content to the remote system and saves it under the given file path. Overwrites existing files.
 
         Parameters
         ----------

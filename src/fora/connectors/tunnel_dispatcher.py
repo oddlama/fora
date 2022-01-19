@@ -545,7 +545,7 @@ class PacketResolveGroup(NamedTuple):
 @Packet(type='request')
 class PacketUpload(NamedTuple):
     """This packet is used to upload the given content to the remote and save it as a file.
-    Responds with PacketOk if saving was successful, or PacketInvalidField if any
+    Overwrites existing files. Responds with PacketOk if saving was successful, or PacketInvalidField if any
     field contained an invalid value."""
     file: str
     content: bytes
@@ -556,7 +556,7 @@ class PacketUpload(NamedTuple):
     def handle(self, conn: Connection) -> None:
         """Saves the content under the given path."""
         uid, gid = (None, None)
-        mode_oct = 0o600
+        mode_oct = None
 
         if self.mode is not None:
             try:
@@ -581,7 +581,8 @@ class PacketUpload(NamedTuple):
 
         with open(self.file, 'wb') as f:
             f.write(self.content)
-        os.chmod(self.file, mode_oct)
+        if mode_oct is not None:
+            os.chmod(self.file, mode_oct)
         if uid is not None or gid is not None:
             os.chown(self.file, uid or 0, gid or 0)
 

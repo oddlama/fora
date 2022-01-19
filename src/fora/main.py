@@ -34,7 +34,7 @@ def main_run(args: argparse.Namespace) -> None:
 
     # Deduplicate host selection and check if every host is valid
     host_names = []
-    for h in set(args.hosts.split(',') if args.hosts is not None else G.hosts.keys()):
+    for h in set(args.hosts.split(",") if args.hosts is not None else G.hosts.keys()):
         if h not in G.hosts:
             die_error(f"Unknown host '{h}'")
         host_names.append(h)

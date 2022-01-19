@@ -1,6 +1,8 @@
 """Provides operations related to creating and modifying files and directories."""
 
 import os
+import re
+from datetime import datetime, timezone
 from os.path import join, relpath, normpath
 from typing import Optional, Union
 
@@ -356,7 +358,7 @@ def upload(src: str,
            check: bool = True,
            op: Operation = Operation.internal_use_only) -> OperationResult:
     """
-    Uploads the given file or to the remote host.
+    Uploads the given file or to the remote host. Overwrites existing files.
 
     Parameters
     ----------
@@ -578,3 +580,120 @@ def template(src: str,
         raise ValueError(f"error while templating '{src}': {str(e)}") from None
 
     return save_content(op, rendered_content, dest, mode, owner, group)
+
+@operation("line")
+def line(path: str,
+         line: str,
+         present: bool = True,
+         regex: Optional[str] = None,
+         ignore_whitespace: bool = True,
+         backup: Union[bool, str] = False,
+         name: Optional[str] = None,
+         check: bool = True,
+         op: Operation = Operation.internal_use_only) -> OperationResult:
+    """
+    Manage a line in a file. New lines will be added to the end of the file.
+    If the file does not exist, it will be created with the current default file_mode, owner and group.
+
+    Parameters
+    ----------
+    path
+        The file in question.
+    line
+        The line that should be added or removed. If present is `False` and regex is set,
+        this parameter is not used.
+    present
+        Whether the line should exist in the file.
+    regex
+        A regex to search for in the existing file to determine whether the line exists.
+        Partial matches in a line (when for example not using `^...$`) count as matching the entire line.
+        Uses standard python regular expression. If `None`, the given line will be searched for literally.
+    ignore_whitespace
+        Whether whitespace before and after the line should be ignored when searching for the line.
+        This affects both the provided line and lines in an existing file.
+        This does not affect the actual line that will be put into the file if it isn't found.
+        This parameter is ignored if `regex` was specified.
+    backup
+        Whether to backup the old file if any changes will be made. If this is `True`,
+        the old file will be copied to a new file with `.{date}.bak`, appended to the end of the filename.
+        `date` will be replaced with the current date and time in ISO 8601 UTC format.
+        You pass a string instead of a boolean to enable this option while specifying the new filename manually,
+        relative to the original file.
+    name
+        The name for the operation.
+    check
+        If True, returning `op.failure()` will raise an OperationError. All manually raised
+        OperationErrors will be propagated. When False, any manually raised OperationError will
+        be caught and `op.failure()` will be returned with the given message while continuing execution.
+    op
+        The operation wrapper. Must not be supplied by the user.
+    """
+    _ = (name, check) # Processed automatically.
+    check_absolute_path(path, f"{path=}")
+    op.desc(path)
+
+    conn = fora.host.connection
+    with op.defaults() as attr:
+        op.final_state(line_present=present)
+
+        orig_bytes: Optional[bytes] = None
+        orig_content: Optional[str] = None
+        line_present: bool = False
+
+        # Examine current state
+        stat = conn.stat(path)
+        if stat is not None:
+            if stat.type != "file":
+                return op.failure(f"path '{path}' exists but is not a file!")
+
+            # Download the current file
+            orig_bytes = conn.download(path)
+            orig_content = orig_bytes.decode("utf-8", errors="surrogateescape")
+
+            # Check whether the line is already contained
+            if regex is None:
+                if ignore_whitespace:
+                    line_present = line.strip() in [l.strip() for l in (orig_content or "").splitlines()]
+                else:
+                    line_present = line in (orig_content or "").splitlines()
+            else:
+                line_present = bool(re.search(regex, orig_content, re.MULTILINE))
+
+        op.initial_state(line_present=line_present)
+
+        # Return success if nothing needs to be changed
+        if op.unchanged():
+            return op.success()
+
+        lines = (orig_content or "").splitlines()
+        if present:
+            lines.append(line)
+        else:
+            # Remove matching lines
+            if regex is None:
+                if ignore_whitespace:
+                    lines = filter(lambda l: line != l.strip(), lines)
+                else:
+                    lines = filter(lambda l: line != l, lines)
+            else:
+                lines = filter(lambda l: not re.search(regex, l), lines)
+
+        new_content = "\n".join(lines) + "\n"
+        new_bytes = new_content.encode("utf-8", errors="surrogateescape")
+
+        # Add diff if desired
+        if G.args.diff:
+            op.diff(path, orig_bytes, new_bytes)
+
+        # Apply actions to reach desired state, but only if we are not doing a dry run
+        if not G.args.dry:
+            if orig_bytes is None:
+                conn.upload(file=path, content=new_bytes, mode=attr.file_mode, owner=attr.owner, group=attr.group)
+            else:
+                if backup:
+                    if isinstance(backup, bool):
+                        backup = f".{datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}.bak"
+                    conn.run(["cp", "-a", "--", path, os.path.join(os.path.dirname(path), backup)])
+                conn.upload(file=path, content=new_bytes)
+
+        return op.success()

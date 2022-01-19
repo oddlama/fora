@@ -597,6 +597,81 @@ def test_create_group():
     with pytest.raises(KeyError):
         grp.getgrnam("foratest")
 
+def test_files_line():
+    files.upload_content(dest="/tmp/__pytest_fora/testcontent", content="  hello a \n  \t  hello b \n hello a\n", mode="644")
+
+    G.args.dry = True
+    ret = files.line(path="/tmp/__pytest_fora/testcontent", line="hello c")
+    assert ret.changed
+    with open("/tmp/__pytest_fora/testcontent", 'rb') as f:
+        assert b"hello c" not in f.read()
+    G.args.dry = False
+
+    ret = files.line(path="/tmp/__pytest_fora/testcontent", line="hello c")
+    assert ret.changed
+    with open("/tmp/__pytest_fora/testcontent", 'rb') as f:
+        assert b"hello c" in f.read()
+
+    ret = files.line(path="/tmp/__pytest_fora/testcontent", line="hello c")
+    assert not ret.changed
+    with open("/tmp/__pytest_fora/testcontent", 'rb') as f:
+        assert b"hello c" in f.read()
+
+    ret = files.line(path="/tmp/__pytest_fora/testcontent", line="hello a", present=False)
+    assert ret.changed
+    with open("/tmp/__pytest_fora/testcontent", 'rb') as f:
+        assert b"hello a" not in f.read()
+
+    ret = files.line(path="/tmp/__pytest_fora/testcontent", line="hello b")
+    assert not ret.changed
+    with open("/tmp/__pytest_fora/testcontent", 'rb') as f:
+        assert b"hello b" in f.read()
+
+    ret = files.line(path="/tmp/__pytest_fora/testcontent", line=" hello d")
+    assert ret.changed
+    with open("/tmp/__pytest_fora/testcontent", 'rb') as f:
+        assert b" hello d" in f.read()
+
+    ret = files.line(path="/tmp/__pytest_fora/testcontent", line="hello d ", present=False, ignore_whitespace=False)
+    assert not ret.changed
+    with open("/tmp/__pytest_fora/testcontent", 'rb') as f:
+        assert b"hello d " not in f.read()
+
+    ret = files.line(path="/tmp/__pytest_fora/testcontent", line="hello d ", ignore_whitespace=False)
+    assert ret.changed
+    with open("/tmp/__pytest_fora/testcontent", 'rb') as f:
+        assert b"hello d " in f.read()
+
+    ret = files.line(path="/tmp/__pytest_fora/testcontent", line="hello\t \td")
+    assert ret.changed
+    with open("/tmp/__pytest_fora/testcontent", 'rb') as f:
+        assert b"hello\t \td" in f.read()
+
+    ret = files.line(path="/tmp/__pytest_fora/testcontent", line="<unused; remove hello d>", regex=r"hello\s+d", present=False)
+    assert ret.changed
+    with open("/tmp/__pytest_fora/testcontent", 'rb') as f:
+        c = f.read()
+        assert b"hello d" not in c
+        assert b"hello\t \td" not in c
+
+    ret = files.line(path="/tmp/__pytest_fora/testcontent", line="hello e", backup=True)
+    assert ret.changed
+    with open("/tmp/__pytest_fora/testcontent", 'rb') as f:
+        assert b"hello e" in f.read()
+
+    ret = files.line(path="/tmp/__pytest_fora/testcontent", line="hello e", present=False, backup="testcontent.withe")
+    assert ret.changed
+    with open("/tmp/__pytest_fora/testcontent", 'rb') as f:
+        assert b"hello e" not in f.read()
+    with open("/tmp/__pytest_fora/testcontent.withe", 'rb') as f:
+        assert b"hello e" in f.read()
+
+def test_files_line_wrong_existing_type():
+    G.args.dry = True
+    with pytest.raises(OperationError, match="exists but is not a file"):
+        files.line(path="/tmp/__pytest_fora", line="hello")
+    G.args.dry = False
+
 def test_full_deploy(request):
     os.chdir("test/simple_deploy")
     try:
@@ -623,7 +698,7 @@ def test_full_deploy_bad_recursive_test_script_traceback(request):
         with pytest.raises(ValueError, match="invalid recursive call to") as e:
             main(["inventory.py", "deploy_bad_recursive.py"])
         utils.print_exception(e.type, e.value, e.tb)
-        utils.script_trace([(None, inspect.getouterframes(inspect.currentframe())[0])], include_root=True)
+        utils.script_trace([(cast(ScriptWrapper, None), inspect.getouterframes(inspect.currentframe())[0])], include_root=True)
         G.args.debug = True
     finally:
         fora.host = host
