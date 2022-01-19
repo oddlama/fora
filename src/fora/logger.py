@@ -306,5 +306,5 @@ def print_operation(op: Any, result: Any) -> None:
         # Print diffs with block character line
         if len(diff_lines) > 0:
             for l in diff_lines[:-1]:
-                print_indented("│ " + l)
-            print_indented("└ " + diff_lines[-1])
+                print_indented(f"{col('[90m')}│ {col('[m')}" + l)
+            print_indented(f"{col('[90m')}└ {col('[m')}" + diff_lines[-1])
