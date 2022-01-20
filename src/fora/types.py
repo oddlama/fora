@@ -77,6 +77,27 @@ class ModuleWrapper:
         else:
             module.__setattr__(attr, value)
 
+    def is_overloaded(self, attr: str) -> Optional[bool]:
+        """Returns NonoTrue if the given attribute exists as a variable on this wrapper but is overloaded by the wrapped module,
+        False if the attribute exists on this wrapper but isn't overloaded and None if the attribute doesn't exist on this wrapper."""
+        try:
+            # try to get the attr from the wrapper.
+            _ = object.__getattribute__(self, attr)
+        except AttributeError:
+            # attr doesn't exist on the wrapper class -> not overloaded, just a passthrough
+            return None
+
+        # Return true if the module overloads this wrapper's fallback
+        module = object.__getattribute__(self, "module")
+        if module is None:
+            return False
+        return hasattr(module, attr)
+
+    def is_overridden(self, attr: str) -> bool:
+        """Returns True if a variable has both been overloaded and changed."""
+        module = object.__getattribute__(self, "module")
+        return self.is_overloaded(attr) == True and getattr(module, attr) != object.__getattribute__(self, attr)
+
     def wrap(self, module: Any, copy_members: bool = False, copy_functions: bool = False) -> None:
         """
         Replaces the currently wrapped module (if any) with the given object.
