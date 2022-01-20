@@ -7,9 +7,12 @@
 hosts = [ "localhost"
 #        , ("mail1", "hosts/mail.py")
 #        , ("mail2", "hosts/mail.py")
+#        , dict(url="localhost", module="hosts/mail.py", groups=["desktops"])
         ]
 
 # The inventory is loaded early, so you may modify the parsed options of
 # fora here, to enforce certain settings for your inventory.
 # from fora import globals as G
 # G.args.diff = True
+
+groups = []

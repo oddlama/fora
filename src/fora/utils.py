@@ -309,6 +309,31 @@ def is_normal_var(attr: str, value: Any) -> bool:
     return not attr.startswith("_") \
             and not isinstance(value, ModuleType)
 
+# We need a way to allow groups and host modules to override variables from other
+# low precedence groups, or to extend a dictionary, list or some other object defined
+# previously. How do we accomplish this?
+#
+# An alternative approach that I tried was to implement a fully hierarchical lookup for the
+# host module that did go through all groups in reverse order of precedence and return the
+# as soon as a variable was defined on one of the modules. Apart from the complexity,
+# a problem with this approach was that modifying existing variables like dictionaries from
+# parent modules wasn't easy or clean. We would've had to distinguish between those cases
+# depending on a type annotation of the variable. While this was possible, it introduced
+# an unnecessary conecept of annotating some variables to gain special "magic" behavior
+# and a lot of complexity. At that time, the depndencies between modules was defined in
+# the modules themselves, which made it impossible to inherit variables between groups.
+#
+# The approach I settled on now is to define groups and group dependencies in the inventory,
+# allowing us to load group modules in the correct order. By doing this, we can bequest (copy)
+# all variables that have been defined until that point to the next module that will be loaded,
+# be it a host or another group. This allows any module to access and modify all inherited
+# variables easily, as they are just part of the global variables.
+#
+# This reduces the special "fora" behavior to this list of things:
+#   - script parameters are defined via a "params" dataclass
+#   - all attributes are defined on the host in question, but script default variables
+#     still require minimal hijacking of getattr
+#   - inventories, groups and hosts are collections of global variables used within fora
 def host_getattr_hierarchical(host: HostWrapper, attr: str) -> Any:
     """
     Looks up and returns the given attribute on the host's hierarchy in the following order:

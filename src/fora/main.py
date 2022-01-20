@@ -7,7 +7,6 @@ import argparse
 import inspect
 import os
 import sys
-from types import MethodType, ModuleType
 from typing import Any, Callable, NoReturn, Optional, Union, cast
 
 import fora

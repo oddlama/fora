@@ -5,3 +5,4 @@ this.add_group("desktops")
 
 onlyhost = "localhost"
 overwritten = "localhost"
+mergedict["localhost"] = "set by localhost"
