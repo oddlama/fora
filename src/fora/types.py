@@ -247,10 +247,10 @@ class GroupWrapper(ModuleWrapper):
         """
         print("-------------------------", self)
         module_vars = set(attr for attr in dir(self.module) if
-                            not callable(getattr(self.module, attr)) and
                             not attr.startswith("_") and
                             not isinstance(getattr(self.module, attr), ModuleType))
         module_vars -= set(GroupWrapper.__annotations__)
+        module_vars -= set(GroupWrapper.__dict__)
         print(module_vars)
         return module_vars
 

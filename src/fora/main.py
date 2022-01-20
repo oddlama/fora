@@ -87,7 +87,11 @@ def show_inventory(inventory: str) -> None:
     col_darker_b = col("\033[1;90m")
     col_reset    = col("\033[m")
 
-    base_dir = fora.inventory.base_dir()
+    try:
+        base_dir = fora.inventory.base_dir()
+    except RuntimeError:
+        base_dir = "."
+
     def relpath(path: Optional[str]) -> Optional[str]:
         return None if path is None else os.path.relpath(path, start=base_dir)
 
@@ -142,7 +146,7 @@ def show_inventory(inventory: str) -> None:
             if not is_normal_var(attr, value):
                 continue
 
-            is_declared_by_wrapper = attr in GroupWrapper.__dict__.keys() or attr in GroupWrapper.__annotations__
+            is_declared_by_wrapper = attr in GroupWrapper.__dict__ or attr in GroupWrapper.__annotations__
             entries.append((attr, value, is_declared_by_wrapper))
 
         # Sort by "is_declared" the by "attr"
@@ -168,7 +172,7 @@ def show_inventory(inventory: str) -> None:
         for attr, (value, definition) in host_vars_hierarchical(host, include_definition=True).items():
             if not is_normal_var(attr, value):
                 continue
-            is_declared_by_wrapper = attr in HostWrapper.__dict__.keys() or attr in HostWrapper.__annotations__
+            is_declared_by_wrapper = attr in HostWrapper.__dict__ or attr in HostWrapper.__annotations__
             entries.append((attr, value, is_declared_by_wrapper, definition))
 
         table = []
@@ -192,7 +196,7 @@ def show_inventory(inventory: str) -> None:
             table.append([[col_var, attr, col_reset], [col_darker, type(value).__name__, col_reset], definition_str, value_repr(value)])
         print_table([[col_blue, "variable", col_reset],
                      [col_blue, "type", col_reset],
-                     [col_darker, "(prec) ", col_reset, col_blue, "definition", col_reset],
+                     [col_darker, "(prec) ", col_reset, col_blue, "defined by", col_reset],
                      [col_blue, "value", col_reset]],
                      table, min_col_width=[24, 0, 12, 0])
 

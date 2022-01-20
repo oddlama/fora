@@ -346,7 +346,7 @@ def host_getattr_hierarchical(host: HostWrapper, attr: str) -> Any:
             raise AttributeError(attr)
         return vars(host)[attr]
 
-    if attr not in GroupWrapper.__annotations__:
+    if attr not in GroupWrapper.__annotations__ and attr not in GroupWrapper.__dict__:
         # Look up variable on groups
         for g in G.group_order:
             # Only consider a group if the host is in that group
@@ -361,7 +361,7 @@ def host_getattr_hierarchical(host: HostWrapper, attr: str) -> Any:
                 if is_normal_var(attr, value):
                     return value
 
-    if attr not in ScriptWrapper.__annotations__:
+    if attr not in ScriptWrapper.__annotations__ and attr not in ScriptWrapper.__dict__:
         # Look up variable on current script
         # pylint: disable=protected-access,import-outside-toplevel,cyclic-import
         if fora.script is not None:
@@ -401,8 +401,10 @@ def host_vars_hierarchical(host: HostWrapper, include_all_host_variables: bool =
     # pylint: disable=protected-access,import-outside-toplevel,cyclic-import
     if fora.script is not None:
         # Add variables from the script that are neither private
-        # nor part of a script's standard variables (ScriptWrapper.__annotations__)
-        dvars.update({attr: (v, fora.script) for attr,v in vars(fora.script).items() if is_normal_var(attr, v) and attr not in ScriptWrapper.__annotations__})
+        # nor part of a script's standard variables (ScriptWrapper.__annotations__ / __dict__)
+        dvars.update({attr: (v, fora.script) for attr,v in vars(fora.script).items() if is_normal_var(attr, v)
+                and attr not in ScriptWrapper.__annotations__
+                and attr not in ScriptWrapper.__dict__})
 
     # Add variable from groups (reverse order so that the highest-priority
     # group overwrites variables from lower priorities.
@@ -414,7 +416,9 @@ def host_vars_hierarchical(host: HostWrapper, include_all_host_variables: bool =
         # Add variables from groups that are neither private
         # nor part of a group's standard variables (GroupWrapper.__annotations__)
         group = G.groups[g]
-        dvars.update({attr: (v, group) for attr,v in vars(group).items() if is_normal_var(attr, v) and attr not in GroupWrapper.__annotations__})
+        dvars.update({attr: (v, group) for attr,v in vars(group).items() if is_normal_var(attr, v)
+                and attr not in GroupWrapper.__annotations__
+                and attr not in GroupWrapper.__dict__})
 
     # Lastly add all host variables, as they have the highest priority.
     dvars.update({attr: (v, host) for attr,v in vars(host).items() if include_all_host_variables or is_normal_var(attr, v)})
