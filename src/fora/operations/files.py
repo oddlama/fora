@@ -672,11 +672,12 @@ def line(path: str,
             # Remove matching lines
             if regex is None:
                 if ignore_whitespace:
-                    lines = filter(lambda l: line != l.strip(), lines)
+                    lines = list(filter(lambda l: line != l.strip(), lines))
                 else:
-                    lines = filter(lambda l: line != l, lines)
+                    lines = list(filter(lambda l: line != l, lines))
             else:
-                lines = filter(lambda l: not re.search(regex, l), lines)
+                # mypy false positive here, ignore type warning
+                lines = list(filter(lambda l: not re.search(regex, l), lines)) # type: ignore[type-var]
 
         new_content = "\n".join(lines) + "\n"
         new_bytes = new_content.encode("utf-8", errors="surrogateescape")
