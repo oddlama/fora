@@ -7,15 +7,17 @@ import argparse
 import inspect
 import os
 import sys
-from typing import Any, Callable, NoReturn, Optional, cast
+from types import MethodType, ModuleType
+from typing import Any, Callable, NoReturn, Optional, Union, cast
 
 import fora
 from fora import globals as G
 from fora.connection import open_connection
 from fora.example_deploys import init_deploy_structure
 from fora.loader import load_inventory, run_script
-from fora.types import HostWrapper
-from fora.utils import FatalError, die_error, install_exception_hook
+from fora.logger import col
+from fora.types import GroupWrapper, HostWrapper, ScriptWrapper
+from fora.utils import FatalError, die_error, host_vars_hierarchical, install_exception_hook, is_normal_var, print_fullwith, print_table
 from fora.version import version
 
 def main_run(args: argparse.Namespace) -> None:
@@ -60,6 +62,142 @@ def main_run(args: argparse.Namespace) -> None:
             # Separate hosts by a newline for better visibility
             print()
 
+def show_inventory(inventory: str) -> None:
+    """
+    Display a summary of the given inventory.
+
+    Parameters
+    ----------
+    inventory
+        The inventory argument
+    """
+    try:
+        load_inventory(inventory)
+    except FatalError as e:
+        die_error(str(e), loc=e.loc)
+
+    col_red      = col("\033[31m")
+    col_red_b    = col("\033[1;31m")
+    col_green    = col("\033[32m")
+    col_green_b  = col("\033[1;32m")
+    col_yellow   = col("\033[33m")
+    col_yellow_b = col("\033[1;33m")
+    col_blue     = col("\033[34m")
+    col_darker   = col("\033[90m")
+    col_darker_b = col("\033[1;90m")
+    col_reset    = col("\033[m")
+
+    base_dir = fora.inventory.base_dir()
+    def relpath(path: Optional[str]) -> Optional[str]:
+        return None if path is None else os.path.relpath(path, start=base_dir)
+
+    print_fullwith(["──────── ", col_red_b, "inventory", col_reset, " ", col_darker_b, inventory, col_reset, " "], [col_darker, f" {relpath(fora.inventory.definition_file())}", col_reset])
+
+    pretty_group_names = { name: f"{col_darker}- ({index}){col_reset} {col_yellow}{name}{col_reset}" for index,name in enumerate(reversed(G.group_order)) }
+    print(f"{col_blue}groups{col_reset} {col_darker}(precedence, low to high){col_reset}")
+    for i in pretty_group_names.values():
+        print(f"  {i}")
+
+    pretty_host_names = { name: f"{col_darker}-{col_reset} {col_green}{name}{col_reset} {col_darker}({host.url}, {relpath(host.definition_file())}){col_reset}" for name,host in G.hosts.items() }
+    print(f"{col_blue}hosts{col_reset} {col_darker}(url, module){col_reset}")
+    for i in pretty_host_names.values():
+        print(f"  {i}")
+
+    has_variables = len(fora.inventory.global_variables()) > 0
+    print(f"{col_blue if has_variables else col_darker}variables{col_reset}")
+    for attr, value in fora.inventory.global_variables().items():
+        print(f"{col_green}{attr}{col_reset}\t(type {type(value)}) = {value}")
+
+    def value_repr(x: Any) -> list[str]:
+        col = col_reset
+        if x is None:
+            col = col_red
+        elif isinstance(x, bool):
+            col = col_green if x else col_red
+        elif isinstance(x, (list, tuple, range, dict, set)):
+            col = col_blue
+        elif isinstance(x, (str, bytes)):
+            col = col_green
+        elif isinstance(x, (int, float)):
+            col = col_yellow
+        else:
+            col = col_darker
+
+        return [col, repr(value), col_reset]
+
+    def precedence(wrapper: Union[ScriptWrapper, GroupWrapper, HostWrapper]) -> int:
+        """Calculates a numeric variable precedence in accordance with the hierachical lookup rules."""
+        if isinstance(wrapper, GroupWrapper):
+            return G.group_order.index(wrapper.name)
+        elif isinstance(wrapper, HostWrapper):
+            return len(G.group_order)
+        else:
+            return -1
+
+    for name, group in G.groups.items():
+        print()
+        print_fullwith(["──────── ", col_red_b, "group", col_reset, " ", col_yellow_b, name, col_reset, " "], [col_darker, f" {relpath(group.definition_file())}", col_reset])
+        entries = []
+        for attr, value in vars(group).items():
+            if not is_normal_var(attr, value):
+                continue
+
+            is_declared_by_wrapper = attr in GroupWrapper.__dict__.keys() or attr in GroupWrapper.__annotations__
+            entries.append((attr, value, is_declared_by_wrapper))
+
+        # Sort by "is_declared" the by "attr"
+        table = []
+        for attr, value, is_declared_by_wrapper in sorted(entries, key=lambda tup: (not tup[2], tup[0])):
+            if is_declared_by_wrapper:
+                if group.is_overridden(attr):
+                    col_var = col_darker_b
+                else:
+                    col_var = col_darker
+            else:
+                col_var = col_yellow
+            table.append([[col_var, attr, col_reset], [col_darker, type(value).__name__, col_reset], value_repr(value)])
+        print_table([[col_blue, "variable", col_reset],
+                     [col_blue, "type", col_reset],
+                     [col_blue, "value", col_reset]],
+                     table, min_col_width=[24, 0, 0])
+
+    for name, host in G.hosts.items():
+        print()
+        print_fullwith(["──────── ", col_red_b, "host", col_reset, " ", col_green_b, name, col_reset, " "], [col_darker, f" {relpath(host.definition_file())}", col_reset])
+        entries = []
+        for attr, (value, definition) in host_vars_hierarchical(host, include_definition=True).items():
+            if not is_normal_var(attr, value):
+                continue
+            is_declared_by_wrapper = attr in HostWrapper.__dict__.keys() or attr in HostWrapper.__annotations__
+            entries.append((attr, value, is_declared_by_wrapper, definition))
+
+        table = []
+        for attr, value, is_declared_by_wrapper, definition in sorted(entries, key=lambda tup: (not tup[2], precedence(tup[3]), tup[0])):
+            definition_str = [col_darker, f"({precedence(host)}) ", col_reset, col_green, host.name, col_reset]
+            if is_declared_by_wrapper:
+                if host.is_overridden(attr):
+                    col_var = col_darker_b
+                else:
+                    col_var = col_darker
+            elif isinstance(definition, GroupWrapper):
+                col_var = col_yellow
+                definition_str = pretty_group_names[definition.name]
+                definition_str = [col_darker, f"({precedence(definition)}) ", col_reset, col_yellow, definition.name, col_reset]
+            elif isinstance(definition, HostWrapper):
+                col_var = col_green
+            else:
+                col_var = col_reset
+                definition_str = [col_darker, f"({precedence(definition)}) ?", col_reset]
+
+            table.append([[col_var, attr, col_reset], [col_darker, type(value).__name__, col_reset], definition_str, value_repr(value)])
+        print_table([[col_blue, "variable", col_reset],
+                     [col_blue, "type", col_reset],
+                     [col_darker, "(prec) ", col_reset, col_blue, "definition", col_reset],
+                     [col_blue, "value", col_reset]],
+                     table, min_col_width=[24, 0, 12, 0])
+
+    sys.exit(0)
+
 class ArgumentParserError(Exception):
     """Error class for argument parsing errors."""
 
@@ -96,6 +234,8 @@ def main(argv: Optional[list[str]] = None) -> None:
     # Run script options
     parser.add_argument('--init', action=ActionImmediateFunction, func=init_deploy_structure, choices=["minimal", "flat", "dotfiles", "modular", "staging_prod"],
             help="Initialize the current directory with a default deploy structure and exit. The various choices are explained in-depth in the documentation. As a rule of thumb, 'minimal' is the most basic starting point, 'flat' is well-suited for small and simple deploys, 'dotfiles' is explicitly intended for dotfile deploys, 'modular' is the most versatile layout intended to be used with modular sub-tasks, and 'staging_prod' is the modular layout with two separate inventories.")
+    parser.add_argument('--inspect-inventory', action=ActionImmediateFunction, func=show_inventory,
+            help="Display all available information about a specific inventory. This includes a summary as well as the specific variables available on each group or host.")
     parser.add_argument('-H', '--hosts', dest='hosts', default=None, type=str,
             help="Specifies a comma separated list of hosts to run on. By default all hosts are selected. Duplicates will be ignored.")
     parser.add_argument('--dry', '--dry-run', '--pretend', dest='dry', action='store_true',

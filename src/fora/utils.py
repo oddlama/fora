@@ -10,11 +10,12 @@ import importlib.util
 import inspect
 import os
 import pkgutil
+import shutil
 import sys
 import traceback
 import uuid
 from types import ModuleType, TracebackType
-from typing import Any, NoReturn, Type, TypeVar, Callable, Iterable, Optional, Union
+from typing import Any, Collection, NoReturn, Type, TypeVar, Callable, Iterable, Optional, Union
 
 import fora
 from fora import globals as G
@@ -55,6 +56,69 @@ def print_error(msg: str, loc: Optional[str] = None) -> None:
         print(f"{col('[1;31m')}error:{col('[m')} {msg}", file=sys.stderr)
     else:
         print(f"{col('[1m')}{loc}: {col('[1;31m')}error:{col('[m')} {msg}", file=sys.stderr)
+
+def len_ignore_leading_ansi(s: str) -> int:
+    """Returns the length of the string or 0 if it starts with `\033[`"""
+    return 0 if s.startswith("\033[") else len(s)
+
+def ansilen(ss: Collection[str]) -> int:
+    """Returns the length of all strings combined ignoring ansi control sequences"""
+    return sum(map(len_ignore_leading_ansi, ss))
+
+def ansipad(ss: Collection[str], pad: int = 0) -> str:
+    """Joins an array of string and ansi codes together and pads the result with spaces to at least `pad` characters."""
+    return ''.join(ss) + " " * max(0, pad - ansilen(ss))
+
+def print_fullwith(left: Optional[list[str]] = None, right: Optional[list[str]] = None, pad: str = '─', **kwargs: Any) -> None:
+    """Prints a message padded to the terminal width to stderr."""
+    if not left:
+        left = []
+    if not right:
+        right = []
+
+    cols = max(shutil.get_terminal_size((80, 20)).columns, 80)
+    n_pad = max(0, (cols - ansilen(left) - ansilen(right)))
+    print(''.join(left) + pad * n_pad + ''.join(right), **kwargs)
+
+def print_table(header: Collection[Collection[str]], rows: Collection[Collection[Collection[str]]], box_color: str = "\033[90m", min_col_width: Optional[list[int]] = None) -> None:
+    """Prints the given rows as an ascii box table."""
+    max_col_width = 40
+    terminal_cols = max(shutil.get_terminal_size((80, 20)).columns, 80)
+
+    # Calculate max needed with for each column
+    cols = len(header)
+    max_value_width = [0] * cols
+    for i,v in enumerate(header):
+        max_value_width[i] = max(max_value_width[i], ansilen(v))
+    for row in rows:
+        for i,v in enumerate(row):
+            max_value_width[i] = max(max_value_width[i], ansilen(v))
+
+    # Fairly distribute space between columns
+    if min_col_width is None:
+        min_col_width = [0] * cols
+    even_col_width = terminal_cols // cols
+    chars_needed_for_table_boxes = 3 * (len(header) - 1)
+    available_space = terminal_cols - chars_needed_for_table_boxes
+    col_width = [max(min_col_width[i], min(max_col_width, w, available_space - (cols - i - 1) * even_col_width)) for i,w in enumerate(max_value_width)]
+
+    # Distribute remaining space to first column from the back that would need the space
+    total_width = sum(col_width)
+    rest = available_space - total_width
+    if rest > 0:
+        for i,w in reversed(list(enumerate(max_value_width))):
+            if w > col_width[i]:
+                col_width[i] += rest
+                break
+
+    # Print table
+    col_reset = col("\033[m")
+    col_box = col(box_color)
+    delim = col_box + " │ " + col_reset
+    print(delim.join([ansipad(col, w) for col,w in zip(header, col_width)]))
+    print(col_box + "─┼─".join(["─" * w for w in col_width]) + col_reset)
+    for row in rows:
+        print(delim.join([ansipad(col, w) for col,w in zip(row, col_width)]))
 
 def die_error(msg: str, loc: Optional[str] = None, status_code: int = 1) -> NoReturn:
     """Prints a message with a colored 'error: ' prefix, and exit with the given status code afterwards."""

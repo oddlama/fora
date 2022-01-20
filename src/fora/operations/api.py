@@ -1,6 +1,5 @@
 """Provides API to define operations."""
 
-import shutil
 import subprocess
 import sys
 
@@ -11,7 +10,7 @@ from types import TracebackType, FrameType
 import fora
 from fora import globals as G, logger
 from fora.types import RemoteDefaultsContext
-from fora.utils import check_host_active
+from fora.utils import check_host_active, print_fullwith
 
 class OperationError(Exception):
     """An exception that indicates an error while executing an operation."""
@@ -265,27 +264,22 @@ def operation(op_name: str) -> Callable[[Callable], Callable]:
                 raise e.with_traceback(_calling_site_traceback())
             except subprocess.CalledProcessError as e:
                 ret = op.failure(str(e))
-                cols = max(shutil.get_terminal_size((80, 20)).columns, 80)
-
-                def print_fullwith(msg: list[str], pad: str = '─') -> None:
-                    """Prints a message padded to the terminal width to stderr."""
-                    msglen = sum(map(lambda s: 0 if s.startswith("\033[") else len(s), msg))
-                    print(pad * 8 + ''.join(msg) + pad * (cols - msglen - 8), file=sys.stderr)
 
                 # Print output of failed command for debugging
-                col_red = logger.col("\033[1;31m")
+                col_red    = logger.col("\033[1;31m")
                 col_yellow = logger.col("\033[1;33m")
-                col_reset = logger.col("\033[m")
-                print_fullwith(["────────[ ",
+                col_reset  = logger.col("\033[m")
+                col_darker = logger.col("\033[90m")
+                print_fullwith(["──────── ",
                     col_red, "command", col_reset, " ",
                     str(e.cmd), " ",
                     col_red, "failed", col_reset, " ",
-                    f"with code {e.returncode} ]"])
-                print_fullwith(["────────[ ", col_yellow, "stdout", col_reset, " (special characters escaped) ]"])
+                    f"with code {e.returncode} ]"], file=sys.stderr)
+                print_fullwith(["──────── ", col_yellow, "stdout", col_reset, col_darker, " (special characters escaped) ", col_reset], file=sys.stderr)
                 print(e.stdout.decode("utf-8", errors="backslashreplace"), file=sys.stderr)
-                print_fullwith(["────────[ ", col_yellow, "stderr", col_reset, " (special characters escaped) ]"])
+                print_fullwith(["──────── ", col_yellow, "stderr", col_reset, col_darker, " (special characters escaped) ", col_reset], file=sys.stderr)
                 print(e.stderr.decode("utf-8", errors="backslashreplace"), file=sys.stderr)
-                print_fullwith(["────────[ ", col_yellow, "end", col_reset, " ]"])
+                print_fullwith(["──────── ", col_yellow, "end", col_reset, col_darker, " ", col_reset], file=sys.stderr)
 
                 if G.args.debug:
                     raise
