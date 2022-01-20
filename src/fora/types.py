@@ -57,6 +57,14 @@ class ModuleWrapper:
     def __getattribute__(self, attr: str) -> Any:
         """Dynamic lookup will ensure that attributes on the module are used if available."""
         module = object.__getattribute__(self, "module")
+        if attr == "__dict__":
+            # Override `vars(obj)` to do correct fallback lookup
+            d = object.__getattribute__(self, "__dict__")
+            if module is not None:
+                d = d.copy()
+                d.update(module.__dict__)
+            return d
+
         if attr.startswith("__") or module is None or not hasattr(module, attr):
             return object.__getattribute__(self, attr)
         return getattr(module, attr)

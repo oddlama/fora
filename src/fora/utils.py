@@ -240,7 +240,7 @@ def import_submodules(package: Union[str, ModuleType], recursive: bool = False) 
             results.update(import_submodules(results[full_name]))
     return results
 
-def _is_normal_var(attr: str, value: Any) -> bool:
+def is_normal_var(attr: str, value: Any) -> bool:
     """Returns True if the attribute doesn't start with an underscore, and is not a module."""
     return not attr.startswith("_") \
             and not isinstance(value, ModuleType)
@@ -294,7 +294,7 @@ def host_getattr_hierarchical(host: HostWrapper, attr: str) -> Any:
             group = G.groups[g]
             if hasattr(group, attr):
                 value = getattr(group, attr)
-                if _is_normal_var(attr, value):
+                if is_normal_var(attr, value):
                     return value
 
     if attr not in ScriptWrapper.__annotations__:
@@ -303,12 +303,12 @@ def host_getattr_hierarchical(host: HostWrapper, attr: str) -> Any:
         if fora.script is not None:
             if hasattr(fora.script, attr):
                 value = getattr(fora.script, attr)
-                if _is_normal_var(attr, value):
+                if is_normal_var(attr, value):
                     return value
 
     raise AttributeError(attr)
 
-def host_vars_hierarchical(host: HostWrapper, include_all_host_variables: bool = False) -> dict[str, Any]:
+def host_vars_hierarchical(host: HostWrapper, include_all_host_variables: bool = False, include_definition: bool = False) -> dict[str, Any]:
     """
     Functions similarly to a hierarchical equivalent of `vars()`, just as
     `host_getattr_hierarchical` is the hierarchical equivalent of `getattr`.
@@ -321,6 +321,8 @@ def host_vars_hierarchical(host: HostWrapper, include_all_host_variables: bool =
         The host for which all variables should be collected.
     include_all_host_variables
         Whether to include all host variables that `var(host)` yields (also hidden and special variables such as __getattr__, or imported modules).
+    include_definition
+        Wrap each `value` in a tuple `(value, definition)` and also return from where the variable originates.
 
     Returns
     -------
@@ -329,14 +331,14 @@ def host_vars_hierarchical(host: HostWrapper, include_all_host_variables: bool =
     """
     # We will add variables from bottom-up so that low-priority
     # variables can be overwritten as expected.
-    dvars = {}
+    dvars: dict[str, Any] = {}
 
     # First, add all variable from the current script
     # pylint: disable=protected-access,import-outside-toplevel,cyclic-import
     if fora.script is not None:
         # Add variables from the script that are neither private
         # nor part of a script's standard variables (ScriptWrapper.__annotations__)
-        dvars.update({attr: v for attr,v in vars(fora.script.module).items() if _is_normal_var(attr, v) and attr not in ScriptWrapper.__annotations__})
+        dvars.update({attr: (v, fora.script) for attr,v in vars(fora.script).items() if is_normal_var(attr, v) and attr not in ScriptWrapper.__annotations__})
 
     # Add variable from groups (reverse order so that the highest-priority
     # group overwrites variables from lower priorities.
@@ -348,11 +350,15 @@ def host_vars_hierarchical(host: HostWrapper, include_all_host_variables: bool =
         # Add variables from groups that are neither private
         # nor part of a group's standard variables (GroupWrapper.__annotations__)
         group = G.groups[g]
-        dvars.update({attr: v for attr,v in vars(group).items() if _is_normal_var(attr, v) and attr not in GroupWrapper.__annotations__})
+        dvars.update({attr: (v, group) for attr,v in vars(group).items() if is_normal_var(attr, v) and attr not in GroupWrapper.__annotations__})
 
     # Lastly add all host variables, as they have the highest priority.
-    dvars.update({attr: v for attr,v in vars(host).items() if include_all_host_variables
-        or (_is_normal_var(attr, v) and attr not in HostWrapper.__annotations__)})
+    dvars.update({attr: (v, host) for attr,v in vars(host).items() if include_all_host_variables or is_normal_var(attr, v)})
+
+    # Strip definition if it isn't requested
+    if not include_definition:
+        dvars = {attr: v for attr,(v,_) in dvars.items()}
+
     return dvars
 
 def check_host_active() -> None:

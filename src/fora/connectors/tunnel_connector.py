@@ -60,7 +60,7 @@ class TunnelConnector(Connector):
             if returncode is None:
                 logger.connection_failed(str(e))
             else:
-                logger.connection_failed(f"ssh exited with code {returncode}")
+                logger.connection_failed(f"command exited with code {returncode}")
             raise
         finally:
             # If the connection failed for any reason, be sure to kill the background process.
