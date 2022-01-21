@@ -251,10 +251,10 @@ class HostWrapper(ModuleWrapper):
             return self.connector(self.url, self)
 
         if ':' not in self.url:
-            raise FatalError("url doesn't include a schema and no connector was specified explicitly", loc=self.definition_file())
+            raise FatalError("Url doesn't include a schema and no connector was specified explicitly", loc=self.definition_file())
         schema = self.url.split(':', maxsplit=1)[0]
         if schema not in Connector.registered_connectors:
-            raise FatalError(f"no connector found for schema '{schema}'", loc=self.definition_file())
+            raise FatalError(f"No connector found for schema '{schema}'", loc=self.definition_file())
         return Connector.registered_connectors[schema](self.url, self)
 
     def __getattr__(self, attr: str) -> Any:

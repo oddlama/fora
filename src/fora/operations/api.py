@@ -238,7 +238,7 @@ def operation(op_name: str) -> Callable[[Callable], Callable]:
             back_frame = back_frame.f_back if back_frame else None # Omit this function
             back_frame = back_frame.f_back if back_frame else None # Omit the function where _calling_site_traceback is called (the operation_wrapper below)
             if back_frame is None:
-                raise RuntimeError("back_frame cannot be None. This is a bug!") from None
+                raise RuntimeError("Error in site traceback: back_frame cannot be None. This is a bug!") from None
 
         return TracebackType(tb_next=None,
                              tb_frame=back_frame,

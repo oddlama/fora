@@ -88,7 +88,7 @@ def service(service: str, # pylint: disable=redefined-outer-name
     }
 
     if state is not None and state not in state_actions:
-        raise ValueError(f"invalid target state '{state}'")
+        raise ValueError(f"Invalid target state '{state}'")
 
     # Examine current state
     systemd_active_state = conn.run(["systemctl", "show", "--value", "--property", "ActiveState", "--", service]).stdout

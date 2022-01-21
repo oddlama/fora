@@ -457,6 +457,6 @@ def host_vars_hierarchical(host: HostWrapper, include_all_host_variables: bool =
 def check_host_active() -> None:
     """Asserts that an inventory has been loaded and a host is active."""
     if not G.inventory_loaded:
-        raise FatalError("invalid attempt to call operation before inventory was loaded! Did you maybe swap the inventory and deploy file on the command line?")
+        raise FatalError("Invalid attempt to call operation before inventory was loaded! Did you maybe swap the inventory and deploy file on the command line?")
     if fora.host is None:
-        raise FatalError("invalid attempt to call operation while no host is active!")
+        raise FatalError("Invalid attempt to call operation while no host is active!")

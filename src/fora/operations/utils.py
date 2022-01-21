@@ -191,9 +191,9 @@ def check_absolute_path(path: str, path_desc: str) -> None:
         Will be printed in case of error as a substitute for the invalid variable
     """
     if not path:
-        raise ValueError(f"path {path_desc} must be non-empty")
+        raise ValueError(f"Path {path_desc} must be non-empty")
     if path[0] != "/":
-        raise ValueError(f"path {path_desc} must be absolute")
+        raise ValueError(f"Path {path_desc} must be absolute")
 
 def new_op_fail(op_name: str, name: Optional[str], desc: str, error: str) -> OperationError:
     """

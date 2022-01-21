@@ -112,7 +112,7 @@ def user(user: str, # pylint: disable=redefined-outer-name,too-many-statements
     conn = fora.host.connection
 
     if groups is not None and not isinstance(groups, list):
-        raise ValueError("groups must be a list!")
+        raise ValueError("Groups must be a list!")
 
     # Examine current state
     current = conn.query_user(user=user, query_password_hash=True)

@@ -274,7 +274,7 @@ def init_deploy_structure(layout: Literal["minimal", "flat", "dotfiles", "modula
         Invalid layout.
     """
     if layout not in _init_fns:
-        raise ValueError(f"unknown deploy layout structure '{layout}'")
+        raise ValueError(f"Unknown deploy layout structure '{layout}'")
 
     # Check if directory is empty. If not, ask whether to proceed.
     cwd = os.getcwd()

@@ -263,7 +263,7 @@ def link(path: str,
     _ = (name, check) # Processed automatically.
     check_absolute_path(path, f"{path=}")
     if not target:
-        raise ValueError("link target cannot be empty")
+        raise ValueError("Link target cannot be empty")
     op.desc(path)
 
     conn = fora.host.connection
@@ -522,7 +522,7 @@ def template_content(content: str,
         templ = G.jinja2_env.from_string(content)
         rendered_content = _render_template(templ, context)
     except UndefinedError as e:
-        raise ValueError(f"error while templating string: {str(e)}") from None
+        raise ValueError(f"Error while templating string: {str(e)}") from None
 
     return save_content(op, rendered_content, dest, mode, owner, group)
 
@@ -572,12 +572,12 @@ def template(src: str,
     try:
         templ = G.jinja2_env.get_template(src)
     except TemplateNotFound as e:
-        raise ValueError(f"template '{str(e)}' not found") from None
+        raise ValueError(f"Template '{str(e)}' not found") from None
 
     try:
         rendered_content = _render_template(templ, context)
     except UndefinedError as e:
-        raise ValueError(f"error while templating '{src}': {str(e)}") from None
+        raise ValueError(f"Error while templating '{src}': {str(e)}") from None
 
     return save_content(op, rendered_content, dest, mode, owner, group)
 
