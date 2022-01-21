@@ -2,16 +2,14 @@
 
 import inspect
 import os
-import sys
-from itertools import combinations
 from types import ModuleType
 from typing import Union, cast, Any, Optional
 
 import fora
 
 from fora import globals as G, logger
-from fora.types import GroupDeclaration, GroupWrapper, HostDeclaration, HostWrapper, InventoryWrapper, ScriptWrapper
-from fora.utils import FatalError, print_error, load_py_module, rank_sort, CycleError
+from fora.types import GroupWrapper, HostWrapper, ScriptWrapper
+from fora.utils import FatalError, print_error, load_py_module
 
 script_stack: list[tuple[ScriptWrapper, inspect.FrameInfo]] = []
 """A stack of all currently executed scripts ((name, file), frame)."""
@@ -87,150 +85,6 @@ def load_group(name: str, module_file: Optional[str]) -> GroupWrapper:
     fora.group = cast(GroupWrapper, None)
     return wrapper
 
-def check_modules_for_conflicts(a: GroupWrapper, b: GroupWrapper) -> bool:
-    """
-    Asserts that two modules don't contain conflicting attributes.
-    Exits with an error in case any conflicts are detected.
-
-    Parameters
-    ----------
-    a
-        The first group module
-    b
-        The second group module
-
-    Returns
-    -------
-    bool
-        True when at least one conflicting attribute was found
-    """
-    # pylint: disable=protected-access
-    conflicts = list(a.group_variables() & b.group_variables())
-    had_conflicts = False
-    for conflict in conflicts:
-        if not had_conflicts:
-            print_error("Found group variables with ambiguous evaluation order, insert group dependency or remove one definition.")
-            had_conflicts = True
-        print_error(f"Definition of '{conflict}' is in conflict with definition at '{b.definition_file()}", loc=a.definition_file())
-    return had_conflicts
-
-def merge_group_dependencies(groups: dict[str, GroupWrapper]) -> None:
-    """
-    Merges the dependencies of a group module.
-    This means that before and after dependencies are duplicated to the referenced group,
-    and duplicated afterwards. Any self-references are detected and will cause the program to exit
-    with an error.
-
-    Parameters
-    ----------
-    groups
-        The dictionary of groups
-    """
-    # pylint: disable=protected-access
-    # Unify _before and _after dependencies
-    for g in groups:
-        for before in groups[g]._groups_before:
-            groups[before]._groups_after.add(g)
-
-    # Deduplicate _after, clear before
-    for _,group in groups.items():
-        group._groups_before = set()
-        group._groups_after = set(group._groups_after)
-
-    # Recalculate _before from _after
-    for g in groups:
-        for after in groups[g]._groups_after:
-            groups[after]._groups_before.add(g)
-
-    # Deduplicate before
-    for _,group in groups.items():
-        group._groups_before = set(group._groups_before)
-
-def sort_and_validate_groups(groups: dict[str, GroupWrapper]) -> list[str]:
-    """
-    Topologically sorts a dictionary of group modules (indexed by name), by their declared dependencies.
-    Also validates that the dependencies don't contain any cycles and don't contain any conflicting assignments.
-
-    Parameters
-    ----------
-    groups
-        The sorted dictionary of groups.
-
-    Returns
-    -------
-    list[GroupWrapper]
-        The topologically sorted list of groups
-
-    Raises
-    ------
-    ValueError
-        The loaded inventory was invalid.
-    """
-    # pylint: disable=protected-access
-
-    # Rank sort from bottom-up and top-down to calculate minimum rank and maximum rank.
-    # This is basically the earliest time a group might be applied (exactly after all dependencies
-    # were processed), and the latest time (any other group requires this one to be processed first).
-    #
-    # Rank numbers are already 0-based. This means in the top-down view, the root node
-    # has top-rank 0 and a high bottom-rank, and all leaves have bottom_rank 0 a high top-rank.
-    l_before = lambda g: groups[g]._groups_before
-    l_after = lambda g: groups[g]._groups_after
-
-    try:
-        gkeys = list(groups.keys())
-        ranks_t = rank_sort(gkeys, l_before, l_after) # Top-down
-        ranks_b = rank_sort(gkeys, l_after, l_before) # Bottom-up
-    except CycleError as e:
-        raise ValueError(f"dependency cycle detected! The cycle includes {[groups[g].definition_file() for g in e.cycle]}.") from None
-
-    # Find cycles in dependencies by checking for the existence of any edge that doesn't increase the rank.
-    # This is an error.
-    for g in groups:
-        for c in groups[g]._groups_after:
-            if ranks_t[c] <= ranks_t[g]:
-                raise ValueError(f"dependency cycle detected! The cycle includes '{groups[g].definition_file()}' and '{groups[c].definition_file()}'.")
-
-    # Find the maximum rank. Both ranking systems have the same number of ranks. This is
-    # true because the longest dependency chain determines the amount of ranks, and all dependencies
-    # are the same.
-    ranks_t_max = max(ranks_t.values())
-    ranks_b_max = max(ranks_b.values())
-    assert ranks_t_max == ranks_b_max
-    n_ranks = ranks_b_max
-
-    # Rebase bottom-ranks on top-ranks. We now want to transform top-ranks into minimum-ranks and
-    # bottom-ranks into maximum-ranks, as viewed from a top-down scheme. I.e. we want to know the
-    # range of ranks a module could occupy in any valid topological order. Therefore, we will simply
-    # subtract all bottom-ranks from the highest rank number to get maximum-ranks. The top-down ranks
-    # are already the minimum ranks.
-    ranks_min = ranks_t
-    ranks_max = {k: n_ranks - v for k,v in ranks_b.items()}
-
-    # For each group find all other groups that share at lease one rank. This means
-    # that there exists a topological order where A comes before B as well as a topological order where
-    # this order is reversed. These pairs will then be tested for any variable that is assigned in both.
-    # This would be an error, as the order of assignment and therfore the final value is ambiguous.
-    # Although these kind of errors are not fatal, we collect all and exit if necessary,
-    # because this constitutes a group design issue and should be fixed.
-    has_conflicts = False
-    for a, b in combinations(groups, 2):
-        # Skip pair if the ranks don't overlap
-        if ranks_max[a] < ranks_min[b] or ranks_min[a] > ranks_max[b]:
-            continue
-
-        # The two groups a and b share at least one rank with other,
-        # so we need to make sure they can't conflict
-        has_conflicts |= check_modules_for_conflicts(groups[a], groups[b])
-
-    if has_conflicts:
-        if G.args.debug:
-            raise RuntimeError("Exiting because of group module conflicts.")
-        sys.exit(1)
-
-    # Return a topological order based on the top-rank
-    return sorted(list(g for g in groups.keys()), key=lambda g: ranks_min[g])
-
 def add_predefined_global_variables(group_all: GroupWrapper) -> None:
     """
     Predefines global variables on the given all group. This includes
@@ -281,7 +135,7 @@ def load_groups() -> tuple[dict[str, GroupWrapper], list[str]]:
     try:
         topological_order = sort_and_validate_groups(loaded_groups)
     except ValueError as e:
-        raise FatalError(str(e)) from e
+        raise FatalError(str(e)) from E
     return (loaded_groups, topological_order)
 
 def load_host(name: str, url: str, module_file: Optional[str] = None, requires_module_file: bool = False) -> HostWrapper:
@@ -314,7 +168,7 @@ def load_host(name: str, url: str, module_file: Optional[str] = None, requires_m
     # Instanciate host module file if it exists, else return default host definition
     if module_file is None or not module_file_exists:
         if requires_module_file:
-            raise ValueError(f"required module file '{module_file}' for host '{name}' does not exist")
+            raise ValueError(f"Required module file '{module_file}' for host '{name}' does not exist")
         wrapper.wrap(DefaultHost())
     else:
         def _pre_exec(module: ModuleType) -> None:
@@ -349,7 +203,7 @@ def load_hosts() -> dict[str, HostWrapper]:
             (url, module_file, requires_module_file) = host + (True,)
             module_file = os.path.join(fora.inventory.base_dir(), module_file)
         else:
-            raise FatalError(f"invalid host '{str(host)}'", loc=fora.inventory.definition_file())
+            raise FatalError(f"Invalid host '{str(host)}'", loc=fora.inventory.definition_file())
 
         # First qualify the url (by default this adds ssh:// to "naked" hostnames)
         url = fora.inventory.qualify_url(url)
@@ -361,7 +215,7 @@ def load_hosts() -> dict[str, HostWrapper]:
             module_file = fora.inventory.host_module_file(name)
 
         if name in loaded_hosts:
-            raise FatalError(f"duplicate host '{str(host)}'", loc=fora.inventory.definition_file())
+            raise FatalError(f"Duplicate host '{str(host)}'", loc=fora.inventory.definition_file())
         loaded_hosts[name] = load_host(name=name, url=url, module_file=module_file, requires_module_file=requires_module_file)
 
     return loaded_hosts
@@ -395,21 +249,21 @@ def load_inventory(inventory_file_or_host_url: str) -> None:
 
         # Check that the hosts definition is valid.
         if not hasattr(inv, "hosts"):
-            raise FatalError("inventory must define a list of hosts!", loc=wrapper.definition_file())
+            raise FatalError("Inventory must define a list of hosts!", loc=wrapper.definition_file())
         hosts = getattr(inv, "hosts")
         if not isinstance(hosts, list):
-            raise FatalError(f"inventory.hosts must be of type list, not {type(hosts)}!", loc=wrapper.definition_file())
+            raise FatalError(f"`hosts` definition must be of type list, not {type(hosts)}!", loc=wrapper.definition_file())
     else:
         # Create an immediate inventory with just the given host.
         wrapper.wrap(ImmediateInventory([inventory_file_or_host_url]))
 
     try:
-        wrapper.process_inventory()
+        wrapper.preprocess_inventory()
     except ValueError as e:
         raise FatalError(str(e), loc=wrapper.definition_file()) from None
 
     # Load all groups and hosts from the global inventory.
-    G.groups, G.group_order = load_groups()
+    wrapper.load_groups()
     G.hosts = load_hosts()
     G.inventory_loaded = True
 

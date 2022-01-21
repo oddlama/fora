@@ -14,7 +14,7 @@ import inspect
 
 from dataclasses import dataclass, field
 from types import ModuleType, TracebackType
-from typing import TYPE_CHECKING, Any, Callable, Optional, Type, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Callable, Optional, Type, TypeVar, Union, cast
 from fora.remote_settings import RemoteSettings, ResolvedRemoteSettings
 
 if TYPE_CHECKING:
@@ -229,6 +229,12 @@ class HostWrapper(ModuleWrapper):
     # Cast to ease typechecking in user code.
     connection: Connection = cast("Connection", None)
     """The active connection to this host, if one is opened."""
+
+    variable_definition_history: dict[str, list[Union[GroupWrapper, HostWrapper]]] = field(default_factory=dict1)
+    """
+    A dictionary tracking the variable definition history for each variable on the host module.
+    This variable is usually filled by the inventory when this host module is loaded.
+    """
 
     def create_connector(self) -> Connector:
         """

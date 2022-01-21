@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
+
 if TYPE_CHECKING:
-    from fora.types import GroupWrapper, HostWrapper, InventoryWrapper, ScriptWrapper
+    from fora.types import GroupWrapper, HostWrapper, ScriptWrapper
+    from fora.inventory_wrapper import InventoryWrapper
 
 inventory: InventoryWrapper = cast("InventoryWrapper", None)
 """

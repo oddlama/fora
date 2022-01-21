@@ -148,10 +148,7 @@ def load_py_module(file: str, pre_exec: Optional[Callable[[ModuleType], None]] =
 def rank_sort(vertices: Iterable[T], preds_of: Callable[[T], Iterable[T]], childs_of: Callable[[T], Iterable[T]]) -> dict[T, int]:
     """
     Calculates the top-down rank for each vertex. Supports graphs with multiple components.
-    The graph must not have any cycles. If it does, a CycleError might be thrown, but this
-    is not guaranteed and can also result in the resulting rank containing back-edges.
-    By checking if the rank assignment contains a back-edge, a cycle in the graph can be detected
-    retroactively.
+    The graph must not have any cycles or a CycleError will be thrown.
 
     Parameters
     ----------
@@ -161,6 +158,11 @@ def rank_sort(vertices: Iterable[T], preds_of: Callable[[T], Iterable[T]], child
         A function that returns a list of predecessors given a vertex
     childs_of
         A function that returns a list of successors given a vertex
+
+    Raises
+    ------
+    CycleError
+        The given graph is cyclic.
 
     Returns
     -------
@@ -216,6 +218,13 @@ def rank_sort(vertices: Iterable[T], preds_of: Callable[[T], Iterable[T]], child
             ranks[n] = r
             # Queue childenii for rank assignment
             needs_rank_list.extend([(c, n) for c in childs_of(n)])
+
+    # Find cycles in dependencies by checking for the existence of any edge
+    # that doesn't increase the rank. This is an error.
+    for v in vertices:
+        for c in childs_of(v):
+            if ranks[c] <= ranks[v]:
+                raise CycleError(f"Cannot apply rank_sort to cyclic graph (late detection).", [c, v])
 
     return ranks
 
@@ -453,6 +462,33 @@ def host_vars_hierarchical(host: HostWrapper, include_all_host_variables: bool =
         dvars = {attr: v for attr,(v,_) in dvars.items()}
 
     return dvars
+
+def transitive_dependencies(initial: set[T], relation: Callable[[T], set[T]]) -> set[T]:
+    """
+    Calculates all transitive dependencies given a set of inital nodes and a relation.
+
+    Parameters
+    ----------
+    inital
+        The initial nodes to calculate transitive dependencies for.
+    relation
+        A function that relates a `T` to a set of `T`s
+
+    Returns
+    -------
+    set[T]
+        The transitive dependencies
+    """
+    to_process = initial
+    transitive_set = set()
+    while len(to_process) > 0:
+        t = to_process.pop()
+        if t in transitive_set:
+            continue
+
+        transitive_set.add(t)
+        to_process.update(relation(t))
+    return transitive_set
 
 def check_host_active() -> None:
     """Asserts that an inventory has been loaded and a host is active."""
