@@ -366,126 +366,6 @@ def load_hosts() -> dict[str, HostWrapper]:
 
     return loaded_hosts
 
-def process_host_declarations(inventory: InventoryWrapper) -> None:
-    """
-    Processes and modifies `inventory.hosts` to ensure each host is represented by a `HostDeclaration`
-    object. Also checks that no duplicate host declarations are present.
-
-    Parameters
-    ----------
-    inventory
-        The inventory to process.
-
-    Raises
-    ------
-    FatalError
-        Invalid hosts declaration (duplicate host or invalid definition)
-    """
-    # Unify declarations
-    decls = {}
-    for host in inventory.hosts:
-        decl: HostDeclaration
-        if isinstance(host, HostDeclaration):
-            decl = host
-        elif isinstance(host, str):
-            decl = HostDeclaration(url=host)
-        elif isinstance(host, dict):
-            decl = HostDeclaration(**host)
-        else:
-            raise FatalError(f"invalid host declaration '{str(host)}'", loc=inventory.definition_file())
-
-        # First qualify the url (by default this adds ssh:// to "naked" hostnames)
-        decl.url = inventory.qualify_url(decl.url)
-        # Next extract the indentifying "friendly" hostname which we need to find the module file for the host.
-        decl.name = inventory.extract_hostname(decl.url)
-
-        if decl.name in decls:
-            raise FatalError(f"duplicate host '{str(decl.name)}' specified by '{host}'", loc=inventory.definition_file())
-        decls[decl.name] = decl
-
-    inventory.hosts = list(decls.values())
-
-def process_group_declarations(inventory: InventoryWrapper) -> None:
-    """
-    Processes and modifies `inventory.groups` to ensure each host is represented by a `GroupDeclaration`
-    object. Also checks that no duplicate group declarations are present and that the `all` group is defined.
-
-    Parameters
-    ----------
-    inventory
-        The inventory to process.
-
-    Raises
-    ------
-    FatalError
-        Invalid groups declaration (duplicate group or invalid definition)
-    """
-    # No explicit definition was given. Therefore, automatically define groups
-    # based on the groups that were assigned to hosts.
-    if inventory.groups is None:
-        inventory.groups = []
-        for host in inventory.hosts:
-            if isinstance(host, HostDeclaration):
-                inventory.groups.extend(host.groups)
-            else:
-                raise RuntimeError("found invalid host declaration. Ensure that process_group_declarations is called after hosts were processed.")
-
-        # Deduplicate
-        inventory.groups = list(set(inventory.groups))
-
-    # Unify declarations
-    decls = {}
-    for group in inventory.groups:
-        decl: GroupDeclaration
-        if isinstance(group, GroupDeclaration):
-            decl = group
-        elif isinstance(group, str):
-            decl = GroupDeclaration(name=group)
-        elif isinstance(group, dict):
-            decl = GroupDeclaration(**group)
-        else:
-            raise FatalError(f"invalid group declaration '{str(group)}'", loc=inventory.definition_file())
-
-        if decl.name in decls:
-            raise FatalError(f"duplicate group '{str(decl.name)}' specified by '{group}'", loc=inventory.definition_file())
-        decls[decl.name] = decl
-
-    # Ensure "all" group is defined.
-    if "all" not in decls:
-        decls["all"] = GroupDeclaration(name="all")
-
-    inventory.groups = list(decls.values())
-
-def ensure_used_groups_are_declared(inventory: InventoryWrapper) -> None:
-    """
-    Ensure that all used groups are are actually declared.
-
-    Parameters
-    ----------
-    inventory
-        The inventory to process.
-
-    Raises
-    ------
-    FatalError
-        An unknown group was used or an invalid declaration was encountered.
-    """
-    groups = set()
-    assert inventory.groups is not None
-    for group in inventory.groups:
-        if isinstance(group, GroupDeclaration):
-            groups.add(group.name)
-        else:
-            raise RuntimeError("found invalid group declaration. Ensure that ensure_used_groups_are_declared is called after hosts and groups were processed.")
-
-    for host in inventory.hosts:
-        if isinstance(host, HostDeclaration):
-            for group in host.groups:
-                if group not in groups:
-                    raise FatalError(f"Unknown group '{group}' used in declaration of host '{host.name}'", loc=inventory.definition_file())
-        else:
-            raise RuntimeError("found invalid host declaration. Ensure that ensure_used_groups_are_declared is called after hosts and groups were processed.")
-
 def load_inventory(inventory_file_or_host_url: str) -> None:
     """
     Loads the global inventory from the given filename or single-host url
@@ -523,11 +403,10 @@ def load_inventory(inventory_file_or_host_url: str) -> None:
         # Create an immediate inventory with just the given host.
         wrapper.wrap(ImmediateInventory([inventory_file_or_host_url]))
 
-    process_host_declarations(wrapper)
-    process_group_declarations(wrapper)
-    ensure_used_groups_are_declared(wrapper)
-
-    wrapper._topological_order = []
+    try:
+        wrapper.process_inventory()
+    except ValueError as e:
+        raise FatalError(str(e), loc=wrapper.definition_file()) from None
 
     # Load all groups and hosts from the global inventory.
     G.groups, G.group_order = load_groups()
