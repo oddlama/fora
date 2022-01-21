@@ -42,6 +42,79 @@ class RemoteDefaultsContext:
         _ = (exc_type, exc, traceback)
         self.obj._defaults_stack.pop()
 
+@dataclass
+class HostDeclaration:
+    """A declaration of a host in an inventory."""
+
+    url: str
+    """
+    The default url used to connect to this host. If this is given without an connection
+    schema (like `ssh://`), `ssh://` will be used as the default. The function responsible
+    for this is `qualify_url`.
+    """
+
+    name: Optional[str] = None
+    """
+    The name that will be used to refer to this specific host.
+
+    If this is `None`, the name is extracted from the `url` after
+    qualification by the means of `extract_hostname`. In that case, the connector
+    determined by the `url` is responsible to parse it and provides a hostname.
+    This means that both of the urls `localhost` and `ssh://root@localhost:22` will
+    result in a host named `localhost` by default.
+
+    Beware that hostname extraction naturally needs to occurr before the corresponding
+    host module is loaded. The module can theoretically overwrite its intially assigned
+    `url` or even specify an explicit connector implementation, which can never be used
+    to assign a different name to the host in retrospect. Therefore, specifying the final
+    `url` in the inventory is preferred.
+    """
+
+    file: Optional[str] = None
+    """
+    The module file for this host, relative to the `base_dir`.
+
+    If `None`, this will default to `{hosts_dir}/{name}.py`. In that case,
+    the file is optional and will only be loaded when it exists.
+    If this attribute is set explicitly the file must exist, otherwise an error will be thrown.
+    """
+
+    groups: list[str] = field(default_factory=list)
+    """
+    The groups for this host. Duplicate entries are ignored.
+    All hosts will always be added to the global `all` group,
+    regardless of whether it is part of this list.
+    """
+
+@dataclass
+class GroupDeclaration:
+    """A declaration of a group in an inventory."""
+
+    name: str
+    """The name that will be used to refer to this specific group."""
+
+    file: Optional[str] = None
+    """
+    The module file for this group, relative to the `base_dir`.
+
+    If `None`, this will default to `{groups_dir}/{name}.py`. In that case,
+    the file is optional and will only be loaded when it exists.
+    If this attribute is set explicitly the file must exist, otherwise an error will be thrown.
+    """
+
+    after: list[str] = field(default_factory=list)
+    """
+    This group will be loaded _after_ this given list of groups.
+    The global `all` group will always be added to this list.
+    Duplicates are ignored.
+    """
+
+    before: list[str] = field(default_factory=list)
+    """
+    This group will be loaded _before_ this given list of groups.
+    Duplicates are ignored.
+    """
+
 class ModuleWrapper:
     """
     A module wrapper, that defaults attribute lookups to this object if the module doesn't define it.
@@ -167,74 +240,10 @@ class GroupWrapper(ModuleWrapper):
     """The name of the group. Must not be changed."""
 
     _groups_before: set[str] = field(default_factory=set)
-    """This group will be loaded before this set of other groups."""
+    """This group was loaded before this set of other groups."""
 
     _groups_after: set[str] = field(default_factory=set)
-    """This group will be loaded after this set of other groups."""
-
-    def before(self, group: str) -> None:
-        """
-        Adds a reverse-dependency on the given group.
-
-        Parameters
-        ----------
-        group
-            The group that must be loaded before this group.
-        """
-        import fora
-        from fora import globals as G
-        if fora.group is not self:
-            raise RuntimeError("This function may only be called inside a group module definition.")
-        if group not in G.available_groups:
-            raise ValueError(f"Referenced invalid group '{group}'!")
-        if group == self.name:
-            raise ValueError("Cannot add reverse-dependency to self!")
-
-        self._groups_before.add(group)
-
-    def before_all(self, groups: list[str]) -> None:
-        """
-        Adds a reverse-dependency on all given groups.
-
-        Parameters
-        ----------
-        groups
-            The groups
-        """
-        for g in groups:
-            self.before(g)
-
-    def after(self, group: str) -> None:
-        """
-        Adds a dependency on the given group.
-
-        Parameters
-        ----------
-        group
-            The group that must be loaded after this group.
-        """
-        import fora
-        from fora import globals as G
-        if fora.group is not self:
-            raise RuntimeError("This function may only be called inside a group module definition.")
-        if group not in G.available_groups:
-            raise ValueError(f"Referenced invalid group '{group}'!")
-        if group == self.name:
-            raise ValueError("Cannot add dependency to self!")
-
-        self._groups_after.add(group)
-
-    def after_all(self, groups: list[str]) -> None:
-        """
-        Adds a dependency on all given groups.
-
-        Parameters
-        ----------
-        groups
-            The groups
-        """
-        for g in groups:
-            self.after(g)
+    """This group was be loaded after this set of other groups."""
 
     def group_variables(self) -> set[str]:
         """
@@ -265,68 +274,36 @@ class HostWrapper(ModuleWrapper):
 
         url = "ssh://root@localhost" # Use this url to connect
         print(name)                  # Access this hosts's name
-        add_group("desktops")        # Add to desktops group
 
     instead of having to first import the wrapper API:
 
         from fora import group as this
-
-        this.after("desktops")
         print(this.name)
     """
 
     name: str
-    """The corresponding host name as defined in the inventory. Must not be changed."""
+    """The name that used to refer to this specific host. Must not be changed."""
 
     url: str
     """
-    The url for this host. The schema in this url will be used to determine
-    which connector is used to initiate a connection to this host, if the connector
-    has not been explicitly overridden by the host module by specifying a value
-    for the `connector` attribute.
+    The url used to connect to this host. The schema in this url will be used to
+    determine which connector implementation is used to establish a connection,
+    if the `connector` has not been explicitly overridden by the module.
+    This is determined just before a connection is initiated.
 
-    By default, this field will be set to a value which the inventory provided
-    for this host at load-time by the means of `InventoryWrapper.qualify_url`,
-    or by an overridden implementation of this function from the specific inventory.
+    By default, this field will reflect the value specified in the inventory,
+    after url qualification.
     """
 
     groups: set[str] = field(default_factory=set)
     """The set of groups this host belongs to."""
 
     connector: Optional[Callable[[str, HostWrapper], Connector]] = None
-    """The connector class to use. If None, the connector will be determined by the schema in the url when needed."""
+    """The connector class to use. If `None`, the connector will be determined by the schema in the `url` when needed."""
 
-    connection: Connection = cast("Connection", None) # Cast None to ease typechecking in user code.
-    """The connection to this host, if it is opened."""
-
-    def add_group(self, group: str) -> None:
-        """
-        Adds a this host to the specified group.
-
-        Parameters
-        ----------
-        group
-            The group
-        """
-        import fora
-        from fora import globals as G
-        if fora.host is not self:
-            raise RuntimeError("This function may only be called inside a host module definition.")
-        if group not in G.groups:
-            raise ValueError(f"Referenced invalid group '{group}'!")
-        self.groups.add(group)
-
-    def add_groups(self, groups: list[str]) -> None:
-        """
-        Adds a this host to the specified list of groups.
-
-        Parameters
-        ----------
-        groups
-            The groups
-        """
-        for g in groups:
-            self.add_group(g)
+    # Cast to ease typechecking in user code.
+    connection: Connection = cast("Connection", None)
+    """The active connection to this host, if one is opened."""
 
     def create_connector(self) -> Connector:
         """
@@ -356,6 +333,8 @@ class HostWrapper(ModuleWrapper):
         return Connector.registered_connectors[schema](self.url, self)
 
     def __getattr__(self, attr: str) -> Any:
+        """Variable lookup on the host has to fall back to a lookup on
+        the currently active script."""
         from fora.utils import host_getattr_hierarchical
         return host_getattr_hierarchical(self, attr)
 
@@ -372,30 +351,51 @@ class InventoryWrapper(ModuleWrapper):
     hosts_dir: str = "hosts"
     """The directory where to search for host module files, relative to the inventory."""
 
-    hosts: list[Union[str, tuple[str, str]]] = field(default_factory=list)
+    hosts: list[Union[str, HostDeclaration, dict[str, Any]]] = field(default_factory=list)
     """
-    A list of hosts in this inventory. Entries are either a single host url,
-    or a tuple of `(url, file)`, where `file` is the module file for that host.
-    Module files are searched relative to the inventory and default to `{hosts_dir}/{name}.py`
-    if not given. Host module files are optional, except when explicitly specified.
+    The list of hosts in this inventory. See `HostDeclaration` for an explanation
+    of the parameters for individual hosts. If a `dict` is given, it is automatically
+    used to construct a HostDeclaration. Providing a single `str` is equivalent to
+    `HostDeclaration(url=the_str)`.
 
-    If the host url is given without an connection schema (like `ssh://`),
-    by default `ssh://` will be prepended as each url is passed through `qualify_url`.
+    Duplicate entries (same name) will cause an exception to be raised when the
+    inventory is loaded.
 
-    The host's "friendly" name is extracted from the url after qualification
-    by the means of `extract_hostname`. By default the responsible connector
-    will be asked to provide a hostname. This means that both `localhost` and
-    `ssh://root@localhost:22` will result in a host named `localhost`.
+    Example:
 
-    Beware that a host module could possibly overwrite its assigned url
-    or specify an explicit connector in its module file. This means the
-    connector which extracted the hostname before host instanciation could
-    possibly be a different one than the connector used later for the connection.
+        hosts = [HostDeclaration(url="localhost", groups=["desktops"])),
+                 dict(url="host.example.com", name="myhost"),
+                 "example.com"]
+    """
+
+    groups: Optional[list[Union[str, GroupDeclaration, dict[str, Any]]]] = None
+    """
+    The list of groups in this inventory. See `GroupDeclaration` for an explanation
+    of the parameters for individual groups. If a `dict` is given, it is automatically
+    used to construct a GroupDeclaration. Providing a single `str` is equivalent to
+    `GroupDeclaration(name=the_str)`.
+
+    The global `all` group will always be added to this list, if it isn't already.
+
+    Duplicate entries (same name) will cause an exception to be raised when the
+    inventory is loaded.
+
+    Example:
+
+        groups = [GroupDeclaration(name="desktops", after=["archlinux"]),
+                  dict(name="servers", after=["archlinux"]),
+                  "archlinux"]
+    """
+
+    _topological_order: list[str] = field(default_factory=list)
+    """
+    A topological order of all groups in this inventory. Will be filled
+    when the inventory is loaded.
     """
 
     def global_variables(self) -> dict[str, Any]:
         """
-        Returns a list of global variables to implicitly add to the 'all' group
+        Returns a list of global variables to implicitly add to the global `all` group
         (before it is actually loaded). Useful to provide global per-inventory
         variables.
 

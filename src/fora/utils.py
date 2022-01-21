@@ -313,7 +313,7 @@ def is_normal_var(attr: str, value: Any) -> bool:
 # low precedence groups, or to extend a dictionary, list or some other object defined
 # previously. How do we accomplish this?
 #
-# An alternative approach that I tried was to implement a fully hierarchical lookup for the
+# One approach that I tried was to implement a fully hierarchical lookup for the
 # host module that did go through all groups in reverse order of precedence and return the
 # as soon as a variable was defined on one of the modules. Apart from the complexity,
 # a problem with this approach was that modifying existing variables like dictionaries from
