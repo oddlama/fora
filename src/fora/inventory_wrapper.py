@@ -1,3 +1,4 @@
+"""Provides the inventory wrapper for all inventory related functionality."""
 from __future__ import annotations
 
 import os
@@ -172,7 +173,8 @@ class InventoryWrapper(ModuleWrapper):
         dict[str, Any]
             Global variables for this inventory
         """
-        return dict()
+        _ = (self)
+        return {}
 
     def available_groups(self) -> set[str]:
         """
@@ -349,18 +351,13 @@ class InventoryWrapper(ModuleWrapper):
         ------
         ValueError
             Invalid groups declaration (duplicate group or invalid definition)
-        RuntimeError
-            The inventory has no associated module file.
         """
         # No explicit definition was given. Therefore, automatically define groups
         # based on the groups that were assigned to hosts.
         if self.groups is None:
             self.groups = []
-            for host in self.hosts:
-                if isinstance(host, HostDeclaration):
-                    self.groups.extend(host.groups)
-                else:
-                    raise RuntimeError("Invalid host declaration. Ensure that preprocess_group_declarations is called after hosts were processed.")
+            for host in self._host_decls.values():
+                self.groups.extend(host.groups)
 
             # Deduplicate
             self.groups = list(set(self.groups))
@@ -400,9 +397,9 @@ class InventoryWrapper(ModuleWrapper):
             An unknown group was used or an invalid declaration was encountered.
         """
         for host in self._host_decls.values():
-            for group in host.groups:
-                if group not in self._group_decls:
-                    raise ValueError(f"Unknown group '{group}' used in declaration of host '{host.name}'")
+            for group_name in host.groups:
+                if group_name not in self._group_decls:
+                    raise ValueError(f"Unknown group '{group_name}' used in declaration of host '{host.name}'")
 
         for group in self._group_decls.values():
             for after in group.after:
@@ -550,6 +547,7 @@ class InventoryWrapper(ModuleWrapper):
         wrapper = GroupWrapper(declaration.name)
         module_file = self.group_module_file(declaration.name) if declaration.file is None else declaration.file
 
+        # pylint: disable=import-outside-toplevel
         import fora
         def pre_exec(module: Any) -> None:
             fora.group = wrapper
@@ -601,9 +599,10 @@ class InventoryWrapper(ModuleWrapper):
             raise ValueError("Invalid instanciation request of unknown host. Ensure that the host has been defined in the inventory.")
 
         assert declaration.name is not None
-        wrapper = HostWrapper(declaration.name, declaration.url)
+        wrapper = HostWrapper(declaration.name, declaration.url, groups=declaration.groups)
         module_file = self.host_module_file(declaration.name) if declaration.file is None else declaration.file
 
+        # pylint: disable=import-outside-toplevel
         import fora
         def pre_exec(module: Any) -> None:
             fora.host = wrapper
@@ -700,7 +699,7 @@ class InventoryWrapper(ModuleWrapper):
         # we need to raise an error later, to allow all conflicts to be shown to the user first.
         conflicts: list[tuple[Literal["definition", "modification"], ModuleWrapper, Literal["definition", "modification"], ModuleWrapper, str]] = []
 
-        def record_variable_change(actor: ModuleWrapper, initializer: Optional[ModuleWrapper], attr: str, value: Any, record_conflicts: bool = False):
+        def record_variable_change(actor: ModuleWrapper, initializer: Optional[ModuleWrapper], attr: str, value: Any, record_conflicts_group: Optional[GroupWrapper] = None) -> None:
             if not is_bequestable(attr, value):
                 return
 
@@ -711,13 +710,13 @@ class InventoryWrapper(ModuleWrapper):
             previous_value = None if attr not in variable_action_history else variable_action_history[attr][-1].value
             was_modified = previous_value != value
             was_overwritten = hasattr(initializer, attr) and getattr(initializer, attr) is not value
-            cur_action = "modification" if was_modified and not was_overwritten else "definition"
+            cur_action: Literal["definition", "modification"] = "modification" if was_modified and not was_overwritten else "definition"
 
             if initializer is None or was_overwritten or was_modified:
                 # If the variable was actually overwritten, we need to make sure that this module
                 # was allowed to overwrite it. Otherwise, we record that this is a variable
                 # conflict and raise an exception later, once we found all offending variables.
-                if record_conflicts and initializer is not None and attr in variable_action_history:
+                if record_conflicts_group is not None and initializer is not None and attr in variable_action_history:
                     # Determine if the ranks of this group and any previous defining module overlap
                     # (which means they would share a common possible rank). If that is the case,
                     # they don't have any dependency on each other and overwriting is forbidden
@@ -726,7 +725,7 @@ class InventoryWrapper(ModuleWrapper):
                     # so a problem would only arise if the previous group's maximum possible rank
                     # overlaps with our minimum required rank.
                     for prev in variable_action_history[attr]:
-                        if self._group_ranks_max[prev.actor.name] >= self._group_ranks_min[group]:
+                        if self._group_ranks_max[prev.actor.name] >= self._group_ranks_min[record_conflicts_group.name]:
                             conflicts.append((prev.action, prev.actor, cur_action, actor, attr))
 
                 # Record this change for later analyses
@@ -735,7 +734,7 @@ class InventoryWrapper(ModuleWrapper):
         for group in groups_in_order:
             group_wrapper = self.load_group(group, initializer)
             for attr, value in vars(group_wrapper).items():
-                record_variable_change(group_wrapper, initializer, attr, value, record_conflicts=True)
+                record_variable_change(group_wrapper, initializer, attr, value, record_conflicts_group=group_wrapper)
 
             # Use the newly loaded group as the initializer for the next group
             initializer = group_wrapper
@@ -750,8 +749,9 @@ class InventoryWrapper(ModuleWrapper):
         # Update the variable action history one more time to include
         # definitions from the host module.
         for attr, value in vars(host_wrapper).items():
-            record_variable_change(host_wrapper, initializer, attr, value, record_conflicts=False)
+            record_variable_change(host_wrapper, initializer, attr, value)
 
         # Transfer the variable action history to the host wrapper,
+        # pylint: disable=protected-access
         host_wrapper._variable_action_history = variable_action_history
         return host_wrapper

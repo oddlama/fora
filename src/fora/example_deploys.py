@@ -114,7 +114,7 @@ def _write_file(file: str, content: str) -> None:
     content
         The content
     """
-    with open(file, "w") as f:
+    with open(file, "w", encoding="utf-8") as f:
         f.write(content)
 
 def init_structure_minimal() -> None:
@@ -258,7 +258,7 @@ def init_structure_staging_prod() -> None:
     _write_file("tasks/example_task/templates/site.j2", _nginx_site_j2)
     _write_file("deploy.py", _modular_nginx_deploy)
 
-def init_deploy_structure(layout: Literal["minimal", "flat", "dotfiles", "modular", "staging_prod"]) -> NoReturn:
+def init_deploy_structure(layout: Literal["minimal", "flat", "dotfiles", "modular", "staging_prod"]) -> NoReturn: # type: ignore[misc]
     """
     Initializes the current directory with a default deploy structure, if it is empty.
     Prompts the user to confirm operation if the current directory is not empty.

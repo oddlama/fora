@@ -222,7 +222,7 @@ def rank_sort(vertices: Iterable[T], preds_of: Callable[[T], Iterable[T]], child
     for v in vertices:
         for c in childs_of(v):
             if ranks[c] <= ranks[v]:
-                raise CycleError(f"Cannot apply rank_sort to cyclic graph (late detection).", [c, v])
+                raise CycleError("Cannot apply rank_sort to cyclic graph (late detection).", [c, v])
 
     return ranks
 

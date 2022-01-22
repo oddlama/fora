@@ -8,7 +8,7 @@ import inspect
 import os
 import sys
 from types import ModuleType
-from typing import Any, Callable, NoReturn, Optional, Union, cast
+from typing import Any, Callable, NoReturn, Optional, cast
 
 import fora
 from fora import globals as G
@@ -16,7 +16,7 @@ from fora.connection import open_connection
 from fora.example_deploys import init_deploy_structure
 from fora.loader import load_inventory, run_script
 from fora.logger import col
-from fora.types import GroupWrapper, HostWrapper, ScriptWrapper, VariableActionSnapshot
+from fora.types import GroupWrapper, HostWrapper, ModuleWrapper, VariableActionSnapshot
 from fora.utils import FatalError, die_error, install_exception_hook, print_fullwith, print_table
 from fora.version import version
 
@@ -72,6 +72,7 @@ def show_inventory(inventory: str) -> None:
     inventory
         The inventory argument
     """
+    # pylint: disable=protected-access,too-many-branches,too-many-statements
     try:
         load_inventory(inventory)
     except FatalError as e:
@@ -82,7 +83,6 @@ def show_inventory(inventory: str) -> None:
     col_green    = col("\033[32m")
     col_green_b  = col("\033[1;32m")
     col_yellow   = col("\033[33m")
-    col_yellow_b = col("\033[1;33m")
     col_blue     = col("\033[34m")
     col_darker   = col("\033[90m")
     col_darker_b = col("\033[1;90m")
@@ -96,6 +96,31 @@ def show_inventory(inventory: str) -> None:
     def relpath(path: Optional[str]) -> Optional[str]:
         return None if path is None else os.path.relpath(path, start=base_dir)
 
+    def value_repr(x: Any) -> list[str]:
+        color = col_reset
+        if x is None:
+            color = col_red
+        elif isinstance(x, bool):
+            color = col_green if x else col_red
+        elif isinstance(x, (list, tuple, range, dict, set)):
+            color = col_blue
+        elif isinstance(x, (str, bytes)):
+            color = col_green
+        elif isinstance(x, (int, float)):
+            color = col_yellow
+        else:
+            color = col_darker
+
+        return [color, repr(value), col_reset]
+
+    def precedence(wrapper: ModuleWrapper) -> int:
+        """Calculates a numeric variable precedence in accordance with the hierachical lookup rules."""
+        if isinstance(wrapper, GroupWrapper):
+            return fora.inventory._topological_order.index(wrapper.name)
+        if isinstance(wrapper, HostWrapper):
+            return len(fora.inventory._topological_order)
+        return -1
+
     print_fullwith(["──────── ", col_red_b, "inventory", col_reset, " ", col_darker_b, inventory, col_reset, " "], [col_darker, f" {relpath(fora.inventory.definition_file())}", col_reset])
 
     pretty_group_names = { name: f"{col_darker}- ({index}){col_reset} {col_yellow}{name}{col_reset}" for index,name in enumerate(fora.inventory._topological_order) }
@@ -108,74 +133,17 @@ def show_inventory(inventory: str) -> None:
     for i in pretty_host_names.values():
         print(f"  {i}")
 
-    has_variables = len(fora.inventory.global_variables()) > 0
-    print(f"{col_blue if has_variables else col_darker}variables{col_reset}")
-    for attr, value in fora.inventory.global_variables().items():
-        print(f"{col_green}{attr}{col_reset}\t(type {type(value)}) = {value}")
-
-    def value_repr(x: Any) -> list[str]:
-        col = col_reset
-        if x is None:
-            col = col_red
-        elif isinstance(x, bool):
-            col = col_green if x else col_red
-        elif isinstance(x, (list, tuple, range, dict, set)):
-            col = col_blue
-        elif isinstance(x, (str, bytes)):
-            col = col_green
-        elif isinstance(x, (int, float)):
-            col = col_yellow
-        else:
-            col = col_darker
-
-        return [col, repr(value), col_reset]
-
-    def precedence(wrapper: Union[ScriptWrapper, GroupWrapper, HostWrapper]) -> int:
-        """Calculates a numeric variable precedence in accordance with the hierachical lookup rules."""
-        if isinstance(wrapper, GroupWrapper):
-            return fora.inventory._topological_order.index(wrapper.name)
-        elif isinstance(wrapper, HostWrapper):
-            return len(fora.inventory._topological_order)
-        else:
-            return -1
-
-    is_normal_var = lambda attr, v: not attr.startswith("_") and not isinstance(v, ModuleType)
-
-    ######### TODO for name, group in G.groups.items():
-    ######### TODO     print()
-    ######### TODO     print_fullwith(["──────── ", col_red_b, "group", col_reset, " ", col_yellow_b, name, col_reset, " "], [col_darker, f" {relpath(group.definition_file())}", col_reset])
-    ######### TODO     entries = []
-    ######### TODO     for attr, value in vars(group).items():
-    ######### TODO         if not is_normal_var(attr, value):
-    ######### TODO             continue
-
-    ######### TODO         is_declared_by_wrapper = attr in GroupWrapper.__dict__ or attr in GroupWrapper.__annotations__
-    ######### TODO         entries.append((attr, value, is_declared_by_wrapper))
-
-    ######### TODO     # Sort by "is_declared" the by "attr"
-    ######### TODO     table = []
-    ######### TODO     for attr, value, is_declared_by_wrapper in sorted(entries, key=lambda tup: (not tup[2], tup[0])):
-    ######### TODO         if is_declared_by_wrapper:
-    ######### TODO             if group.is_overridden(attr):
-    ######### TODO                 col_var = col_darker_b
-    ######### TODO             else:
-    ######### TODO                 col_var = col_darker
-    ######### TODO         else:
-    ######### TODO             col_var = col_yellow
-    ######### TODO         table.append([[col_var, attr, col_reset], [col_darker, type(value).__name__, col_reset], value_repr(value)])
-    ######### TODO     print_table([[col_blue, "variable", col_reset],
-    ######### TODO                  [col_blue, "type", col_reset],
-    ######### TODO                  [col_blue, "value", col_reset]],
-    ######### TODO                  table, min_col_width=[24, 0, 0])
+    if len(fora.inventory.global_variables()) > 0:
+        print(f"{col_blue}variables{col_reset}")
+        for attr, value in fora.inventory.global_variables().items():
+            print(f"{col_green}{attr}{col_reset}\t(type {type(value)}) = {value}")
 
     for name, host in fora.inventory.loaded_hosts.items():
         print()
         print_fullwith(["──────── ", col_red_b, "host", col_reset, " ", col_green_b, name, col_reset, " "], [col_darker, f" {relpath(host.definition_file())}", col_reset])
         entries = []
-        import json
-        print(json.dumps(host._variable_action_history, indent=4, default=str))
         for attr, value in host.vars_hierarchical().items():
-            if not is_normal_var(attr, value):
+            if attr.startswith("_") or isinstance(value, ModuleType):
                 continue
             is_declared_by_wrapper = attr in HostWrapper.__dict__ or attr in HostWrapper.__annotations__
             last_actor = host._variable_action_history.get(attr, [VariableActionSnapshot("definition", host, value)])[-1].actor
@@ -183,16 +151,18 @@ def show_inventory(inventory: str) -> None:
 
         table = []
         for attr, value, is_declared_by_wrapper, last_actor in sorted(entries, key=lambda tup: (not tup[2], precedence(tup[3]), tup[0])):
-            definition_str = []
+            definition_str: list[str] = []
             for action in reversed(host._variable_action_history.get(attr, [VariableActionSnapshot("definition", host, value)])):
                 if isinstance(action.actor, GroupWrapper):
                     definition_str = [col_darker, f"({precedence(action.actor)}) ", col_reset, col_yellow, action.actor.name, col_reset, col_darker, ", ", col_reset] + definition_str
                 elif isinstance(action.actor, HostWrapper):
                     definition_str = [col_darker, f"({precedence(action.actor)}) ", col_reset, col_green, action.actor.name, col_reset, col_darker, ", ", col_reset] + definition_str
+                if action.action == "definition":
+                    break
 
+            # Strip last ", "
             definition_str = definition_str[:-3]
 
-            #definition_str = [col_darker, f"({precedence(host)}) ", col_reset, col_green, host.name, col_reset]
             col_var = col_darker
             if is_declared_by_wrapper:
                 if host.is_overridden(attr):
@@ -201,12 +171,10 @@ def show_inventory(inventory: str) -> None:
                     col_var = col_darker
             elif isinstance(last_actor, GroupWrapper):
                 col_var = col_yellow
-                #definition_str = [col_darker, f"({precedence(last_actor)}) ", col_reset, col_yellow, last_actor.name, col_reset]
             elif isinstance(last_actor, HostWrapper):
                 col_var = col_green
             else:
                 col_var = col_reset
-                #definition_str = [col_darker, f"({precedence(last_actor)}) ?", col_reset]
 
             table.append([[col_var, attr, col_reset], [col_darker, type(value).__name__, col_reset], definition_str, value_repr(value)])
         print_table([[col_blue, "variable", col_reset],

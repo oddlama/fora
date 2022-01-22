@@ -13,7 +13,6 @@ import fora
 from fora import globals as G, logger
 from fora.operations.api import Operation, OperationResult, operation
 from fora.operations.utils import check_absolute_path, save_content
-from fora.utils import host_vars_hierarchical
 
 def _render_template(templ: Template, context: Optional[dict]) -> bytes:
     """
@@ -34,7 +33,7 @@ def _render_template(templ: Template, context: Optional[dict]) -> bytes:
         The utf-8 encoded rendered template.
     """
 
-    dvars = host_vars_hierarchical(fora.host)
+    dvars = fora.host.vars_hierarchical()
 
     # Add context and "host"
     if context is None:
@@ -590,7 +589,7 @@ def line(path: str,
          backup: Union[bool, str] = False,
          name: Optional[str] = None,
          check: bool = True,
-         op: Operation = Operation.internal_use_only) -> OperationResult:
+         op: Operation = Operation.internal_use_only) -> OperationResult: # pylint: disable=redefined-outer-name,too-many-branches
     """
     Manage a line in a file. New lines will be added to the end of the file.
     If the file does not exist, it will be created with the current default file_mode, owner and group.

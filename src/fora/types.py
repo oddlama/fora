@@ -105,7 +105,7 @@ class ModuleWrapper:
     def is_overridden(self, attr: str) -> bool:
         """Returns True if a variable has both been overloaded and changed."""
         module = object.__getattribute__(self, "module")
-        return self.is_overloaded(attr) == True and getattr(module, attr) != object.__getattribute__(self, attr)
+        return self.is_overloaded(attr) is True and getattr(module, attr) != object.__getattribute__(self, attr)
 
     def wrap(self, module: Any, copy_members: bool = False, copy_functions: bool = False) -> None:
         """
@@ -250,7 +250,7 @@ class HostWrapper(ModuleWrapper):
             raise FatalError(f"No connector found for schema '{schema}'", loc=self.definition_file())
         return Connector.registered_connectors[schema](self.url, self)
 
-    def vars_hierarchical(self):
+    def vars_hierarchical(self) -> dict[str, Any]:
         """
         Returns `vars(self)` but adds all variables defined by the current script that
         are not overwritten by this host.
