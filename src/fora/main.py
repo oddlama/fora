@@ -98,7 +98,7 @@ def show_inventory(inventory: str) -> None:
 
     print_fullwith(["──────── ", col_red_b, "inventory", col_reset, " ", col_darker_b, inventory, col_reset, " "], [col_darker, f" {relpath(fora.inventory.definition_file())}", col_reset])
 
-    pretty_group_names = { name: f"{col_darker}- ({index}){col_reset} {col_yellow}{name}{col_reset}" for index,name in enumerate(reversed(fora.inventory._topological_order)) }
+    pretty_group_names = { name: f"{col_darker}- ({index}){col_reset} {col_yellow}{name}{col_reset}" for index,name in enumerate(fora.inventory._topological_order) }
     print(f"{col_blue}groups{col_reset} {col_darker}(precedence, low to high){col_reset}")
     for i in pretty_group_names.values():
         print(f"  {i}")
@@ -172,14 +172,17 @@ def show_inventory(inventory: str) -> None:
         print()
         print_fullwith(["──────── ", col_red_b, "host", col_reset, " ", col_green_b, name, col_reset, " "], [col_darker, f" {relpath(host.definition_file())}", col_reset])
         entries = []
+        import json
+        print(json.dumps(host._variable_definition_history, indent=4, default=str))
         for attr, value in host.vars_hierarchical().items():
             if not is_normal_var(attr, value):
                 continue
             is_declared_by_wrapper = attr in HostWrapper.__dict__ or attr in HostWrapper.__annotations__
-            entries.append((attr, value, is_declared_by_wrapper))
+            definition = host._variable_definition_history.get(attr, [host])[-1]
+            entries.append((attr, value, is_declared_by_wrapper, definition))
 
         table = []
-        for attr, value, is_declared_by_wrapper, definition in sorted(entries, key=lambda tup: (not tup[2], precedence(host.variable_definition_history[tup[0]][-1]), tup[0])):
+        for attr, value, is_declared_by_wrapper, definition in sorted(entries, key=lambda tup: (not tup[2], precedence(tup[3]), tup[0])):
             definition_str = [col_darker, f"({precedence(host)}) ", col_reset, col_green, host.name, col_reset]
             if is_declared_by_wrapper:
                 if host.is_overridden(attr):

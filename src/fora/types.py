@@ -150,14 +150,11 @@ class GroupWrapper(ModuleWrapper):
     All functions and members from this wrapper will be implicitly available
     on the wrapped group module. This means you can do the following
 
-        after("desktops") # Higher precedence than desktops
         print(name)       # Access this group's name
 
     instead of having to first import the wrapper API:
 
         from fora import group as this
-
-        this.after("desktops")
         print(this.name)
     """
 
@@ -206,7 +203,7 @@ class HostWrapper(ModuleWrapper):
     connection: Connection = cast("Connection", None)
     """The active connection to this host, if one is opened."""
 
-    variable_definition_history: dict[str, list[Union[GroupWrapper, HostWrapper]]] = field(default_factory=dict)
+    _variable_definition_history: dict[str, list[Union[GroupWrapper, HostWrapper]]] = field(default_factory=dict)
     """
     A dictionary tracking the variable definition history for each variable on the host module.
     This variable is usually filled by the inventory when this host module is loaded.

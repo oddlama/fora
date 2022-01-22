@@ -3,11 +3,15 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from glob import glob
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 from typing import Any, Optional, Union, cast
 
 from fora.types import GroupWrapper, HostWrapper, ModuleWrapper
 from fora.utils import CycleError, load_py_module, print_error, rank_sort, transitive_dependencies
+
+def is_bequestable(attr: str, value: Any) -> bool:
+    """Returns true if this variable will be inherited by modules with higher ordering precedence."""
+    return not (attr.startswith("_") or attr in GroupWrapper.__annotations__ or attr in GroupWrapper.__dict__ or isinstance(value, ModuleType))
 
 @dataclass
 class HostDeclaration:
@@ -355,7 +359,7 @@ class InventoryWrapper(ModuleWrapper):
                 if isinstance(host, HostDeclaration):
                     self.groups.extend(host.groups)
                 else:
-                    raise RuntimeError("Invalid host declaration. ensure that preprocess_group_declarations is called after hosts were processed.")
+                    raise RuntimeError("Invalid host declaration. Ensure that preprocess_group_declarations is called after hosts were processed.")
 
             # Deduplicate
             self.groups = list(set(self.groups))
@@ -398,6 +402,14 @@ class InventoryWrapper(ModuleWrapper):
             for group in host.groups:
                 if group not in self._group_decls:
                     raise ValueError(f"Unknown group '{group}' used in declaration of host '{host.name}'")
+
+        for group in self._group_decls.values():
+            for after in group.after:
+                if after not in self._group_decls:
+                    raise ValueError(f"Unknown group '{after}' used in after set of group '{group.name}'")
+            for before in group.before:
+                if before not in self._group_decls:
+                    raise ValueError(f"Unknown group '{before}' used in after set of group '{group.name}'")
 
     def merge_group_dependencies(self) -> None:
         """
@@ -451,15 +463,15 @@ class InventoryWrapper(ModuleWrapper):
         # were processed), and the latest time (any other group requires this one to be processed first).
         #
         # Rank numbers are already 0-based. This means in the top-down view, the root node
-        # has top-rank 0 and a high bottom-rank, and all leaves have bottom_rank 0 a high top-rank.
+        # has top-rank 0 and a high bottom-rank, and all leaves have bottom_rank 0 and a high top-rank.
         l_before = lambda g: self._group_decls[g].before
         l_after = lambda g: self._group_decls[g].after
 
         group_names = list(self._group_decls)
 
         try:
-            ranks_t = rank_sort(group_names, l_before, l_after) # Top-down
-            ranks_b = rank_sort(group_names, l_after, l_before) # Bottom-up
+            ranks_t = rank_sort(group_names, l_after, l_before) # Top-down
+            ranks_b = rank_sort(group_names, l_before, l_after) # Bottom-up
         except CycleError as e:
             raise ValueError(f"Dependency cycle detected! The cycle includes {e.cycle}.") from None
 
@@ -481,7 +493,6 @@ class InventoryWrapper(ModuleWrapper):
 
         # Save the topological order based on the top-rank
         group_names.sort(key=lambda g: self._group_ranks_min[g])
-        print(self._group_ranks_min)
         self._topological_order = group_names
 
     def load(self) -> None:
@@ -551,12 +562,9 @@ class InventoryWrapper(ModuleWrapper):
 
             # Initialize global namespace if an initializer was provided.
             if initializer is not None:
-                print("init", declaration)
-                for attr, v in vars(initializer).items():
-                    if attr.startswith("_"):
-                        continue
-                    print("bequest", attr)
-                    setattr(module, attr, v)
+                for attr, value in vars(initializer).items():
+                    if is_bequestable(attr, value):
+                        setattr(module, attr, value)
 
         # Instanciate module file if it exists, else return default definition
         if module_file is None or not os.path.exists(module_file):
@@ -602,12 +610,9 @@ class InventoryWrapper(ModuleWrapper):
 
             # Initialize global namespace if an initializer was provided.
             if initializer is not None:
-                print("h init", declaration)
-                for attr, v in vars(initializer).items():
-                    if attr.startswith("_"):
-                        continue
-                    print("bequest", attr)
-                    setattr(module, attr, v)
+                for attr, value in vars(initializer).items():
+                    if is_bequestable(attr, value):
+                        setattr(module, attr, value)
 
         # Instanciate module file if it exists, else return default definition
         if module_file is None or not os.path.exists(module_file):
@@ -671,8 +676,8 @@ class InventoryWrapper(ModuleWrapper):
         """
         # We begin by figuring out all relevant groups for this host. This simply
         # are all transitive dependencies (`group.after`) of all direct groups of this host.
-        host_decl = self._host_decls[host]
-        transitive_groups = transitive_dependencies(set(host_decl.groups), lambda g: set(self._group_decls[g].after))
+        assert host in self._host_decls
+        transitive_groups = transitive_dependencies(set(self._host_decls[host].groups), lambda g: set(self._group_decls[g].after))
         groups_in_order = filter(transitive_groups.__contains__, self._topological_order)
 
         # Next, we iterate through all groups in topological order, and load the
@@ -695,13 +700,15 @@ class InventoryWrapper(ModuleWrapper):
         conflicts: list[tuple[GroupWrapper, GroupWrapper, str]] = []
 
         for group in groups_in_order:
-            print("aaaaaaa", group)
             group_wrapper = self.load_group(group, initializer)
-            for attr in vars(group_wrapper):
+            for attr, value in vars(group_wrapper).items():
+                if not is_bequestable(attr, value):
+                    continue
+
                 # If the variable changed identity compared to the value it was initialized with,
                 # it was overwritten (or it was newly defined). We want to record this in our
                 # definition history.
-                if initializer is None or (hasattr(initializer, attr) and getattr(initializer, attr) is not getattr(group_wrapper, attr)):
+                if initializer is None or (hasattr(initializer, attr) and getattr(initializer, attr) is not value):
                     # If the variable was actually overwritten, we need to make sure that this module
                     # was allowed to overwrite it. Otherwise, we record that this is a variable
                     # conflict and raise an exception later, once we found all offending variables.
@@ -726,9 +733,9 @@ class InventoryWrapper(ModuleWrapper):
             initializer = group_wrapper
 
         if len(conflicts) > 0:
-            print_error("Found conflicting variable assignments from groups with ambiguous evaluation order. Insert a group dependency or remove one definition.")
             for prev_def, new_def, attr in conflicts:
                 print_error(f"Definition of '{attr}' is in conflict with definition at {new_def.definition_file()}", loc=prev_def.definition_file())
+            raise ValueError("Conflict in variable assignment from two groups with ambiguous ordering. Insert dependency or remove one definition.")
 
         # Finally instanciate the actual host.
         host_wrapper = self.load_host(host, initializer)
@@ -737,9 +744,12 @@ class InventoryWrapper(ModuleWrapper):
         # but update that definition history one more time to include
         # definitions from the host module. The transfer is done first, as the
         # type of the dict broadens now.
-        host_wrapper.variable_definition_history.update(variable_definition_history)
-        for attr in vars(host_wrapper):
-            if initializer is None or (hasattr(initializer, attr) and getattr(initializer, attr) is not getattr(host_wrapper, attr)):
-                host_wrapper.variable_definition_history.setdefault(attr, []).append(host_wrapper)
+        host_wrapper._variable_definition_history.update(variable_definition_history)
+        for attr, value in vars(host_wrapper).items():
+            if not is_bequestable(attr, value):
+                continue
+
+            if initializer is None or (hasattr(initializer, attr) and getattr(initializer, attr) is not value):
+                host_wrapper._variable_definition_history.setdefault(attr, []).append(host_wrapper)
 
         return host_wrapper

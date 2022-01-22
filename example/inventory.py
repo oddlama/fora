@@ -4,7 +4,7 @@
 #
 # The instanciated module has access to the name of the host via fora.host_definition.name
 # and may adapt it's behavior dynamically based on this information.
-hosts = [ dict(url="localhost", groups=["desktops"])
+hosts = [ dict(url="localhost", groups=["desktops", "servers"])
 #        , ("mail1", "hosts/mail.py")
 #        , ("mail2", "hosts/mail.py")
 #        , dict(url="localhost", module="hosts/mail.py", groups=["desktops"])
@@ -14,5 +14,5 @@ hosts = [ dict(url="localhost", groups=["desktops"])
 # fora here, to enforce certain settings for your inventory.
 # from fora import globals as G
 # G.args.diff = True
-groups = [ dict(name="desktops", before=["servers"])
+groups = [ dict(name="desktops", before=[])
          , "servers"]
