@@ -16,7 +16,7 @@ from fora.connection import open_connection
 from fora.example_deploys import init_deploy_structure
 from fora.loader import load_inventory, run_script
 from fora.logger import col
-from fora.types import GroupWrapper, HostWrapper, ScriptWrapper
+from fora.types import GroupWrapper, HostWrapper, ScriptWrapper, VariableActionSnapshot
 from fora.utils import FatalError, die_error, install_exception_hook, print_fullwith, print_table
 from fora.version import version
 
@@ -173,31 +173,40 @@ def show_inventory(inventory: str) -> None:
         print_fullwith(["──────── ", col_red_b, "host", col_reset, " ", col_green_b, name, col_reset, " "], [col_darker, f" {relpath(host.definition_file())}", col_reset])
         entries = []
         import json
-        print(json.dumps(host._variable_definition_history, indent=4, default=str))
+        print(json.dumps(host._variable_action_history, indent=4, default=str))
         for attr, value in host.vars_hierarchical().items():
             if not is_normal_var(attr, value):
                 continue
             is_declared_by_wrapper = attr in HostWrapper.__dict__ or attr in HostWrapper.__annotations__
-            definition = host._variable_definition_history.get(attr, [host])[-1]
-            entries.append((attr, value, is_declared_by_wrapper, definition))
+            last_actor = host._variable_action_history.get(attr, [VariableActionSnapshot("definition", host, value)])[-1].actor
+            entries.append((attr, value, is_declared_by_wrapper, last_actor))
 
         table = []
-        for attr, value, is_declared_by_wrapper, definition in sorted(entries, key=lambda tup: (not tup[2], precedence(tup[3]), tup[0])):
-            definition_str = [col_darker, f"({precedence(host)}) ", col_reset, col_green, host.name, col_reset]
+        for attr, value, is_declared_by_wrapper, last_actor in sorted(entries, key=lambda tup: (not tup[2], precedence(tup[3]), tup[0])):
+            definition_str = []
+            for action in reversed(host._variable_action_history.get(attr, [VariableActionSnapshot("definition", host, value)])):
+                if isinstance(action.actor, GroupWrapper):
+                    definition_str = [col_darker, f"({precedence(action.actor)}) ", col_reset, col_yellow, action.actor.name, col_reset, col_darker, ", ", col_reset] + definition_str
+                elif isinstance(action.actor, HostWrapper):
+                    definition_str = [col_darker, f"({precedence(action.actor)}) ", col_reset, col_green, action.actor.name, col_reset, col_darker, ", ", col_reset] + definition_str
+
+            definition_str = definition_str[:-3]
+
+            #definition_str = [col_darker, f"({precedence(host)}) ", col_reset, col_green, host.name, col_reset]
+            col_var = col_darker
             if is_declared_by_wrapper:
                 if host.is_overridden(attr):
                     col_var = col_darker_b
                 else:
                     col_var = col_darker
-            elif isinstance(definition, GroupWrapper):
+            elif isinstance(last_actor, GroupWrapper):
                 col_var = col_yellow
-                definition_str = pretty_group_names[definition.name]
-                definition_str = [col_darker, f"({precedence(definition)}) ", col_reset, col_yellow, definition.name, col_reset]
-            elif isinstance(definition, HostWrapper):
+                #definition_str = [col_darker, f"({precedence(last_actor)}) ", col_reset, col_yellow, last_actor.name, col_reset]
+            elif isinstance(last_actor, HostWrapper):
                 col_var = col_green
             else:
                 col_var = col_reset
-                definition_str = [col_darker, f"({precedence(definition)}) ?", col_reset]
+                #definition_str = [col_darker, f"({precedence(last_actor)}) ?", col_reset]
 
             table.append([[col_var, attr, col_reset], [col_darker, type(value).__name__, col_reset], definition_str, value_repr(value)])
         print_table([[col_blue, "variable", col_reset],

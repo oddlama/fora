@@ -14,7 +14,7 @@ import inspect
 
 from dataclasses import dataclass, field
 from types import ModuleType, TracebackType
-from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, Type, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, Type, TypeVar, cast
 
 from fora.remote_settings import RemoteSettings, ResolvedRemoteSettings
 
@@ -40,6 +40,16 @@ class RemoteDefaultsContext:
     def __exit__(self, exc_type: Optional[Type[BaseException]], exc: Optional[BaseException], traceback: Optional[TracebackType]) -> None:
         _ = (exc_type, exc, traceback)
         self.obj._defaults_stack.pop()
+
+@dataclass
+class VariableActionSnapshot:
+    """A snapshot for variable tracking."""
+    action: Literal["definition", "modification"]
+    """Whether the variable was modified or redefined"""
+    actor: ModuleWrapper
+    """The owner of this variable"""
+    value: Any
+    """The snapshot value."""
 
 class ModuleWrapper:
     """
@@ -194,7 +204,7 @@ class HostWrapper(ModuleWrapper):
     after url qualification.
     """
 
-    groups: set[str] = field(default_factory=set)
+    groups: list[str] = field(default_factory=list)
     """The set of groups this host belongs to."""
 
     connector: Optional[Callable[[str, HostWrapper], Connector]] = None
@@ -204,11 +214,14 @@ class HostWrapper(ModuleWrapper):
     connection: Connection = cast("Connection", None)
     """The active connection to this host, if one is opened."""
 
-    _variable_definition_history: dict[str, list[tuple[Literal["definition", "modification"], Union[GroupWrapper, HostWrapper]]]] = field(default_factory=dict)
+    _variable_action_history: dict[str, list[VariableActionSnapshot]] = field(default_factory=dict)
     """
     A dictionary tracking the variable definition history for each variable on the host module.
     This variable is usually filled by the inventory when this host module is loaded.
     """
+
+    def __repr__(self) -> str:
+        return f"HostWrapper(name={repr(self.name)}, url={repr(self.url)}, groups={repr(self.groups)})"
 
     def create_connector(self) -> Connector:
         """

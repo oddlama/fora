@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import os
+from copy import copy
 from dataclasses import dataclass, field
 from glob import glob
 from types import ModuleType, SimpleNamespace
 from typing import Any, Literal, Optional, Union, cast
 
-from fora.types import GroupWrapper, HostWrapper, ModuleWrapper
+from fora.types import GroupWrapper, HostWrapper, ModuleWrapper, VariableActionSnapshot
 from fora.utils import CycleError, load_py_module, print_error, rank_sort, transitive_dependencies
 
 def is_bequestable(attr: str, value: Any) -> bool:
@@ -693,65 +694,64 @@ class InventoryWrapper(ModuleWrapper):
         # of those two modules in the topological order, so the resulting variable would be
         # ambiguous. As a side effect we can later store this history on the host wrapper,
         # as it is useful for the inspector output of `fora --inspect-inventory`.
-        variable_definition_history: dict[str, list[tuple[Literal["definition", "modification"], GroupWrapper]]] = {}
+        variable_action_history: dict[str, list[VariableActionSnapshot]] = {}
 
         # We record all encountered variable conflicts while loading. If we find any,
         # we need to raise an error later, to allow all conflicts to be shown to the user first.
-        conflicts: list[tuple[GroupWrapper, GroupWrapper, str]] = []
+        conflicts: list[tuple[Literal["definition", "modification"], ModuleWrapper, Literal["definition", "modification"], ModuleWrapper, str]] = []
 
-        # TODO track variable modification
+        def record_variable_change(actor: ModuleWrapper, initializer: Optional[ModuleWrapper], attr: str, value: Any, record_conflicts: bool = False):
+            if not is_bequestable(attr, value):
+                return
+
+            # If the variable changed identity compared to the value it was initialized with,
+            # it was overwritten (or it was newly defined). We want to record this in our
+            # definition history. We also compare against a snapshot of the value to detect
+            # modification instead of redefinition.
+            previous_value = None if attr not in variable_action_history else variable_action_history[attr][-1].value
+            was_modified = previous_value != value
+            was_overwritten = hasattr(initializer, attr) and getattr(initializer, attr) is not value
+            cur_action = "modification" if was_modified and not was_overwritten else "definition"
+
+            if initializer is None or was_overwritten or was_modified:
+                # If the variable was actually overwritten, we need to make sure that this module
+                # was allowed to overwrite it. Otherwise, we record that this is a variable
+                # conflict and raise an exception later, once we found all offending variables.
+                if record_conflicts and initializer is not None and attr in variable_action_history:
+                    # Determine if the ranks of this group and any previous defining module overlap
+                    # (which means they would share a common possible rank). If that is the case,
+                    # they don't have any dependency on each other and overwriting is forbidden
+                    # as their relative order is arbitrary. We already know that the current group
+                    # is ordered after the previous group, as we are iterating in topological order,
+                    # so a problem would only arise if the previous group's maximum possible rank
+                    # overlaps with our minimum required rank.
+                    for prev in variable_action_history[attr]:
+                        if self._group_ranks_max[prev.actor.name] >= self._group_ranks_min[group]:
+                            conflicts.append((prev.action, prev.actor, cur_action, actor, attr))
+
+                # Record this change for later analyses
+                variable_action_history.setdefault(attr, []).append(VariableActionSnapshot(cur_action, actor, copy(value)))
 
         for group in groups_in_order:
             group_wrapper = self.load_group(group, initializer)
             for attr, value in vars(group_wrapper).items():
-                if not is_bequestable(attr, value):
-                    continue
-
-                # If the variable changed identity compared to the value it was initialized with,
-                # it was overwritten (or it was newly defined). We want to record this in our
-                # definition history.
-                if initializer is None or (hasattr(initializer, attr) and getattr(initializer, attr) is not value):
-                    # If the variable was actually overwritten, we need to make sure that this module
-                    # was allowed to overwrite it. Otherwise, we record that this is a variable
-                    # conflict and raise an exception later, once we found all offending variables.
-                    if initializer is not None and attr in variable_definition_history:
-                        previous_definitions = variable_definition_history[attr]
-
-                        # Determine if the ranks of this group and any previous defining module overlap
-                        # (which means they would share a common possible rank). If that is the case,
-                        # they don't have any dependency on each other and overwriting is forbidden
-                        # as their relative order is arbitrary. We already know that the current group
-                        # is ordered after the previous group, as we are iterating in topological order,
-                        # so a problem would only arise if the previous group's maximum possible rank
-                        # overlaps with our minimum required rank.
-                        for prev in previous_definitions:
-                            if self._group_ranks_max[prev.name] >= self._group_ranks_min[group]:
-                                conflicts.append((prev, group_wrapper, attr))
-
-                    # Record this definition for later analyses
-                    variable_definition_history.setdefault(attr, []).append(("definition", group_wrapper))
+                record_variable_change(group_wrapper, initializer, attr, value, record_conflicts=True)
 
             # Use the newly loaded group as the initializer for the next group
             initializer = group_wrapper
 
         if len(conflicts) > 0:
-            for prev_def, new_def, attr in conflicts:
-                print_error(f"Definition of '{attr}' is in conflict with definition at {new_def.definition_file()}", loc=prev_def.definition_file())
+            for prev_action, prev_def, new_action, new_def, attr in conflicts:
+                print_error(f"{new_action.capitalize()} of '{attr}' is in conflict with {prev_action} at {prev_def.definition_file()}", loc=new_def.definition_file())
             raise ValueError("Conflict in variable assignment from two groups with ambiguous ordering. Insert dependency or remove one definition.")
 
         # Finally instanciate the actual host.
         host_wrapper = self.load_host(host, initializer)
-
-        # Transfer the variable definition history to the host wrapper,
-        # but update that definition history one more time to include
-        # definitions from the host module. The transfer is done first, as the
-        # type of the dict broadens now.
-        host_wrapper._variable_definition_history.update(variable_definition_history)
+        # Update the variable action history one more time to include
+        # definitions from the host module.
         for attr, value in vars(host_wrapper).items():
-            if not is_bequestable(attr, value):
-                continue
+            record_variable_change(host_wrapper, initializer, attr, value, record_conflicts=False)
 
-            if initializer is None or (hasattr(initializer, attr) and getattr(initializer, attr) is not value):
-                host_wrapper._variable_definition_history.setdefault(attr, []).append(host_wrapper)
-
+        # Transfer the variable action history to the host wrapper,
+        host_wrapper._variable_action_history = variable_action_history
         return host_wrapper
