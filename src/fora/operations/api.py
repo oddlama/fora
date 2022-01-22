@@ -4,7 +4,7 @@ import subprocess
 import sys
 
 from functools import wraps
-from typing import Callable, cast, Any, Optional
+from typing import Callable, TypeVar, cast, Any, Optional
 from types import TracebackType, FrameType
 
 import fora
@@ -220,7 +220,11 @@ class Operation:
             logger.print_operation(self, result)
         return result
 
-def operation(op_name: str) -> Callable[[Callable], Callable]:
+_TFunc = TypeVar("_TFunc", bound=Callable[..., Any])
+# This is untyped as the language server can then apparently
+# complete the wrapped function correctly, and ParamSpec
+# was only introduced in python 3.10.
+def operation(op_name: str): # type: ignore[no-untyped-def]
     """Operation function decorator."""
 
     def _calling_site_traceback() -> TracebackType:
@@ -245,7 +249,7 @@ def operation(op_name: str) -> Callable[[Callable], Callable]:
                              tb_lasti=back_frame.f_lasti,
                              tb_lineno=back_frame.f_lineno)
 
-    def operation_wrapper(function: Callable) -> Callable:
+    def operation_wrapper(function: _TFunc) -> _TFunc:
         @wraps(function)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             check_host_active()
@@ -300,5 +304,5 @@ def operation(op_name: str) -> Callable[[Callable], Callable]:
                 raise error.with_traceback(_calling_site_traceback())
 
             return ret
-        return wrapper
+        return cast(_TFunc, wrapper)
     return operation_wrapper

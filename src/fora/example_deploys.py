@@ -23,9 +23,6 @@ _localhost_def = dedent("""\
 # if the inventory entry is just a name like "localhost"
 # url = "ssh://root@localhost"
 
-# Add the host to a group if needed
-# add_group("somegroup")
-
 # Define variables for this host
 somevariable = "this was defined by the host"
 """)

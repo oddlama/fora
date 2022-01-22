@@ -79,7 +79,7 @@ def load_inventory(inventory_file_or_host_url: str) -> None:
     try:
         wrapper.load()
     except ValueError as e:
-        raise FatalError(str(e), loc=wrapper.definition_file()) from None
+        raise FatalError(str(e), loc=wrapper.definition_file()) from e
 
 def run_script(script: str,
                frame: inspect.FrameInfo,

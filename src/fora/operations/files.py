@@ -582,14 +582,14 @@ def template(src: str,
 
 @operation("line")
 def line(path: str,
-         line: str,
+         line: str, # pylint: disable=redefined-outer-name
          present: bool = True,
          regex: Optional[str] = None,
          ignore_whitespace: bool = True,
          backup: Union[bool, str] = False,
          name: Optional[str] = None,
          check: bool = True,
-         op: Operation = Operation.internal_use_only) -> OperationResult: # pylint: disable=redefined-outer-name,too-many-branches
+         op: Operation = Operation.internal_use_only) -> OperationResult:
     """
     Manage a line in a file. New lines will be added to the end of the file.
     If the file does not exist, it will be created with the current default file_mode, owner and group.
@@ -627,6 +627,7 @@ def line(path: str,
     op
         The operation wrapper. Must not be supplied by the user.
     """
+    # pylint: disable=too-many-branches
     _ = (name, check) # Processed automatically.
     check_absolute_path(path, f"{path=}")
     op.desc(path)

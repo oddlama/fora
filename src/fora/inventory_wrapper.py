@@ -336,6 +336,8 @@ class InventoryWrapper(ModuleWrapper):
             decl.url = self.qualify_url(decl.url)
             # Next extract the indentifying "friendly" hostname which we need to find the module file for the host.
             decl.name = self.extract_hostname(decl.url)
+            # Ensure host is in "all" group
+            decl.groups = list(set(decl.groups) | set(["all"]))
 
             if decl.name in self._host_decls:
                 raise ValueError(f"Duplicate host '{str(decl.name)}' specified by '{host}'")
@@ -379,7 +381,7 @@ class InventoryWrapper(ModuleWrapper):
 
             # Deduplicate before and after
             decl.before = list(set(decl.before))
-            decl.after = list(set(decl.after) | set(["all"]))
+            decl.after = list(set(decl.after) | set(["all"] if decl.name != "all" else []))
 
             self._group_decls[decl.name] = decl
 
@@ -545,7 +547,7 @@ class InventoryWrapper(ModuleWrapper):
             raise ValueError("Invalid instanciation request of unknown group. Ensure that the group has been defined in the inventory.")
 
         wrapper = GroupWrapper(declaration.name)
-        module_file = self.group_module_file(declaration.name) if declaration.file is None else declaration.file
+        module_file = self.group_module_file(declaration.name) if declaration.file is None else os.path.join(self.base_dir(), declaration.file)
 
         # pylint: disable=import-outside-toplevel
         import fora
@@ -600,7 +602,7 @@ class InventoryWrapper(ModuleWrapper):
 
         assert declaration.name is not None
         wrapper = HostWrapper(declaration.name, declaration.url, groups=declaration.groups)
-        module_file = self.host_module_file(declaration.name) if declaration.file is None else declaration.file
+        module_file = self.host_module_file(declaration.name) if declaration.file is None else os.path.join(self.base_dir(), declaration.file)
 
         # pylint: disable=import-outside-toplevel
         import fora
