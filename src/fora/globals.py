@@ -5,7 +5,6 @@ from typing import cast
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from fora.remote_settings import RemoteSettings
-from fora.types import GroupWrapper, HostWrapper
 
 args: argparse.Namespace = cast(argparse.Namespace, None)
 """
@@ -13,25 +12,6 @@ The global logger. Should be used for all user-facing information logging to ens
 that this information is displayed in a proper format and according to the user's
 verbosity preferences.
 """
-
-available_groups: set[str] = set()
-"""
-All groups that will be available after loading. Useful to raise
-errors early when referencing undefined groups.
-"""
-
-inventory_loaded: bool = False
-"""Indicates whether the inventory is fully loaded. Used to detect argument confusion errors."""
-
-groups: dict[str, GroupWrapper] = {}
-"""A dict containing all group modules loaded from the inventory, indexed by name."""
-
-group_order: list[str] = []
-"""A topological order of all groups, with highest precedence first."""
-
-hosts: dict[str, HostWrapper] = {}
-"""A dict containing all host definitions, mapped by host_id."""
-
 
 jinja2_env: Environment = Environment(
     loader=FileSystemLoader('.', followlinks=True),

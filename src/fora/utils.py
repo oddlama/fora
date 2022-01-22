@@ -18,8 +18,6 @@ from types import ModuleType, TracebackType
 from typing import Any, Collection, NoReturn, Type, TypeVar, Callable, Iterable, Optional, Union
 
 import fora
-from fora import globals as G
-from fora.types import GroupWrapper, HostWrapper, ScriptWrapper
 from fora.logger import col
 
 class FatalError(Exception):
@@ -228,7 +226,7 @@ def rank_sort(vertices: Iterable[T], preds_of: Callable[[T], Iterable[T]], child
 
     return ranks
 
-def script_trace(script_stack: list[tuple[ScriptWrapper, inspect.FrameInfo]],
+def script_trace(script_stack: list[tuple[Any, inspect.FrameInfo]],
                  include_root: bool = False) -> str:
     """
     Creates a script trace similar to a python backtrace.
@@ -272,7 +270,7 @@ def print_exception(exc_type: Optional[Type[BaseException]], exc_info: Optional[
     # Print the script stack if at least one user script is involved,
     # which means we need to have at least two entries as the root context
     # is also involved.
-    script_stack = getattr(exc_info, 'script_stack', None)
+    script_stack = getattr(exc_info, "script_stack", None)
     if script_stack is not None and len(script_stack) > 1:
         print(script_trace(script_stack), file=sys.stderr)
 
@@ -313,156 +311,6 @@ def import_submodules(package: Union[str, ModuleType], recursive: bool = False) 
             results.update(import_submodules(results[full_name]))
     return results
 
-def is_normal_var(attr: str, value: Any) -> bool:
-    """Returns True if the attribute doesn't start with an underscore, and is not a module."""
-    return not attr.startswith("_") \
-            and not isinstance(value, ModuleType)
-
-# We need a way to allow groups and host modules to override variables from other
-# low precedence groups, or to extend a dictionary, list or some other object defined
-# previously. How do we accomplish this?
-#
-# One approach that I tried was to implement a fully hierarchical lookup for the
-# host module that did go through all groups in reverse order of precedence and return the
-# as soon as a variable was defined on one of the modules. Apart from the complexity,
-# a problem with this approach was that modifying existing variables like dictionaries from
-# parent modules wasn't easy or clean. We would've had to distinguish between those cases
-# depending on a type annotation of the variable. While this was possible, it introduced
-# an unnecessary conecept of annotating some variables to gain special "magic" behavior
-# and a lot of complexity. At that time, the depndencies between modules was defined in
-# the modules themselves, which made it impossible to inherit variables between groups.
-#
-# The approach I settled on now is to define groups and group dependencies in the inventory,
-# allowing us to load group modules in the correct order. By doing this, we can bequest (copy)
-# all variables that have been defined until that point to the next module that will be loaded,
-# be it a host or another group. This allows any module to access and modify all inherited
-# variables easily, as they are just part of the global variables.
-#
-# This reduces the special "fora" behavior to this list of things:
-#   - script parameters are defined via a "params" dataclass
-#   - all attributes are defined on the host in question, but script default variables
-#     still require minimal hijacking of getattr
-#   - inventories, groups and hosts are collections of global variables used within fora
-def host_getattr_hierarchical(host: HostWrapper, attr: str) -> Any:
-    """
-    Looks up and returns the given attribute on the host's hierarchy in the following order:
-
-      1. Host variables
-      2. Group variables (respecting topological order, excluding GroupWrapper variables)
-      3. Script variables (excluding ScriptWrapper variables)
-      4. raises AttributeError
-
-    If the attribute starts with an underscore, the lookup will always be from the host object
-    itself, and won't be propagated hierarchically. The same is True for any variable that
-    is a module (so imported modules in group/script definitions will not be visible).
-
-    Parameters
-    ----------
-    host
-        The host for which the attribute should be retrieved.
-    attr
-        The attribute to retrieve.
-
-    Returns
-    -------
-    Any
-        The attribute's value if it was found.
-
-    Raises
-    ------
-    AttributeError
-        The given attribute was not found.
-    """
-    # While getattr implicitly does a local lookup before calling this function,
-    # we still need this block to force certain variables to always be looked up locally.
-    if attr.startswith("_") or attr in HostWrapper.__annotations__:
-        if attr not in vars(host):
-            raise AttributeError(attr)
-        return vars(host)[attr]
-
-    if attr not in GroupWrapper.__annotations__ and attr not in GroupWrapper.__dict__:
-        # Look up variable on groups
-        for g in G.group_order:
-            # Only consider a group if the host is in that group
-            if g not in vars(host)["groups"]:
-                continue
-
-            # Return the attribute if it is set on the group,
-            # and if it is a normal variable
-            group = G.groups[g]
-            if hasattr(group, attr):
-                value = getattr(group, attr)
-                if is_normal_var(attr, value):
-                    return value
-
-    if attr not in ScriptWrapper.__annotations__ and attr not in ScriptWrapper.__dict__:
-        # Look up variable on current script
-        # pylint: disable=protected-access,import-outside-toplevel,cyclic-import
-        if fora.script is not None:
-            if hasattr(fora.script, attr):
-                value = getattr(fora.script, attr)
-                if is_normal_var(attr, value):
-                    return value
-
-    raise AttributeError(attr)
-
-def host_vars_hierarchical(host: HostWrapper, include_all_host_variables: bool = False, include_definition: bool = False) -> dict[str, Any]:
-    """
-    Functions similarly to a hierarchical equivalent of `vars()`, just as
-    `host_getattr_hierarchical` is the hierarchical equivalent of `getattr`.
-    The same constraints as for `host_getattr_hierarchical` apply, but never raises
-    an AttributeError.
-
-    Parameters
-    ----------
-    host
-        The host for which all variables should be collected.
-    include_all_host_variables
-        Whether to include all host variables that `var(host)` yields (also hidden and special variables such as __getattr__, or imported modules).
-    include_definition
-        Wrap each `value` in a tuple `(value, definition)` and also return from where the variable originates.
-
-    Returns
-    -------
-    dict[str, Any]
-        A dictionary containing all currently accessible variables.
-    """
-    # We will add variables from bottom-up so that low-priority
-    # variables can be overwritten as expected.
-    dvars: dict[str, Any] = {}
-
-    # First, add all variable from the current script
-    # pylint: disable=protected-access,import-outside-toplevel,cyclic-import
-    if fora.script is not None:
-        # Add variables from the script that are neither private
-        # nor part of a script's standard variables (ScriptWrapper.__annotations__ / __dict__)
-        dvars.update({attr: (v, fora.script) for attr,v in vars(fora.script).items() if is_normal_var(attr, v)
-                and attr not in ScriptWrapper.__annotations__
-                and attr not in ScriptWrapper.__dict__})
-
-    # Add variable from groups (reverse order so that the highest-priority
-    # group overwrites variables from lower priorities.
-    for g in reversed(G.group_order):
-        # Only consider a group if the host is in that group
-        if g not in vars(host)["groups"]:
-            continue
-
-        # Add variables from groups that are neither private
-        # nor part of a group's standard variables (GroupWrapper.__annotations__)
-        group = G.groups[g]
-        dvars.update({attr: (v, group) for attr,v in vars(group).items() if is_normal_var(attr, v)
-                and attr not in GroupWrapper.__annotations__
-                and attr not in GroupWrapper.__dict__})
-
-    # Lastly add all host variables, as they have the highest priority.
-    dvars.update({attr: (v, host) for attr,v in vars(host).items() if include_all_host_variables or is_normal_var(attr, v)})
-
-    # Strip definition if it isn't requested
-    if not include_definition:
-        dvars = {attr: v for attr,(v,_) in dvars.items()}
-
-    return dvars
-
 def transitive_dependencies(initial: set[T], relation: Callable[[T], set[T]]) -> set[T]:
     """
     Calculates all transitive dependencies given a set of inital nodes and a relation.
@@ -492,7 +340,7 @@ def transitive_dependencies(initial: set[T], relation: Callable[[T], set[T]]) ->
 
 def check_host_active() -> None:
     """Asserts that an inventory has been loaded and a host is active."""
-    if not G.inventory_loaded:
+    if fora.inventory is None or not fora.inventory.is_initialized():
         raise FatalError("Invalid attempt to call operation before inventory was loaded! Did you maybe swap the inventory and deploy file on the command line?")
     if fora.host is None:
         raise FatalError("Invalid attempt to call operation while no host is active!")

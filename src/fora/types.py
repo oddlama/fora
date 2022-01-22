@@ -137,7 +137,7 @@ class ModuleWrapper:
         str
             The file.
         """
-        if self.module is None or not hasattr(self.module, '__file__') or self.module.__file__ is None:
+        if self.module is None or not hasattr(self.module, "__file__") or self.module.__file__ is None:
             return "<internal>"
         return self.module.__file__
 
@@ -163,30 +163,6 @@ class GroupWrapper(ModuleWrapper):
 
     name: str
     """The name of the group. Must not be changed."""
-
-    _groups_before: set[str] = field(default_factory=set)
-    """This group was loaded before this set of other groups."""
-
-    _groups_after: set[str] = field(default_factory=set)
-    """This group was be loaded after this set of other groups."""
-
-    def group_variables(self) -> set[str]:
-        """
-        Returns the list of all user-defined attributes for this group.
-
-        Returns
-        -------
-        set[str]
-            The user-defined attributes for this group
-        """
-        print("-------------------------", self)
-        module_vars = set(attr for attr in dir(self.module) if
-                            not attr.startswith("_") and
-                            not isinstance(getattr(self.module, attr), ModuleType))
-        module_vars -= set(GroupWrapper.__annotations__)
-        module_vars -= set(GroupWrapper.__dict__)
-        print(module_vars)
-        return module_vars
 
 @dataclass
 class HostWrapper(ModuleWrapper):
@@ -230,7 +206,7 @@ class HostWrapper(ModuleWrapper):
     connection: Connection = cast("Connection", None)
     """The active connection to this host, if one is opened."""
 
-    variable_definition_history: dict[str, list[Union[GroupWrapper, HostWrapper]]] = field(default_factory=dict1)
+    variable_definition_history: dict[str, list[Union[GroupWrapper, HostWrapper]]] = field(default_factory=dict)
     """
     A dictionary tracking the variable definition history for each variable on the host module.
     This variable is usually filled by the inventory when this host module is loaded.
@@ -263,11 +239,76 @@ class HostWrapper(ModuleWrapper):
             raise FatalError(f"No connector found for schema '{schema}'", loc=self.definition_file())
         return Connector.registered_connectors[schema](self.url, self)
 
+    def vars_hierarchical(self):
+        """
+        Returns `vars(self)` but adds all variables defined by the current script that
+        are not overwritten by this host.
+
+        Returns
+        -------
+        dict[str, Any]
+        """
+        # We will add variables from bottom-up so that low-priority
+        # variables can be overwritten as expected.
+        dvars: dict[str, Any] = {}
+        is_normal_var = lambda attr, v: not attr.startswith("_") and not isinstance(v, ModuleType)
+
+        # First, add all variable from the current script
+        import fora
+        if fora.script is not None:
+            # Add variables from the script that are neither private nor part
+            # of a script's standard variables
+            dvars.update({attr: v for attr, v in vars(fora.script).items() if
+                        is_normal_var(attr, v)
+                    and attr not in ScriptWrapper.__annotations__
+                    and attr not in ScriptWrapper.__dict__})
+
+        # Lastly add all host variables, as they have the highest priority.
+        dvars.update({attr: v for attr, v in vars(self).items() if is_normal_var(attr, v)})
+        return dvars
+
     def __getattr__(self, attr: str) -> Any:
-        """Variable lookup on the host has to fall back to a lookup on
-        the currently active script."""
-        from fora.utils import host_getattr_hierarchical
-        return host_getattr_hierarchical(self, attr)
+        """
+        Looks up and returns the given attribute on the host, but falls back to a lookup on the
+        current script if the attribute is not found.
+
+        If the attribute starts with an underscore, the lookup will always be from the host object
+        itself. The same is True for any variable that is a module (so that imported modules
+        in script definitions will not be inherited).
+
+        Parameters
+        ----------
+        attr
+            The attribute to get.
+
+        Returns
+        -------
+        Any
+            The attribute's value if it was found.
+
+        Raises
+        ------
+        AttributeError
+            The given attribute was not found.
+        """
+        # __getattr__ is only called when the attribute wasn't already set on
+        # this object. Yet, we still force lookups for underscore variables
+        # to the host, so we can safely assume that the varible did not exist.
+        if attr.startswith("_"):
+            raise AttributeError(attr)
+
+        # Otherwise, we can lookup the variable on the current script but
+        # we omit variables that are part of the default script variables.
+        if attr not in ScriptWrapper.__annotations__ and attr not in ScriptWrapper.__dict__:
+            # Look up variable on current script
+            import fora
+            if fora.script is not None:
+                if hasattr(fora.script, attr):
+                    value = getattr(fora.script, attr)
+                    if not isinstance(value, ModuleType):
+                        return value
+
+        raise AttributeError(attr)
 
 @dataclass
 class ScriptWrapper(ModuleWrapper):

@@ -7,6 +7,7 @@ import argparse
 import inspect
 import os
 import sys
+from types import ModuleType
 from typing import Any, Callable, NoReturn, Optional, Union, cast
 
 import fora
@@ -16,7 +17,7 @@ from fora.example_deploys import init_deploy_structure
 from fora.loader import load_inventory, run_script
 from fora.logger import col
 from fora.types import GroupWrapper, HostWrapper, ScriptWrapper
-from fora.utils import FatalError, die_error, host_vars_hierarchical, install_exception_hook, is_normal_var, print_fullwith, print_table
+from fora.utils import FatalError, die_error, install_exception_hook, print_fullwith, print_table
 from fora.version import version
 
 def main_run(args: argparse.Namespace) -> None:
@@ -34,12 +35,15 @@ def main_run(args: argparse.Namespace) -> None:
         die_error(str(e), loc=e.loc)
 
     # Deduplicate host selection and check if every host is valid
-    host_names = []
-    for h in set(args.hosts.split(",") if args.hosts is not None else G.hosts.keys()):
-        if h not in G.hosts:
-            die_error(f"Unknown host '{h}'")
-        host_names.append(h)
-    host_names = sorted(host_names)
+    selected_hosts = []
+    for host in (args.hosts.split(",") if args.hosts is not None else fora.inventory.loaded_hosts):
+        # Skip duplicate entries
+        if host in selected_hosts:
+            continue
+        # Ensure host existence
+        if host not in fora.inventory.loaded_hosts:
+            die_error(f"Unknown host '{host}'")
+        selected_hosts.append(host)
 
     # TODO: multiprocessing?
     # - displaying must then be handled by ncurses which makes things a lot more complex.
@@ -49,15 +53,13 @@ def main_run(args: argparse.Namespace) -> None:
     # - fatal errors must be delayed until all executions are fininshed.
 
     # Instanciate (run) the given script for each selected host
-    for h in host_names:
-        host = G.hosts[h]
-
+    for host in fora.inventory.loaded_hosts.values():
         with open_connection(host):
             fora.host = host
             run_script(args.script, inspect.getouterframes(inspect.currentframe())[0], name="cmdline")
             fora.host = cast(HostWrapper, None)
 
-        if h != host_names[-1]:
+        if host.name != selected_hosts[-1]:
             # Separate hosts by a newline for better visibility
             print()
 
@@ -96,12 +98,12 @@ def show_inventory(inventory: str) -> None:
 
     print_fullwith(["──────── ", col_red_b, "inventory", col_reset, " ", col_darker_b, inventory, col_reset, " "], [col_darker, f" {relpath(fora.inventory.definition_file())}", col_reset])
 
-    pretty_group_names = { name: f"{col_darker}- ({index}){col_reset} {col_yellow}{name}{col_reset}" for index,name in enumerate(reversed(G.group_order)) }
+    pretty_group_names = { name: f"{col_darker}- ({index}){col_reset} {col_yellow}{name}{col_reset}" for index,name in enumerate(reversed(fora.inventory._topological_order)) }
     print(f"{col_blue}groups{col_reset} {col_darker}(precedence, low to high){col_reset}")
     for i in pretty_group_names.values():
         print(f"  {i}")
 
-    pretty_host_names = { name: f"{col_darker}-{col_reset} {col_green}{name}{col_reset} {col_darker}({host.url}, {relpath(host.definition_file())}){col_reset}" for name,host in G.hosts.items() }
+    pretty_host_names = { name: f"{col_darker}-{col_reset} {col_green}{name}{col_reset} {col_darker}({host.url}, {relpath(host.definition_file())}){col_reset}" for name,host in fora.inventory.loaded_hosts.items() }
     print(f"{col_blue}hosts{col_reset} {col_darker}(url, module){col_reset}")
     for i in pretty_host_names.values():
         print(f"  {i}")
@@ -131,51 +133,53 @@ def show_inventory(inventory: str) -> None:
     def precedence(wrapper: Union[ScriptWrapper, GroupWrapper, HostWrapper]) -> int:
         """Calculates a numeric variable precedence in accordance with the hierachical lookup rules."""
         if isinstance(wrapper, GroupWrapper):
-            return G.group_order.index(wrapper.name)
+            return fora.inventory._topological_order.index(wrapper.name)
         elif isinstance(wrapper, HostWrapper):
-            return len(G.group_order)
+            return len(fora.inventory._topological_order)
         else:
             return -1
 
-    for name, group in G.groups.items():
-        print()
-        print_fullwith(["──────── ", col_red_b, "group", col_reset, " ", col_yellow_b, name, col_reset, " "], [col_darker, f" {relpath(group.definition_file())}", col_reset])
-        entries = []
-        for attr, value in vars(group).items():
-            if not is_normal_var(attr, value):
-                continue
+    is_normal_var = lambda attr, v: not attr.startswith("_") and not isinstance(v, ModuleType)
 
-            is_declared_by_wrapper = attr in GroupWrapper.__dict__ or attr in GroupWrapper.__annotations__
-            entries.append((attr, value, is_declared_by_wrapper))
+    ######### TODO for name, group in G.groups.items():
+    ######### TODO     print()
+    ######### TODO     print_fullwith(["──────── ", col_red_b, "group", col_reset, " ", col_yellow_b, name, col_reset, " "], [col_darker, f" {relpath(group.definition_file())}", col_reset])
+    ######### TODO     entries = []
+    ######### TODO     for attr, value in vars(group).items():
+    ######### TODO         if not is_normal_var(attr, value):
+    ######### TODO             continue
 
-        # Sort by "is_declared" the by "attr"
-        table = []
-        for attr, value, is_declared_by_wrapper in sorted(entries, key=lambda tup: (not tup[2], tup[0])):
-            if is_declared_by_wrapper:
-                if group.is_overridden(attr):
-                    col_var = col_darker_b
-                else:
-                    col_var = col_darker
-            else:
-                col_var = col_yellow
-            table.append([[col_var, attr, col_reset], [col_darker, type(value).__name__, col_reset], value_repr(value)])
-        print_table([[col_blue, "variable", col_reset],
-                     [col_blue, "type", col_reset],
-                     [col_blue, "value", col_reset]],
-                     table, min_col_width=[24, 0, 0])
+    ######### TODO         is_declared_by_wrapper = attr in GroupWrapper.__dict__ or attr in GroupWrapper.__annotations__
+    ######### TODO         entries.append((attr, value, is_declared_by_wrapper))
 
-    for name, host in G.hosts.items():
+    ######### TODO     # Sort by "is_declared" the by "attr"
+    ######### TODO     table = []
+    ######### TODO     for attr, value, is_declared_by_wrapper in sorted(entries, key=lambda tup: (not tup[2], tup[0])):
+    ######### TODO         if is_declared_by_wrapper:
+    ######### TODO             if group.is_overridden(attr):
+    ######### TODO                 col_var = col_darker_b
+    ######### TODO             else:
+    ######### TODO                 col_var = col_darker
+    ######### TODO         else:
+    ######### TODO             col_var = col_yellow
+    ######### TODO         table.append([[col_var, attr, col_reset], [col_darker, type(value).__name__, col_reset], value_repr(value)])
+    ######### TODO     print_table([[col_blue, "variable", col_reset],
+    ######### TODO                  [col_blue, "type", col_reset],
+    ######### TODO                  [col_blue, "value", col_reset]],
+    ######### TODO                  table, min_col_width=[24, 0, 0])
+
+    for name, host in fora.inventory.loaded_hosts.items():
         print()
         print_fullwith(["──────── ", col_red_b, "host", col_reset, " ", col_green_b, name, col_reset, " "], [col_darker, f" {relpath(host.definition_file())}", col_reset])
         entries = []
-        for attr, (value, definition) in host_vars_hierarchical(host, include_definition=True).items():
+        for attr, value in host.vars_hierarchical().items():
             if not is_normal_var(attr, value):
                 continue
             is_declared_by_wrapper = attr in HostWrapper.__dict__ or attr in HostWrapper.__annotations__
-            entries.append((attr, value, is_declared_by_wrapper, definition))
+            entries.append((attr, value, is_declared_by_wrapper))
 
         table = []
-        for attr, value, is_declared_by_wrapper, definition in sorted(entries, key=lambda tup: (not tup[2], precedence(tup[3]), tup[0])):
+        for attr, value, is_declared_by_wrapper, definition in sorted(entries, key=lambda tup: (not tup[2], precedence(host.variable_definition_history[tup[0]][-1]), tup[0])):
             definition_str = [col_darker, f"({precedence(host)}) ", col_reset, col_green, host.name, col_reset]
             if is_declared_by_wrapper:
                 if host.is_overridden(attr):

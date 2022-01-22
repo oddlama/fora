@@ -1,13 +1,13 @@
 from __future__ import annotations
-from itertools import combinations
 
 import os
 from dataclasses import dataclass, field
 from glob import glob
-from typing import Any, Optional, Union
+from types import SimpleNamespace
+from typing import Any, Optional, Union, cast
 
 from fora.types import GroupWrapper, HostWrapper, ModuleWrapper
-from fora.utils import CycleError, print_error, rank_sort, transitive_dependencies
+from fora.utils import CycleError, load_py_module, print_error, rank_sort, transitive_dependencies
 
 @dataclass
 class HostDeclaration:
@@ -131,6 +131,9 @@ class InventoryWrapper(ModuleWrapper):
                   "archlinux"]
     """
 
+    _is_initialized: bool = False
+    """A flag to indicate whether or not the inventory is fully initialized."""
+
     _host_decls: dict[str, HostDeclaration] = field(default_factory=dict)
     """The validated dictionary of host declarations. Set when the inventory is processed."""
 
@@ -138,13 +141,20 @@ class InventoryWrapper(ModuleWrapper):
     """The validated dictionary of group declarations. Set when the inventory is processed."""
 
     _group_ranks_min: dict[str, int] = field(default_factory=dict)
-    """The top-down rank for each group."""
+    """The top-down rank for each group. Set when the inventory is processed."""
 
     _group_ranks_max: dict[str, int] = field(default_factory=dict)
-    """The bottom-up rank for each group."""
+    """The bottom-up rank for each group. Set when the inventory is processed."""
 
     _topological_order: list[str] = field(default_factory=list)
     """A topological order of all groups in this inventory. Set when the inventory is processed."""
+
+    loaded_hosts: dict[str, HostWrapper] = field(default_factory=dict)
+    """All loaded hosts. Set when the inventory is processed."""
+
+    def is_initialized(self) -> bool:
+        """Returns True if the inventory is fully initialized."""
+        return self._is_initialized
 
     def global_variables(self) -> dict[str, Any]:
         """
@@ -367,7 +377,7 @@ class InventoryWrapper(ModuleWrapper):
 
             # Deduplicate before and after
             decl.before = list(set(decl.before))
-            decl.after = list(set(decl.after))
+            decl.after = list(set(decl.after) | set(["all"]))
 
             self._group_decls[decl.name] = decl
 
@@ -471,13 +481,16 @@ class InventoryWrapper(ModuleWrapper):
 
         # Save the topological order based on the top-rank
         group_names.sort(key=lambda g: self._group_ranks_min[g])
+        print(self._group_ranks_min)
         self._topological_order = group_names
 
-    def preprocess_inventory(self) -> None:
+    def load(self) -> None:
         """
-        This function preprocesses the declared hosts and groups and calculates
-        dependent variables like `_topological_order`. This should be called after
-        wrapping a module to ensure the wrapped module didn't supply any bogus declarations.
+        This function preprocesses the declared hosts and groups, calculates
+        dependent variables like `_topological_order` and actually instanciates
+        required modules. This should be called after wrapping a module to ensure
+        the wrapped module didn't supply any bogus declarations and that all
+        dynamic definitions are fully loaded.
 
         Raises
         ------
@@ -487,6 +500,7 @@ class InventoryWrapper(ModuleWrapper):
         # Process user defined declarations
         self.preprocess_host_declarations()
         self.preprocess_group_declarations()
+
         # Ensure validity of used groups
         self.ensure_used_groups_are_declared()
 
@@ -496,6 +510,136 @@ class InventoryWrapper(ModuleWrapper):
 
         self.calculate_topological_order()
 
+        # Instanciate hosts
+        self.loaded_hosts = {host: self.instanciate_host(host) for host in self._host_decls}
+        self._is_initialized = True
+
+    def load_group(self, name: str, initializer: Optional[GroupWrapper]) -> GroupWrapper:
+        """
+        Creates a new instance of the given group.
+
+        Parameters
+        ----------
+        name
+            The group to instanciate.
+        initializer
+            A previously loaded group module that should be used to initialize
+            this module's global variables before its code is executed.
+
+        Returns
+        -------
+        GroupWrapper
+            A new instance of the declared group.
+        """
+        declaration = self._group_decls[name]
+        if name not in self._group_decls:
+            raise ValueError("Invalid instanciation request of unknown group. Ensure that the group has been defined in the inventory.")
+
+        wrapper = GroupWrapper(declaration.name)
+        module_file = self.group_module_file(declaration.name) if declaration.file is None else declaration.file
+
+        import fora
+        def pre_exec(module: Any) -> None:
+            fora.group = wrapper
+            wrapper.wrap(module, copy_members=True, copy_functions=True)
+
+            if wrapper.name == "all":
+                # Add predefined global variables before the "all" group module is instanciated
+                setattr(wrapper, "fora_managed", "This file is managed by fora.")
+                for attr, val in self.global_variables().items():
+                    setattr(wrapper, attr, val)
+
+            # Initialize global namespace if an initializer was provided.
+            if initializer is not None:
+                print("init", declaration)
+                for attr, v in vars(initializer).items():
+                    if attr.startswith("_"):
+                        continue
+                    print("bequest", attr)
+                    setattr(module, attr, v)
+
+        # Instanciate module file if it exists, else return default definition
+        if module_file is None or not os.path.exists(module_file):
+            # Check if the module file is required because it was explicitly set
+            if declaration.file is not None:
+                raise ValueError(f"Module file for {declaration} does not exist but was explicitly specified")
+            pre_exec(SimpleNamespace())
+        else:
+            load_py_module(module_file, pre_exec=pre_exec)
+
+        fora.group = cast(GroupWrapper, None)
+        return wrapper
+
+    def load_host(self, name: str, initializer: Optional[GroupWrapper]) -> HostWrapper:
+        """
+        Creates a new instance of the given host.
+
+        Parameters
+        ----------
+        name
+            The host to instanciate.
+        initializer
+            A previously loaded host module that should be used to initialize
+            this module's global variables before its code is executed.
+
+        Returns
+        -------
+        HostWrapper
+            A new instance of the declared host.
+        """
+        declaration = self._host_decls[name]
+        if name not in self._host_decls:
+            raise ValueError("Invalid instanciation request of unknown host. Ensure that the host has been defined in the inventory.")
+
+        assert declaration.name is not None
+        wrapper = HostWrapper(declaration.name, declaration.url)
+        module_file = self.host_module_file(declaration.name) if declaration.file is None else declaration.file
+
+        import fora
+        def pre_exec(module: Any) -> None:
+            fora.host = wrapper
+            wrapper.wrap(module, copy_members=True, copy_functions=True)
+
+            # Initialize global namespace if an initializer was provided.
+            if initializer is not None:
+                print("h init", declaration)
+                for attr, v in vars(initializer).items():
+                    if attr.startswith("_"):
+                        continue
+                    print("bequest", attr)
+                    setattr(module, attr, v)
+
+        # Instanciate module file if it exists, else return default definition
+        if module_file is None or not os.path.exists(module_file):
+            # Check if the module file is required because it was explicitly set
+            if declaration.file is not None:
+                raise ValueError(f"Module file for {declaration} does not exist but was explicitly specified")
+            pre_exec(SimpleNamespace())
+        else:
+            load_py_module(module_file, pre_exec=pre_exec)
+
+        fora.host = cast(HostWrapper, None)
+        return wrapper
+
+    # We need a way to allow groups and host modules to override variables from other
+    # low precedence groups, or to extend a dictionary, list or some other object defined
+    # previously. How do we accomplish this?
+    #
+    # One approach that I tried was to implement a fully hierarchical lookup for the
+    # host module that did go through all groups in reverse order of precedence and return the
+    # as soon as a variable was defined on one of the modules. Apart from the complexity,
+    # a problem with this approach was that modifying existing variables like dictionaries from
+    # parent modules wasn't easy or clean. We would've had to distinguish between those cases
+    # depending on a type annotation of the variable. While this was possible, it introduced
+    # an unnecessary conecept of annotating some variables to gain special "magic" behavior
+    # and a lot of complexity. At that time, the depndencies between modules was defined in
+    # the modules themselves, which made it impossible to inherit variables between groups.
+    #
+    # The approach I settled on now is to define groups and group dependencies in the inventory,
+    # allowing us to load group modules in the correct order for each host. By doing this, we can
+    # bequest (copy) all variables that have been defined until that point to the next module that
+    # will be loaded, be it a host or another group. This allows any module to access and modify
+    # all inherited variables easily, as they are just part of the global variables.
     def instanciate_host(self, host: str) -> HostWrapper:
         """
         This function instanciates the given host by recursively loading all groups
@@ -551,7 +695,8 @@ class InventoryWrapper(ModuleWrapper):
         conflicts: list[tuple[GroupWrapper, GroupWrapper, str]] = []
 
         for group in groups_in_order:
-            group_wrapper = load_group(group, initializer)
+            print("aaaaaaa", group)
+            group_wrapper = self.load_group(group, initializer)
             for attr in vars(group_wrapper):
                 # If the variable changed identity compared to the value it was initialized with,
                 # it was overwritten (or it was newly defined). We want to record this in our
@@ -586,7 +731,7 @@ class InventoryWrapper(ModuleWrapper):
                 print_error(f"Definition of '{attr}' is in conflict with definition at {new_def.definition_file()}", loc=prev_def.definition_file())
 
         # Finally instanciate the actual host.
-        host_wrapper = load_host(host, initializer)
+        host_wrapper = self.load_host(host, initializer)
 
         # Transfer the variable definition history to the host wrapper,
         # but update that definition history one more time to include
@@ -595,6 +740,6 @@ class InventoryWrapper(ModuleWrapper):
         host_wrapper.variable_definition_history.update(variable_definition_history)
         for attr in vars(host_wrapper):
             if initializer is None or (hasattr(initializer, attr) and getattr(initializer, attr) is not getattr(host_wrapper, attr)):
-                variable_definition_history.setdefault(attr, []).append(host_wrapper)
+                host_wrapper.variable_definition_history.setdefault(attr, []).append(host_wrapper)
 
         return host_wrapper
