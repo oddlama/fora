@@ -229,26 +229,26 @@ def init_structure_staging_prod() -> None:
     _write_file("inventories/staging.py", dedent("""\
             import os
 
-            # These are implicitly put into the all group, so an inventory can also
-            # define global variables
+            # These are implicit variables that will be defined on the `all` group.
+            # Useful to define global variables from the inventory
             def global_variables():
                 return dict(api_key=os.getenv("API_KEY_STAGING"))
 
-            hosts = [("staging1.example.com", "hosts/example.py"),
-                     ("staging2.example.com", "hosts/example.py")]
+            hosts = [dict(url="staging1.example.com", file="hosts/example.py", groups=["staging"]),
+                     dict(url="staging2.example.com", file="hosts/example.py", groups=["staging"])]
         """))
     _write_file("inventories/prod.py", dedent("""\
             import os
 
-            # These are implicitly put into the all group, so an inventory can also
-            # define global variables
+            # These are implicit variables that will be defined on the `all` group.
+            # Useful to define global variables from the inventory
             def global_variables():
                 return dict(api_key=os.getenv("API_KEY_PROD"))
 
-            hosts = [("prod1.example.com", "hosts/example.py"),
-                     ("prod2.example.com", "hosts/example.py"),
-                     ("prod3.example.com", "hosts/example.py"),
-                     ("prod4.example.com", "hosts/example.py")]
+            hosts = [dict(url="prod1.example.com", file="hosts/example.py", groups=["prod"]),
+                     dict(url="prod2.example.com", file="hosts/example.py", groups=["prod"]),
+                     dict(url="prod3.example.com", file="hosts/example.py", groups=["prod"]),
+                     dict(url="prod4.example.com", file="hosts/example.py", groups=["prod"])]
         """))
     _write_file("tasks/example_task/install.py", _nginx_install)
     _write_file("tasks/example_task/add_site.py", _nginx_add_site)
