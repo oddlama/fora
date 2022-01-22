@@ -14,7 +14,8 @@ import inspect
 
 from dataclasses import dataclass, field
 from types import ModuleType, TracebackType
-from typing import TYPE_CHECKING, Any, Callable, Optional, Type, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, Literal, Optional, Type, TypeVar, Union, cast
+
 from fora.remote_settings import RemoteSettings, ResolvedRemoteSettings
 
 if TYPE_CHECKING:
@@ -203,7 +204,7 @@ class HostWrapper(ModuleWrapper):
     connection: Connection = cast("Connection", None)
     """The active connection to this host, if one is opened."""
 
-    _variable_definition_history: dict[str, list[Union[GroupWrapper, HostWrapper]]] = field(default_factory=dict)
+    _variable_definition_history: dict[str, list[tuple[Literal["definition", "modification"], Union[GroupWrapper, HostWrapper]]]] = field(default_factory=dict)
     """
     A dictionary tracking the variable definition history for each variable on the host module.
     This variable is usually filled by the inventory when this host module is loaded.

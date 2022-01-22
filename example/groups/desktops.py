@@ -1,3 +1,4 @@
 onlydesktops = "onlydesktops"
 overwritten = "desktops"
-mergedict = {"desktops": "set by desktops"}
+from fora import group as this
+this.mergedict["desktops"] = "set by desktops"

@@ -4,7 +4,7 @@ import os
 from dataclasses import dataclass, field
 from glob import glob
 from types import ModuleType, SimpleNamespace
-from typing import Any, Optional, Union, cast
+from typing import Any, Literal, Optional, Union, cast
 
 from fora.types import GroupWrapper, HostWrapper, ModuleWrapper
 from fora.utils import CycleError, load_py_module, print_error, rank_sort, transitive_dependencies
@@ -693,11 +693,13 @@ class InventoryWrapper(ModuleWrapper):
         # of those two modules in the topological order, so the resulting variable would be
         # ambiguous. As a side effect we can later store this history on the host wrapper,
         # as it is useful for the inspector output of `fora --inspect-inventory`.
-        variable_definition_history: dict[str, list[GroupWrapper]] = {}
+        variable_definition_history: dict[str, list[tuple[Literal["definition", "modification"], GroupWrapper]]] = {}
 
         # We record all encountered variable conflicts while loading. If we find any,
         # we need to raise an error later, to allow all conflicts to be shown to the user first.
         conflicts: list[tuple[GroupWrapper, GroupWrapper, str]] = []
+
+        # TODO track variable modification
 
         for group in groups_in_order:
             group_wrapper = self.load_group(group, initializer)
@@ -727,7 +729,7 @@ class InventoryWrapper(ModuleWrapper):
                                 conflicts.append((prev, group_wrapper, attr))
 
                     # Record this definition for later analyses
-                    variable_definition_history.setdefault(attr, []).append(group_wrapper)
+                    variable_definition_history.setdefault(attr, []).append(("definition", group_wrapper))
 
             # Use the newly loaded group as the initializer for the next group
             initializer = group_wrapper
