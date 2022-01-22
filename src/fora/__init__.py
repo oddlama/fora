@@ -2,11 +2,19 @@
 
 from __future__ import annotations
 
+import argparse
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from fora.types import GroupWrapper, HostWrapper, ScriptWrapper
     from fora.inventory_wrapper import InventoryWrapper
+
+args: argparse.Namespace = cast(argparse.Namespace, None)
+"""
+The global logger. Should be used for all user-facing information logging to ensure
+that this information is displayed in a proper format and according to the user's
+verbosity preferences.
+"""
 
 inventory: InventoryWrapper = cast("InventoryWrapper", None)
 """

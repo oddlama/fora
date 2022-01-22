@@ -7,7 +7,6 @@ from typing import Any, Callable, Optional, Union
 from fora.connection import Connection
 import fora
 
-from fora import globals as G
 from fora.operations.api import Operation, OperationError, OperationResult
 
 package_managers: dict[str, Any] = {}
@@ -95,7 +94,7 @@ def generic_package(op: Operation,
         return op.success()
 
     # Apply actions to reach desired state, but only if we are not doing a dry run
-    if not G.args.dry:
+    if not fora.args.dry:
         if present:
             for p in set(packages) - installed:
                 install(p)
@@ -155,11 +154,11 @@ def save_content(op: Operation,
             return op.success()
 
         # Add diff if desired
-        if G.args.diff:
+        if fora.args.diff:
             op.diff(dest, conn.download_or(dest), content)
 
         # Apply actions to reach desired state, but only if we are not doing a dry run
-        if not G.args.dry:
+        if not fora.args.dry:
             # Create directory if it doesn't exist
             if op.changed("exists") or op.changed("sha512"):
                 conn.upload(

@@ -3,7 +3,7 @@
 import os
 from typing import Optional
 
-from fora import globals as G
+import fora
 from fora.connectors import tunnel_dispatcher as td
 from fora.connectors.connector import connector
 from fora.connectors.tunnel_connector import TunnelConnector
@@ -31,7 +31,7 @@ class LocalConnector(TunnelConnector):
             The required ssh command.
         """
         command = ["python3", os.path.realpath(td.__file__)]
-        if G.args.debug:
+        if fora.args.debug:
             command.append("--debug")
         return command
 

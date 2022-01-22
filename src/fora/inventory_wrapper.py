@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from glob import glob
 from types import ModuleType, SimpleNamespace
 from typing import Any, Literal, Optional, Union, cast
+from fora.remote_settings import RemoteSettings
 
 from fora.types import GroupWrapper, HostWrapper, ModuleWrapper, VariableActionSnapshot
 from fora.utils import CycleError, load_py_module, print_error, rank_sort, transitive_dependencies
@@ -222,6 +223,29 @@ class InventoryWrapper(ModuleWrapper):
             raise RuntimeError("Cannot return base directory for an inventory module without an associated module file.")
         return os.path.realpath(os.path.dirname(self.module.__file__))
 
+    def base_remote_settings(self) -> RemoteSettings:
+        """
+        Returns the base remote settings that will be used when connections to hosts
+        from this inventory are created. Usually the host connection will override
+        certain parameters such as the default executing and owning user and group,
+        to match the privileges the remote dispatcher is running under.
+
+        Returns
+        -------
+        RemoteSettings
+            The base remote settings.
+        """
+        _ = (self)
+        return RemoteSettings(
+            as_user="root",
+            as_group="root",
+            owner="root",
+            group="root",
+            file_mode="600",
+            dir_mode="700",
+            umask="077",
+            cwd="/tmp")
+
     def group_module_file(self, name: str) -> Optional[str]:
         """
         Returns the absolute group module file path given the group's name.
@@ -310,7 +334,7 @@ class InventoryWrapper(ModuleWrapper):
             raise ValueError(f"Invalid url schema '{schema}'")
         return Connector.registered_connectors[schema].extract_hostname(url)
 
-    def preprocess_host_declarations(self) -> None:
+    def _preprocess_host_declarations(self) -> None:
         """
         Processes and modifies `hosts` to ensure each host is represented by a `HostDeclaration`
         object. Also checks that no duplicate host declarations are present.
@@ -344,7 +368,7 @@ class InventoryWrapper(ModuleWrapper):
 
             self._host_decls[decl.name] = decl
 
-    def preprocess_group_declarations(self) -> None:
+    def _preprocess_group_declarations(self) -> None:
         """
         Processes and modifies `groups` to ensure each host is represented by a `GroupDeclaration`
         object. Also checks that no duplicate group declarations are present and that the `all` group is defined.
@@ -389,7 +413,7 @@ class InventoryWrapper(ModuleWrapper):
         if "all" not in self._group_decls:
             self._group_decls["all"] = GroupDeclaration(name="all")
 
-    def ensure_used_groups_are_declared(self) -> None:
+    def _ensure_used_groups_are_declared(self) -> None:
         """
         Ensure that all used groups are are actually declared.
 
@@ -411,7 +435,7 @@ class InventoryWrapper(ModuleWrapper):
                 if before not in self._group_decls:
                     raise ValueError(f"Unknown group '{before}' used in after set of group '{group.name}'")
 
-    def merge_group_dependencies(self) -> None:
+    def _merge_group_dependencies(self) -> None:
         """
         Merges the dependencies of all group declarations.
         This will ensure that if `"a" in b.before` then `"b" in a.after` and vice versa.
@@ -435,7 +459,7 @@ class InventoryWrapper(ModuleWrapper):
         for group in self._group_decls.values():
             group.before = list(set(group.before))
 
-    def detect_self_dependencies(self) -> None:
+    def _detect_self_dependencies(self) -> None:
         """
         Raises a `ValueError` when a group depends on itself.
 
@@ -448,7 +472,7 @@ class InventoryWrapper(ModuleWrapper):
             if group.name in group.before or group.name in group.after:
                 raise ValueError(f"Group '{group.name}' must not depend on itself")
 
-    def calculate_topological_order(self) -> None:
+    def _calculate_topological_order(self) -> None:
         """
         Topologically sorts the group declarations using their stated (and preprocessed) dependencies.
         Also validates that the dependencies are not cyclic.
@@ -509,17 +533,17 @@ class InventoryWrapper(ModuleWrapper):
             An invalid supplied value caused an error while processing.
         """
         # Process user defined declarations
-        self.preprocess_host_declarations()
-        self.preprocess_group_declarations()
+        self._preprocess_host_declarations()
+        self._preprocess_group_declarations()
 
         # Ensure validity of used groups
-        self.ensure_used_groups_are_declared()
+        self._ensure_used_groups_are_declared()
 
         # Unify `before` and `after` dependencies
-        self.merge_group_dependencies()
-        self.detect_self_dependencies()
+        self._merge_group_dependencies()
+        self._detect_self_dependencies()
 
-        self.calculate_topological_order()
+        self._calculate_topological_order()
 
         # Instanciate hosts
         self.loaded_hosts = {host: self.instanciate_host(host) for host in self._host_decls}
@@ -601,7 +625,7 @@ class InventoryWrapper(ModuleWrapper):
             raise ValueError("Invalid instanciation request of unknown host. Ensure that the host has been defined in the inventory.")
 
         assert declaration.name is not None
-        wrapper = HostWrapper(declaration.name, declaration.url, groups=declaration.groups)
+        wrapper = HostWrapper(self, declaration.name, declaration.url, groups=declaration.groups)
         module_file = self.host_module_file(declaration.name) if declaration.file is None else os.path.join(self.base_dir(), declaration.file)
 
         # pylint: disable=import-outside-toplevel

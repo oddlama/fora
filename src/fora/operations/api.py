@@ -8,7 +8,7 @@ from typing import Callable, TypeVar, cast, Any, Optional
 from types import TracebackType, FrameType
 
 import fora
-from fora import globals as G, logger
+from fora import logger
 from fora.types import RemoteDefaultsContext
 from fora.utils import check_host_active, print_fullwith
 
@@ -263,7 +263,7 @@ def operation(op_name: str): # type: ignore[no-untyped-def]
                 ret = op.failure(str(e))
                 # If we are not in debug mode, we modify the traceback such that the exception
                 # seems to originate at the calling site where the operation is called.
-                if G.args.debug:
+                if fora.args.debug:
                     raise
                 raise e.with_traceback(_calling_site_traceback())
             except subprocess.CalledProcessError as e:
@@ -285,7 +285,7 @@ def operation(op_name: str): # type: ignore[no-untyped-def]
                 print(e.stderr.decode("utf-8", errors="backslashreplace"), file=sys.stderr)
                 print_fullwith(["──────── ", col_yellow, "end", col_reset, col_darker, " ", col_reset], file=sys.stderr)
 
-                if G.args.debug:
+                if fora.args.debug:
                     raise
                 raise e.with_traceback(_calling_site_traceback())
             except Exception as e:
@@ -299,7 +299,7 @@ def operation(op_name: str): # type: ignore[no-untyped-def]
                 error = OperationError(ret.failure_message)
                 # If we are not in debug mode, we modify the traceback such that the exception
                 # seems to originate at the calling site where the operation is called.
-                if G.args.debug:
+                if fora.args.debug:
                     raise error
                 raise error.with_traceback(_calling_site_traceback())
 

@@ -21,6 +21,7 @@ from fora.remote_settings import RemoteSettings, ResolvedRemoteSettings
 if TYPE_CHECKING:
     from fora.connection import Connection
     from fora.connectors.connector import Connector
+    from fora.inventory_wrapper import InventoryWrapper
 
 T = TypeVar('T')
 
@@ -189,6 +190,9 @@ class HostWrapper(ModuleWrapper):
         from fora import group as this
         print(this.name)
     """
+
+    inventory: InventoryWrapper
+    """A back reference to the parent inventory which created this host."""
 
     name: str
     """The name that used to refer to this specific host. Must not be changed."""

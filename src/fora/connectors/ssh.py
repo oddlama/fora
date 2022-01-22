@@ -4,7 +4,7 @@ import base64
 import zlib
 from typing import Optional
 
-from fora import globals as G
+import fora
 from fora.connectors import tunnel_dispatcher as td
 from fora.connectors.connector import connector
 from fora.connectors.tunnel_connector import TunnelConnector
@@ -37,7 +37,7 @@ class SshConnector(TunnelConnector):
             tunnel_dispatcher_gz_b64 = base64.b64encode(zlib.compress(f.read(), 9)).decode('ascii')
 
         # Start the remote dispatcher by uploading it inline as base64
-        param_debug = "--debug" if G.args.debug else ""
+        param_debug = "--debug" if fora.args.debug else ""
 
         command = ["ssh"]
         command.extend(self.ssh_opts)

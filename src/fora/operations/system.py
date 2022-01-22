@@ -2,7 +2,6 @@
 
 from typing import Optional, cast
 
-from fora import globals as G
 from fora.operations import utils
 from fora.operations.api import Operation, OperationResult, operation
 from fora.operations.utils import find_command, new_op_fail
@@ -143,7 +142,7 @@ def user(user: str, # pylint: disable=redefined-outer-name,too-many-statements
         return op.success()
 
     # Apply actions to reach desired state, but only if we are not doing a dry run
-    if not G.args.dry:
+    if not fora.args.dry:
         if op.changed("exists"):
             if present:
                 # Create new user
@@ -273,7 +272,7 @@ def group(group: str, # pylint: disable=redefined-outer-name,too-many-statements
         return op.success()
 
     # Apply actions to reach desired state, but only if we are not doing a dry run
-    if not G.args.dry:
+    if not fora.args.dry:
         if op.changed("exists"):
             if present:
                 # Create new group

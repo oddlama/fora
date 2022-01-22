@@ -6,13 +6,18 @@ from datetime import datetime, timezone
 from os.path import join, relpath, normpath
 from typing import Optional, Union
 
-from jinja2 import Template
-from jinja2.exceptions import TemplateNotFound, UndefinedError
+from jinja2 import Environment, StrictUndefined, Template
+from jinja2.exceptions import UndefinedError
 
 import fora
-from fora import globals as G, logger
+from fora import logger
 from fora.operations.api import Operation, OperationResult, operation
 from fora.operations.utils import check_absolute_path, save_content
+
+_jinja2_env: Environment = Environment(
+    autoescape=False,
+    undefined=StrictUndefined)
+"""The jinja2 environment used for templating."""
 
 def _render_template(templ: Template, context: Optional[dict]) -> bytes:
     """
@@ -111,7 +116,7 @@ def directory(path: str,
             return op.success()
 
         # Apply actions to reach desired state, but only if we are not doing a dry run
-        if not G.args.dry:
+        if not fora.args.dry:
             if present:
                 # Create directory if it doesn't exist
                 if op.changed("exists"):
@@ -200,7 +205,7 @@ def file(path: str,
             return op.success()
 
         # Apply actions to reach desired state, but only if we are not doing a dry run
-        if not G.args.dry:
+        if not fora.args.dry:
             if present:
                 # Create file if it doesn't exist
                 # or touch file if requested
@@ -289,7 +294,7 @@ def link(path: str,
             return op.success()
 
         # Apply actions to reach desired state, but only if we are not doing a dry run
-        if not G.args.dry:
+        if not fora.args.dry:
             if present:
                 # Create link if it doesn't exist
                 if op.changed("exists"):
@@ -518,7 +523,7 @@ def template_content(content: str,
     op.desc(dest)
 
     try:
-        templ = G.jinja2_env.from_string(content)
+        templ = _jinja2_env.from_string(content)
         rendered_content = _render_template(templ, context)
     except UndefinedError as e:
         raise ValueError(f"Error while templating string: {str(e)}") from None
@@ -568,12 +573,11 @@ def template(src: str,
     check_absolute_path(dest, f"{dest=}")
     op.desc(dest)
 
-    try:
-        templ = G.jinja2_env.get_template(src)
-    except TemplateNotFound as e:
-        raise ValueError(f"Template '{str(e)}' not found") from None
+    with open(src, "r", encoding="utf-8") as f:
+        content = f.read()
 
     try:
+        templ = _jinja2_env.from_string(content)
         rendered_content = _render_template(templ, context)
     except UndefinedError as e:
         raise ValueError(f"Error while templating '{src}': {str(e)}") from None
@@ -683,11 +687,11 @@ def line(path: str,
         new_bytes = new_content.encode("utf-8", errors="surrogateescape")
 
         # Add diff if desired
-        if G.args.diff:
+        if fora.args.diff:
             op.diff(path, orig_bytes, new_bytes)
 
         # Apply actions to reach desired state, but only if we are not doing a dry run
-        if not G.args.dry:
+        if not fora.args.dry:
             if orig_bytes is None:
                 conn.upload(file=path, content=new_bytes, mode=attr.file_mode, owner=attr.owner, group=attr.group)
             else:

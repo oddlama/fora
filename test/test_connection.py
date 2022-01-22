@@ -6,7 +6,6 @@ import pytest
 import subprocess
 from typing import cast
 
-import fora.globals as G
 import fora
 import fora.loader
 from fora.connection import Connection
@@ -20,7 +19,7 @@ def test_init():
     class DefaultArgs:
         debug = False
         diff = False
-    G.args = DefaultArgs()
+    fora.args = DefaultArgs()
     fora.loader.load_inventory("local:")
 
     global host

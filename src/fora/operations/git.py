@@ -3,7 +3,6 @@
 import os
 from typing import Optional
 import fora
-from fora import globals as G
 from fora.operations.api import Operation, OperationResult, operation
 from fora.operations.utils import check_absolute_path
 
@@ -99,7 +98,7 @@ def repo(url: str,
         return op.success()
 
     # Apply actions to reach new state, if we aren't in pretend mode
-    if not G.args.dry:
+    if not fora.args.dry:
         if stat_path is None:
             # Create a fresh clone of the repository
             clone_cmd = ["git", "clone"]

@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from types import SimpleNamespace
+from fora.inventory_wrapper import InventoryWrapper
 from fora.utils import FatalError
 import pytest
 from typing import Any, cast
@@ -8,7 +9,7 @@ from fora.connectors.ssh import SshConnector
 from fora.types import HostWrapper
 
 def create_host(name: str):
-    wrapper = HostWrapper(name=name, url=name)
+    wrapper = HostWrapper(InventoryWrapper(), name=name, url=name)
     wrapper.wrap(SimpleNamespace())
     return wrapper
 

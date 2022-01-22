@@ -14,7 +14,6 @@ from fora.operations import local, files, git, system
 from fora.operations.api import OperationError
 from fora.types import HostWrapper, HostWrapper, ScriptWrapper
 import fora
-import fora.globals as G
 import fora.loader
 
 host: HostWrapper = cast(HostWrapper, None)
@@ -27,7 +26,7 @@ def test_init():
         dry = False
         changes = True
         verbose = 99
-    G.args = DefaultArgs()
+    fora.args = DefaultArgs()
     fora.loader.load_inventory("ssh://root@localhost")
 
     global host
@@ -95,11 +94,11 @@ def test_files_directory():
     files.directory(path, present=False)
 
     # dry run create
-    G.args.dry = True
+    fora.args.dry = True
     ret = files.directory(path=path)
     assert ret.changed
     assert not os.path.isdir(path)
-    G.args.dry = False
+    fora.args.dry = False
 
     # create
     ret = files.directory(path=path)
@@ -145,10 +144,10 @@ def test_files_directory():
     assert os.path.isdir(path)
 
 def test_files_file_wrong_existing_type():
-    G.args.dry = True
+    fora.args.dry = True
     with pytest.raises(OperationError, match="exists but is not a file"):
         files.file(path="/tmp/__pytest_fora")
-    G.args.dry = False
+    fora.args.dry = False
 
 def test_invalid_path():
     with pytest.raises(ValueError, match="must be absolute"):
@@ -170,11 +169,11 @@ def test_files_file():
     path = "/tmp/__pytest_fora/testfile"
 
     # dry run create
-    G.args.dry = True
+    fora.args.dry = True
     ret = files.file(path=path)
     assert ret.changed
     assert not os.path.isfile(path)
-    G.args.dry = False
+    fora.args.dry = False
 
     # create
     ret = files.file(path=path)
@@ -220,27 +219,27 @@ def test_files_file():
     assert os.path.isfile(path)
 
 def test_files_dir_wrong_existing_type():
-    G.args.dry = True
+    fora.args.dry = True
     with pytest.raises(OperationError, match="exists but is not a directory"):
         files.directory(path="/tmp/__pytest_fora/testfile")
-    G.args.dry = False
+    fora.args.dry = False
 
 def test_files_link_wrong_existing_type():
-    G.args.dry = True
+    fora.args.dry = True
     with pytest.raises(OperationError, match="exists but is not a link"):
         files.link(path="/tmp/__pytest_fora/testfile", target="/tmp/__pytest_fora/testfile")
-    G.args.dry = False
+    fora.args.dry = False
 
 def test_files_link():
     path = "/tmp/__pytest_fora/testlink"
     target = "/tmp/__pytest_fora/testfile"
 
     # dry run create
-    G.args.dry = True
+    fora.args.dry = True
     ret = files.link(path=path, target=target)
     assert ret.changed
     assert not os.path.islink(path)
-    G.args.dry = False
+    fora.args.dry = False
 
     # create
     ret = files.link(path=path, target=target)
@@ -290,11 +289,11 @@ def test_files_upload_content():
     content = os.urandom(512)
 
     # upload bytes
-    G.args.dry = True
+    fora.args.dry = True
     ret = files.upload_content(dest="/tmp/__pytest_fora/testcontent", content=content, mode="644")
     assert ret.changed
     assert not os.path.exists("/tmp/__pytest_fora/testcontent")
-    G.args.dry = False
+    fora.args.dry = False
 
     # upload bytes
     ret = files.upload_content(dest="/tmp/__pytest_fora/testcontent", content=content, mode="644")
@@ -322,10 +321,10 @@ def test_files_upload_content():
         assert f.read().decode('ascii', errors='ignore') == str_content
 
 def test_files_upload_content_wrong_existing_type():
-    G.args.dry = True
+    fora.args.dry = True
     with pytest.raises(OperationError, match="exists but is not a file"):
         files.upload_content(dest="/tmp/__pytest_fora", content=b"")
-    G.args.dry = False
+    fora.args.dry = False
 
 def test_files_upload():
     files.upload(src=__file__, dest="/tmp/__pytest_fora/testupload", mode="644")
@@ -345,15 +344,19 @@ def test_files_template_content():
     with pytest.raises(ValueError, match="Error while templating"):
         files.template_content(dest="/tmp/__pytest_fora/testtemplcontent", content="{{ host.name }}", context=dict(host=""), mode="644")
 
-def test_files_template():
+def test_files_template(request):
     files.template(src="test/templates/test.j2", dest="/tmp/__pytest_fora/testtempl", context=dict(myvar="graio208hfae"), mode="644")
     with open("/tmp/__pytest_fora/testtempl", 'rb') as f:
         assert f.read() == b"graio208hfae"
 
-    with pytest.raises(ValueError, match="Error while templating"):
-        files.template(src="test/templates/test.j2", dest="/tmp/__pytest_fora/testtempl", mode="644")
+    try:
+        with pytest.raises(ValueError, match="Error while templating"):
+            os.chdir("test")
+            files.template(src="../test/templates/test.j2", dest="/tmp/__pytest_fora/testtempl", mode="644")
+    finally:
+        os.chdir(request.config.invocation_dir)
 
-    with pytest.raises(ValueError, match=r"Template.*not found"):
+    with pytest.raises(FileNotFoundError, match=r"No such file or directory"):
         files.template(src="test/templates/__nonexistent__.j2", dest="/tmp/__pytest_fora/testtempl", mode="644")
 
 def test_files_upload_dir_invalid_src():
@@ -404,14 +407,14 @@ def test_create_user():
         ue = connection.query_user("foratest", query_password_hash=True)
         return ue.password_hash if ue is not None else None
 
-    G.args.dry = True
+    fora.args.dry = True
     ret = system.user(user="foratest")
     assert ret.changed
     with pytest.raises(KeyError):
         pwd.getpwnam("foratest")
     with pytest.raises(KeyError):
         grp.getgrnam("foratest")
-    G.args.dry = False
+    fora.args.dry = False
 
     ret = system.user(user="foratest")
     assert ret.changed
@@ -528,7 +531,7 @@ def test_create_user():
     assert set(groups) == set(["nobody"])
 
     with pytest.raises(ValueError, match="must be a list"):
-        system.user(user="foratest", groups="oops_not_a_list")
+        system.user(user="foratest", groups=cast(list[str], "oops_not_a_list"))
 
     ret = system.user(user="foratest", present=False)
     assert ret.changed
@@ -540,12 +543,12 @@ def test_create_user():
 def test_create_group():
     system.group(group="foratest", present=False)
 
-    G.args.dry = True
+    fora.args.dry = True
     ret = system.group(group="foratest")
     assert ret.changed
     with pytest.raises(KeyError):
         grp.getgrnam("foratest")
-    G.args.dry = False
+    fora.args.dry = False
 
     ret = system.group(group="foratest")
     assert ret.changed
@@ -600,12 +603,12 @@ def test_create_group():
 def test_files_line():
     files.upload_content(dest="/tmp/__pytest_fora/testcontent", content="  hello a \n  \t  hello b \n hello a\n", mode="644")
 
-    G.args.dry = True
+    fora.args.dry = True
     ret = files.line(path="/tmp/__pytest_fora/testcontent", line="hello c")
     assert ret.changed
     with open("/tmp/__pytest_fora/testcontent", 'rb') as f:
         assert b"hello c" not in f.read()
-    G.args.dry = False
+    fora.args.dry = False
 
     ret = files.line(path="/tmp/__pytest_fora/testcontent", line="hello c")
     assert ret.changed
@@ -667,16 +670,16 @@ def test_files_line():
         assert b"hello e" in f.read()
 
 def test_files_line_wrong_existing_type():
-    G.args.dry = True
+    fora.args.dry = True
     with pytest.raises(OperationError, match="exists but is not a file"):
         files.line(path="/tmp/__pytest_fora", line="hello")
-    G.args.dry = False
+    fora.args.dry = False
 
 def test_git_repo():
-    G.args.dry = True
+    fora.args.dry = True
     ret = git.repo(url="https://github.com/oddlama/fora", path="/tmp/__pytest_fora/gitrepo")
     assert ret.changed
-    G.args.dry = False
+    fora.args.dry = False
 
     ret = git.repo(url="https://github.com/oddlama/fora", path="/tmp/__pytest_fora/gitrepo")
     assert ret.changed
@@ -701,10 +704,10 @@ def test_full_deploy_inspect(request):
 def test_full_deploy_bad(request):
     os.chdir("test/simple_deploy")
     try:
-        G.args.debug = False
+        fora.args.debug = False
         with pytest.raises(ValueError, match="must be absolute"):
             main(["inventory.py", "deploy_bad.py"])
-        G.args.debug = True
+        fora.args.debug = True
     finally:
         fora.host = host
         os.chdir(request.config.invocation_dir)
@@ -712,12 +715,12 @@ def test_full_deploy_bad(request):
 def test_full_deploy_bad_recursive_test_script_traceback(request):
     os.chdir("test/simple_deploy")
     try:
-        G.args.debug = False
+        fora.args.debug = False
         with pytest.raises(ValueError, match="Invalid recursive call to") as e:
             main(["inventory.py", "deploy_bad_recursive.py"])
         utils.print_exception(e.type, e.value, e.tb)
         utils.script_trace([(cast(ScriptWrapper, None), inspect.getouterframes(inspect.currentframe())[0])], include_root=True)
-        G.args.debug = True
+        fora.args.debug = True
     finally:
         fora.host = host
         os.chdir(request.config.invocation_dir)

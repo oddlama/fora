@@ -4,12 +4,13 @@ Stores state along with the connection.
 """
 
 from __future__ import annotations
+from copy import copy
 
 from types import TracebackType
 from typing import Type, cast, Optional
 
 import fora
-from fora import globals as G, logger
+from fora import logger
 from fora.connectors.connector import Connector, CompletedRemoteCommand, GroupEntry, StatResult, UserEntry
 from fora.remote_settings import RemoteSettings
 from fora.types import HostWrapper
@@ -25,7 +26,7 @@ class Connection:
     def __init__(self, host: HostWrapper):
         self.host = host
         self.connector: Connector = self.host.create_connector()
-        self.base_settings: RemoteSettings = G.base_remote_settings
+        self.base_settings: RemoteSettings = copy(self.host.inventory.base_remote_settings())
 
     def __enter__(self) -> Connection:
         self.connector.open()

@@ -2,7 +2,6 @@
 
 from typing import Optional
 
-from fora import globals as G
 from fora.operations.api import Operation, OperationResult, operation
 from fora.operations.utils import service_manager
 import fora
@@ -36,7 +35,7 @@ def daemon_reload(user_mode: bool = False,
     op.initial_state(reloaded=False)
     op.final_state(reloaded=True)
 
-    if not G.args.dry:
+    if not fora.args.dry:
         if user_mode:
             conn.run(["systemctl", "--user", "daemon_reload"])
         else:
@@ -108,7 +107,7 @@ def service(service: str, # pylint: disable=redefined-outer-name
         return op.success()
 
     # Apply actions to reach desired state, but only if we are not doing a dry run
-    if not G.args.dry:
+    if not fora.args.dry:
         base_command = ["systemctl", "--user"] if user_mode else ["systemctl"]
         if op.changed("state") and state is not None:
             conn.run(base_command + [state_actions[state], "--", service])

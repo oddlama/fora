@@ -11,7 +11,6 @@ from types import ModuleType
 from typing import Any, Callable, NoReturn, Optional, cast
 
 import fora
-from fora import globals as G
 from fora.connection import open_connection
 from fora.example_deploys import init_deploy_structure
 from fora.loader import load_inventory, run_script
@@ -266,5 +265,5 @@ def main(argv: Optional[list[str]] = None) -> None:
         # Fallback to --help.
         parser.print_help()
     else:
-        G.args = args
+        fora.args = args
         args.func(args)

@@ -10,7 +10,7 @@ import sys
 from types import TracebackType
 from typing import Any, Optional, Type, cast
 
-from fora import globals as G
+import fora
 
 @dataclass
 class State:
@@ -24,9 +24,9 @@ state: State = State()
 
 def use_color() -> bool:
     """Returns true if color should be used."""
-    if not isinstance(cast(Any, G.args), argparse.Namespace):
+    if not isinstance(cast(Any, fora.args), argparse.Namespace):
         return os.getenv("NO_COLOR") is None
-    return not G.args.no_color
+    return not fora.args.no_color
 
 def col(color_code: str) -> str:
     """Returns the given argument only if color is enabled."""
@@ -79,14 +79,14 @@ def indent_prefix() -> str:
 
 def debug(msg: str) -> None:
     """Prints the given message only in debug mode."""
-    if not G.args.debug:
+    if not fora.args.debug:
         return
 
     print(f"   [1;34mDEBUG[m: {msg}", file=sys.stderr)
 
 def debug_args(msg: str, args: dict[str, Any]) -> None:
     """Prints all given arguments when in debug mode."""
-    if not G.args.debug:
+    if not fora.args.debug:
         return
 
     str_args = ""
@@ -125,14 +125,14 @@ def run_script(script: str, name: Optional[str] = None) -> None:
 def print_operation_title(op: Any, title_color: str, end: str = "\n") -> None:
     """Prints the operation title and description."""
     name_if_given = (" " + col('[90m') + f"({op.name})" + col('[m')) if op.name is not None else ""
-    dry_run_info = f" {col('[90m')}(dry){col('[m')}" if G.args.dry else ""
+    dry_run_info = f" {col('[90m')}(dry){col('[m')}" if fora.args.dry else ""
     print_indented(f"{title_color}{op.op_name}{col('[m')}{dry_run_info} {op.description}{name_if_given}", end=end, flush=True)
 
 def print_operation_early(op: Any) -> None:
     """Prints the operation title and description before the final status is known."""
     title_color = col("[1;33m")
     # Only overwrite status later if debugging is not enabled.
-    print_operation_title(op, title_color, end=" (early status)\n" if G.args.debug else "")
+    print_operation_title(op, title_color, end=" (early status)\n" if fora.args.debug else "")
 
 
 def decode_escape(data: bytes, encoding: str = 'utf-8') -> str:
@@ -253,13 +253,13 @@ def _operation_state_infos(result: Any) -> list[str]:
         str_final_v = to_str(final_v)
 
         # Add ellipsis on long strings, if we are not in verbose mode
-        if G.args.verbose == 0:
+        if fora.args.verbose == 0:
             k = ellipsis(k, 12)
             str_initial_v = ellipsis(to_str(initial_v), 9)
             str_final_v = ellipsis(to_str(final_v), 9+3+9 if initial_v is None else 9)
 
         if initial_v == final_v:
-            if G.args.verbose >= 1:
+            if fora.args.verbose >= 1:
                 # TODO = instead of : for better readability
                 entry_str = f"{col('[90m')}{k}: {str_initial_v}{col('[m')}"
                 state_infos.append(entry_str)
@@ -286,11 +286,11 @@ def print_operation(op: Any, result: Any) -> None:
         print_indented(f" {col('[90m')}└{col('[m')} " + f"{col('[31m')}{result.failure_message}{col('[m')}")
         return
 
-    if not G.args.changes:
+    if not fora.args.changes:
         return
 
     # Cache number of upcoming diffs to determine what box character to print
-    n_diffs = len(op.diffs) if G.args.diff else 0
+    n_diffs = len(op.diffs) if fora.args.diff else 0
     box_char = '└' if n_diffs == 0 else '├'
 
     # Print "key: value" pairs with changes
@@ -298,7 +298,7 @@ def print_operation(op: Any, result: Any) -> None:
     if len(state_infos) > 0:
         print_indented(f"{col('[90m')}{box_char}{col('[m')} " + f"{col('[90m')},{col('[m')} ".join(state_infos))
 
-    if G.args.diff:
+    if fora.args.diff:
         diff_lines = []
         # Generate diffs
         for file, old, new in op.diffs:

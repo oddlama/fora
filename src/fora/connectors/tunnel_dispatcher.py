@@ -31,7 +31,7 @@ u64 = NewType('u64', int)
 is_server = False
 debug = False
 try:
-    from fora import globals as G
+    import fora
 except ModuleNotFoundError:
     pass
 
@@ -51,7 +51,7 @@ class RemoteOSError(Exception):
 
 def _is_debug() -> bool:
     """Returns True if debugging output should be genereated."""
-    return debug if is_server else cast(bool, G.args.debug)
+    return debug if is_server else cast(bool, fora.args.debug)
 
 def _log(msg: str) -> None:
     """
