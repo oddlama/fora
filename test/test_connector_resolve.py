@@ -1,15 +1,15 @@
 from dataclasses import dataclass
+from types import SimpleNamespace
 from fora.utils import FatalError
 import pytest
 from typing import Any, cast
 from fora.connectors.ssh import SshConnector
 
-import fora.loader
 from fora.types import HostWrapper
 
 def create_host(name: str):
     wrapper = HostWrapper(name=name, url=name)
-    wrapper.wrap(fora.loader.DefaultHost())
+    wrapper.wrap(SimpleNamespace())
     return wrapper
 
 def test_explicit_connector():
@@ -25,7 +25,7 @@ def test_explicit_connector():
 
 def test_connector_invalid():
     h = create_host("cannotresolve")
-    with pytest.raises(FatalError, match=r"url doesn't include a schema and no connector was specified"):
+    with pytest.raises(FatalError, match=r"Url doesn't include a schema and no connector was specified"):
         h.create_connector()
 
 def test_connector_ssh():
@@ -35,5 +35,5 @@ def test_connector_ssh():
 def test_connector_unknown():
     h = cast(Any, create_host("unknown://user@host.localhost"))
 
-    with pytest.raises(FatalError, match=r"no connector found for schema"):
+    with pytest.raises(FatalError, match=r"No connector found for schema"):
         h.create_connector()

@@ -7,7 +7,7 @@ from typing import Any, cast
 from fora import example_deploys
 
 def test_init_unknown():
-    with pytest.raises(ValueError, match="unknown deploy layout structure"):
+    with pytest.raises(ValueError, match="Unknown deploy layout structure"):
         example_deploys.init_deploy_structure(cast(Any, "__unknown"))
 
 def test_init(request, tmp_path):

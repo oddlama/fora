@@ -1,6 +1,5 @@
 import os
 import fora
-import fora.globals as G
 import fora.loader
 
 def test_dynamic_instanciation(request):
@@ -14,11 +13,11 @@ def test_dynamic_instanciation(request):
         expected_files = ["host1.py", "host2.py", "host_templ.py", "host_templ.py"]
 
         for i in hosts:
-            if isinstance(i, tuple):
-                i = i[0]
-            assert i in G.hosts
+            if isinstance(i, dict):
+                i = i["url"]
+            assert i in fora.inventory.loaded_hosts
 
-        for h, e in zip(G.hosts.values(), expected_files):
+        for h, e in zip(fora.inventory.loaded_hosts.values(), expected_files):
             assert hasattr(h, 'pyfile')
             assert getattr(h, 'pyfile', None) == e
     finally:
@@ -31,7 +30,7 @@ def test_inventory_global_variables(request):
         fora.loader.load_inventory("mock_inventories/single_host1.py")
         assert fora.inventory is not None
 
-        assert "host1" in G.hosts
-        assert G.hosts["host1"].inventory_var == "from_inventory"
+        assert "host1" in fora.inventory.loaded_hosts
+        assert fora.inventory.loaded_hosts["host1"].inventory_var == "from_inventory"
     finally:
         os.chdir(request.config.invocation_dir)

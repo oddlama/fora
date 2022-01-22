@@ -3,6 +3,7 @@ import pytest
 
 import fora.globals as G
 import fora.loader
+from fora.utils import FatalError
 
 def test_init():
     class DefaultArgs:
@@ -10,12 +11,10 @@ def test_init():
         diff = False
     G.args = DefaultArgs()
 
-def test_group_variable_conflict(request, capsys):
+def test_group_variable_conflict(request):
     os.chdir(request.fspath.dirname)
 
-    with pytest.raises(SystemExit):
+    with pytest.raises(FatalError, match="Conflict in variable assignment"):
         fora.loader.load_inventory("inventory.py")
-    _, err = capsys.readouterr()
-    assert "conflict" in err
 
     os.chdir(request.config.invocation_dir)

@@ -10,7 +10,7 @@ from fora import utils
 
 from fora.connection import Connection
 from fora.main import main
-from fora.operations import local, files, system
+from fora.operations import local, files, git, system
 from fora.operations.api import OperationError
 from fora.types import HostWrapper, HostWrapper, ScriptWrapper
 import fora
@@ -31,7 +31,7 @@ def test_init():
     fora.loader.load_inventory("ssh://root@localhost")
 
     global host
-    host = G.hosts["localhost"]
+    host = fora.inventory.loaded_hosts["localhost"]
     fora.host = host
     fora.script = ScriptWrapper("__internal_test")
     class Empty:
@@ -163,7 +163,7 @@ def test_invalid_path():
         files.link(path="__tmp_fora", target="__test")
     with pytest.raises(ValueError, match="must be non-empty"):
         files.link(path="", target="__test")
-    with pytest.raises(ValueError, match="link target cannot be empty"):
+    with pytest.raises(ValueError, match="Link target cannot be empty"):
         files.link(path="/tmp/__tmp_fora_link", target="")
 
 def test_files_file():
@@ -338,11 +338,11 @@ def test_files_template_content():
     with open("/tmp/__pytest_fora/testtemplcontent", 'rb') as f:
         assert f.read() == b"q948fhqh489f"
 
-    with pytest.raises(ValueError, match="error while templating"):
+    with pytest.raises(ValueError, match="Error while templating"):
         files.template_content(dest="/tmp/__pytest_fora/testtemplcontent", content="{{ undefined_var }}", mode="644")
 
     # Test host override by trying to access .name which is not defined when overridden.
-    with pytest.raises(ValueError, match="error while templating"):
+    with pytest.raises(ValueError, match="Error while templating"):
         files.template_content(dest="/tmp/__pytest_fora/testtemplcontent", content="{{ host.name }}", context=dict(host=""), mode="644")
 
 def test_files_template():
@@ -350,10 +350,10 @@ def test_files_template():
     with open("/tmp/__pytest_fora/testtempl", 'rb') as f:
         assert f.read() == b"graio208hfae"
 
-    with pytest.raises(ValueError, match="error while templating"):
+    with pytest.raises(ValueError, match="Error while templating"):
         files.template(src="test/templates/test.j2", dest="/tmp/__pytest_fora/testtempl", mode="644")
 
-    with pytest.raises(ValueError, match=r"template.*not found"):
+    with pytest.raises(ValueError, match=r"Template.*not found"):
         files.template(src="test/templates/__nonexistent__.j2", dest="/tmp/__pytest_fora/testtempl", mode="644")
 
 def test_files_upload_dir_invalid_src():
@@ -672,10 +672,28 @@ def test_files_line_wrong_existing_type():
         files.line(path="/tmp/__pytest_fora", line="hello")
     G.args.dry = False
 
+def test_git_repo():
+    G.args.dry = True
+    ret = git.repo(url="https://github.com/oddlama/fora", path="/tmp/__pytest_fora/gitrepo")
+    assert ret.changed
+    G.args.dry = False
+
+    ret = git.repo(url="https://github.com/oddlama/fora", path="/tmp/__pytest_fora/gitrepo")
+    assert ret.changed
+
 def test_full_deploy(request):
     os.chdir("test/simple_deploy")
     try:
         main(["inventory.py", "deploy.py"])
+    finally:
+        fora.host = host
+        os.chdir(request.config.invocation_dir)
+
+def test_full_deploy_inspect(request):
+    os.chdir("test/simple_deploy")
+    try:
+        with pytest.raises(SystemExit):
+            main(["--inspect-inventory", "inventory.py"])
     finally:
         fora.host = host
         os.chdir(request.config.invocation_dir)
@@ -695,7 +713,7 @@ def test_full_deploy_bad_recursive_test_script_traceback(request):
     os.chdir("test/simple_deploy")
     try:
         G.args.debug = False
-        with pytest.raises(ValueError, match="invalid recursive call to") as e:
+        with pytest.raises(ValueError, match="Invalid recursive call to") as e:
             main(["inventory.py", "deploy_bad_recursive.py"])
         utils.print_exception(e.type, e.value, e.tb)
         utils.script_trace([(cast(ScriptWrapper, None), inspect.getouterframes(inspect.currentframe())[0])], include_root=True)
