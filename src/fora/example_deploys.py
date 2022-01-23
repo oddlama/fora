@@ -12,8 +12,8 @@ from fora.utils import print_status
 _inventory_def = dedent("""\
 # Define which hosts belong to this inventory.
 hosts = [
-    "local:", # Local machine, executed as the user who invokes fora
-    # "example", # Some remote machine via ssh (probably requires matching entry in `.ssh/config`)
+    "local:",                   # Local machine, executed as the user who invokes fora
+    # "example",                # Some remote machine via ssh (probably requires matching entry in `.ssh/config`)
     # "ssh://root@example.com", # An explicit user on a remote machine via ssh
 ]
 """)
