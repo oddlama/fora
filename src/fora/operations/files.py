@@ -369,7 +369,7 @@ def upload(src: str,
     src
         The local file to upload.
     dest
-        The remote destination path.
+        The remote destination path. If this ends in a slash, the basename of the source file is automatically appended.
     mode
         The file mode. Uses the remote execution defaults if None.
     owner
@@ -387,6 +387,8 @@ def upload(src: str,
     """
     _ = (name, check) # Processed automatically.
     check_absolute_path(dest, f"{dest=}")
+    if dest.endswith("/"):
+        dest = os.path.join(dest, os.path.basename(src))
     op.desc(dest)
     with open(src, 'rb') as f:
         return save_content(op, f.read(), dest, mode, owner, group)
@@ -551,7 +553,7 @@ def template(src: str,
     src
         The local file to template.
     dest
-        The remote destination path for the file.
+        The remote destination path. If this ends in a slash, the basename of the source file is automatically appended.
     context
         Additional dictionary of variables that will be made available in the template.
     mode
@@ -571,6 +573,8 @@ def template(src: str,
     """
     _ = (name, check) # Processed automatically.
     check_absolute_path(dest, f"{dest=}")
+    if dest.endswith("/"):
+        dest = os.path.join(dest, os.path.basename(src))
     op.desc(dest)
 
     with open(src, "r", encoding="utf-8") as f:
