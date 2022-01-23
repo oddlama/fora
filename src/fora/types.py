@@ -197,7 +197,7 @@ class HostWrapper(ModuleWrapper):
     name: str
     """The name that used to refer to this specific host. Must not be changed."""
 
-    url: str
+    url: Optional[str]
     """
     The url used to connect to this host. The schema in this url will be used to
     determine which connector implementation is used to establish a connection,
@@ -205,13 +205,13 @@ class HostWrapper(ModuleWrapper):
     This is determined just before a connection is initiated.
 
     By default, this field will reflect the value specified in the inventory,
-    after url qualification.
+    after url qualification. If this is None, `connector` must be set explicitly.
     """
 
     groups: list[str] = field(default_factory=list)
     """The set of groups this host belongs to."""
 
-    connector: Optional[Callable[[str, HostWrapper], Connector]] = None
+    connector: Optional[Callable[[Optional[str], HostWrapper], Connector]] = None
     """The connector class to use. If `None`, the connector will be determined by the schema in the `url` when needed."""
 
     # Cast to ease typechecking in user code.
@@ -246,6 +246,9 @@ class HostWrapper(ModuleWrapper):
         from fora.connectors.connector import Connector
         if self.connector is not None:
             return self.connector(self.url, self)
+
+        if self.url is None:
+            raise FatalError("Url is None, but no explicit connector was specified", loc=self.definition_file())
 
         if ':' not in self.url:
             raise FatalError("Url doesn't include a schema and no connector was specified explicitly", loc=self.definition_file())

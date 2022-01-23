@@ -4,7 +4,7 @@
 #
 # The instanciated module has access to the name of the host via fora.host_definition.name
 # and may adapt it's behavior dynamically based on this information.
-hosts = [ dict(url="localhost", groups=["desktops"])
+hosts = [ dict(name="localhost", groups=["desktops"])
 #        , ("mail1", "hosts/mail.py")
 #        , ("mail2", "hosts/mail.py")
 #        , dict(url="localhost", module="hosts/mail.py", groups=["desktops"])

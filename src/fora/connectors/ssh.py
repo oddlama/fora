@@ -17,11 +17,16 @@ class SshConnector(TunnelConnector):
     def __init__(self, url: Optional[str], host: HostWrapper):
         super().__init__(url, host)
 
-        self.ssh_opts: list[str] = getattr(host, 'ssh_opts') if hasattr(host, 'ssh_opts') else []
-        if url is not None and url.startswith(f"{self.schema}://"):
-            self.url = url
+        self.ssh_opts: list[str] = host.ssh_opts if hasattr(host, 'ssh_opts') else []
+        schema_prefix = f"{self.schema}:"
+        if url is not None and url.startswith(schema_prefix):
+            # change ssh:host -> ssh://host if necessary
+            if not url.startswith(f"{schema_prefix}//"):
+                self.url = f"{schema_prefix}//{url[len(schema_prefix):]}"
+            else:
+                self.url = url
         else:
-            self.url: str = f"{self.schema}://{getattr(host, 'ssh_host')}:{getattr(host, 'ssh_port')}"
+            self.url: str = f"{self.schema}://{host.ssh_host}:{host.ssh_port}"
 
     def command(self) -> list[str]:
         """

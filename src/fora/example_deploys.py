@@ -146,11 +146,11 @@ def init_structure_flat() -> None:
     _write_file("tasks/example_params.py", dedent("""\
         from fora.operations import files
 
-        script_var = "this is a fallback value defined in a script"
-
         @Params
         class params:
             filename: str
+
+        script_var = "this is a fallback value defined in a script"
 
         files.template(
             name="Render a template to the file that was specified in the parameters",
@@ -178,16 +178,6 @@ def init_structure_flat() -> None:
 
 def init_structure_dotfiles() -> None:
     """Creates a dotfiles deploy structure."""
-    _create_dirs(["zsh", "kitty", "neovim"])
-    _write_file("zsh/zshrc", dedent("""\
-        # Hello I am a zshrc
-        """))
-    _write_file("kitty/kitty.conf", dedent("""\
-        # Hello I am a kitty.conf
-        """))
-    _write_file("neovim/init.lua", dedent("""\
-        -- Hello I am a neovim init.lua
-        """))
     _write_file("deploy.py", dedent("""\
         from fora import host
         from fora.operations import files

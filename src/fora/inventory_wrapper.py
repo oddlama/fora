@@ -20,11 +20,12 @@ def is_bequestable(attr: str, value: Any) -> bool:
 class HostDeclaration:
     """A declaration of a host in an inventory."""
 
-    url: str
+    url: Optional[str] = None
     """
     The default url used to connect to this host. If this is given without an connection
-    schema (like `ssh://`), `ssh://` will be used as the default. The function responsible
-    for this is `qualify_url`.
+    schema (like `schema:...`), `ssh://` will be used as the default. The function responsible
+    for this is `qualify_url`. If this is None, it can still be defined by the host module
+    later.
     """
 
     name: Optional[str] = None
@@ -356,10 +357,16 @@ class InventoryWrapper(ModuleWrapper):
             else:
                 raise ValueError(f"Invalid host declaration '{str(host)}'")
 
-            # First qualify the url (by default this adds ssh:// to "naked" hostnames)
-            decl.url = self.qualify_url(decl.url)
-            # Next extract the indentifying "friendly" hostname which we need to find the module file for the host.
-            decl.name = self.extract_hostname(decl.url)
+            if decl.url is not None:
+                # First qualify the url (by default this adds ssh:// to "naked" hostnames)
+                decl.url = self.qualify_url(decl.url)
+
+            if decl.name is None:
+                if decl.url is None:
+                    raise ValueError(f"Invalid host declaration '{str(host)}', must include either a url or a name!")
+                # Next extract the indentifying "friendly" hostname which we need to find the module file for the host.
+                decl.name = self.extract_hostname(decl.url)
+
             # Ensure host is in "all" group
             decl.groups = list(set(decl.groups) | set(["all"]))
 
