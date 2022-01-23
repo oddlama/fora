@@ -752,6 +752,11 @@ class InventoryWrapper(ModuleWrapper):
                     # overlaps with our minimum required rank.
                     for prev in variable_action_history[attr]:
                         if self._group_ranks_max[prev.actor.name] >= self._group_ranks_min[record_conflicts_group.name]:
+                            if prev.action == "modification" and cur_action == "modification":
+                                # Ambiguous modification order is explicitly allowed.
+                                # While this could in theory also create ambiguities,
+                                # modification should never remove or change existing information.
+                                continue
                             conflicts.append((prev.action, prev.actor, cur_action, actor, attr))
 
                 # Record this change for later analyses
