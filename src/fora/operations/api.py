@@ -1,5 +1,6 @@
 """Provides API to define operations."""
 
+from dataclasses import dataclass
 import subprocess
 import sys
 
@@ -15,20 +16,19 @@ from fora.utils import check_host_active, print_fullwith
 class OperationError(Exception):
     """An exception that indicates an error while executing an operation."""
 
+@dataclass
 class OperationResult:
     """Stores the result of an operation."""
-
-    def __init__(self,
-                 success: bool,
-                 changed: bool,
-                 initial: dict[str, Any],
-                 final: dict[str, Any],
-                 failure_message: Optional[str] = None):
-        self.success = success
-        self.changed = changed
-        self.initial = initial
-        self.final = final
-        self.failure_message = failure_message
+    success: bool
+    """Whether the operation succeeded."""
+    changed: bool
+    """Whether the operation changed something."""
+    initial: dict[str, Any]
+    """The initial state of the host."""
+    final: dict[str, Any]
+    """The final state of the host."""
+    failure_message: Optional[str] = None
+    """The failure message, if success is False."""
 
 class Operation:
     """This class is used to ease the building of operations with consistent output and state tracking."""
