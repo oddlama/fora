@@ -12,8 +12,13 @@ from fora.types import HostWrapper
 class CompletedRemoteCommand:
     """The return value of `Connector.run()`, representing a finished remote process."""
     stdout: Optional[bytes]
+    """The stdout of the remote command. If you need a string, but are not sure that the formatting is utf-8,
+    be sure to decode with `errors="surrogateescape"` or `errors=backslashreplace` depending on your use."""
     stderr: Optional[bytes]
+    """The stderr of the remote command. If you need a string, but are not sure that the formatting is utf-8,
+    be sure to decode with `errors="surrogateescape"` or `errors=backslashreplace` depending on your use."""
     returncode: int
+    """The return code of the remote command."""
 
 class StatResult:
     """

@@ -610,7 +610,7 @@ class InventoryWrapper(ModuleWrapper):
         fora.group = cast(GroupWrapper, None)
         return wrapper
 
-    def load_host(self, name: str, initializer: Optional[GroupWrapper]) -> HostWrapper:
+    def load_host(self, name: str, transitive_groups: list[str], initializer: Optional[GroupWrapper]) -> HostWrapper:
         """
         Creates a new instance of the given host.
 
@@ -618,6 +618,8 @@ class InventoryWrapper(ModuleWrapper):
         ----------
         name
             The host to instanciate.
+        transitive_groups
+            All groups that the host actually belongs to, due to transitive dependencies.
         initializer
             A previously loaded host module that should be used to initialize
             this module's global variables before its code is executed.
@@ -632,7 +634,7 @@ class InventoryWrapper(ModuleWrapper):
             raise ValueError("Invalid instanciation request of unknown host. Ensure that the host has been defined in the inventory.")
 
         assert declaration.name is not None
-        wrapper = HostWrapper(self, declaration.name, declaration.url, groups=declaration.groups)
+        wrapper = HostWrapper(self, declaration.name, declaration.url, groups=transitive_groups)
         module_file = self.host_module_file(declaration.name) if declaration.file is None else os.path.join(self.base_dir(), declaration.file)
 
         # pylint: disable=import-outside-toplevel
@@ -783,7 +785,7 @@ class InventoryWrapper(ModuleWrapper):
             raise ValueError("Conflict in variable assignment from two groups with ambiguous ordering. Insert dependency or remove one definition.")
 
         # Finally instanciate the actual host.
-        host_wrapper = self.load_host(host, initializer)
+        host_wrapper = self.load_host(host, list(transitive_groups), initializer)
         # Update the variable action history one more time to include
         # definitions from the host module.
         for attr, value in vars(host_wrapper).items():
