@@ -22,8 +22,14 @@ _jinja2_env: Environment = Environment(
 def _render_template(templ: Template, context: Optional[dict]) -> bytes:
     """
     Renders the given template with the additional variables provided context (if any).
-    The current host will be added under the key 'host', except when this key is already
-    set explicitly in the given context.
+
+    All host variables, including inherited variables will be available
+    as-is in the template. Any variable provided via the context will
+    also be made available, overshadowing existing variables.
+
+    The current host and inventory will always be added under the keys
+    `"host"` and `"inventory"` respectively, shadowing other variables,
+    to ensure these objects are always accessible.
 
     Parameters
     ----------
@@ -39,14 +45,10 @@ def _render_template(templ: Template, context: Optional[dict]) -> bytes:
     """
 
     dvars = fora.host.vars_hierarchical()
-
-    # Add context and "host"
-    if context is None:
-        context = {}
-    if "host" not in context:
-        context["host"] = fora.host
-    dvars.update(context)
-
+    if context is not None:
+        dvars.update(context)
+    dvars["host"] = fora.host
+    dvars["inventory"] = fora.host
     return templ.render(dvars).encode("utf-8")
 
 @operation("dir")
@@ -329,7 +331,7 @@ def upload_content(content: Union[str, bytes],
     Parameters
     ----------
     content
-        The content to template.
+        The content to upload.
     dest
         The remote destination path.
     mode
@@ -544,9 +546,13 @@ def template(src: str,
              op: Operation = Operation.internal_use_only) -> OperationResult:
     """
     Templates the given file and uploads the result to the remote host.
-    All host variables, including inherited variables will be available by default.
-    The current host will additionally be added under the key `'host'`.
-    Any variable provided via the context will shadow existing variables.
+    All host variables, including inherited variables will be available
+    as-is in the template. Any variable provided via the context will
+    also be made available, overshadowing existing variables.
+
+    The current host and inventory will always be added under the keys
+    `"host"` and `"inventory"` respectively, shadowing other variables,
+    to ensure these objects are always accessible.
 
     Parameters
     ----------
