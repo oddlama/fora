@@ -75,7 +75,7 @@ class ModuleWrapper:
                 d.update(module.__dict__)
             return d
 
-        if attr.startswith("__") or module is None or not hasattr(module, attr):
+        if attr.startswith("_") or module is None or not hasattr(module, attr):
             return object.__getattribute__(self, attr)
         return getattr(module, attr)
 
