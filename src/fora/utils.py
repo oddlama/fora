@@ -311,33 +311,6 @@ def import_submodules(package: Union[str, ModuleType], recursive: bool = False) 
             results.update(import_submodules(results[full_name]))
     return results
 
-def transitive_dependencies(initial: set[T], relation: Callable[[T], set[T]]) -> set[T]:
-    """
-    Calculates all transitive dependencies given a set of inital nodes and a relation.
-
-    Parameters
-    ----------
-    inital
-        The initial nodes to calculate transitive dependencies for.
-    relation
-        A function that relates a `T` to a set of `T`s
-
-    Returns
-    -------
-    set[T]
-        The transitive dependencies
-    """
-    to_process = initial
-    transitive_set = set()
-    while len(to_process) > 0:
-        t = to_process.pop()
-        if t in transitive_set:
-            continue
-
-        transitive_set.add(t)
-        to_process.update(relation(t))
-    return transitive_set
-
 def check_host_active() -> None:
     """Asserts that an inventory has been loaded and a host is active."""
     if fora.inventory is None or not fora.inventory.is_initialized():

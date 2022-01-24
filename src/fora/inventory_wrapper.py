@@ -5,16 +5,12 @@ import os
 from copy import copy
 from dataclasses import dataclass, field
 from glob import glob
-from types import ModuleType, SimpleNamespace
+from types import SimpleNamespace
 from typing import Any, Literal, Optional, Union, cast
 from fora.remote_settings import RemoteSettings
 
 from fora.types import GroupWrapper, HostWrapper, ModuleWrapper, VariableActionSnapshot
-from fora.utils import CycleError, load_py_module, print_error, rank_sort, transitive_dependencies
-
-def is_bequestable(attr: str, value: Any) -> bool:
-    """Returns true if this variable will be inherited by modules with higher ordering precedence."""
-    return not (attr.startswith("_") or attr in GroupWrapper.__annotations__ or attr in GroupWrapper.__dict__ or isinstance(value, ModuleType))
+from fora.utils import CycleError, load_py_module, print_error, rank_sort
 
 @dataclass
 class HostDeclaration:
@@ -163,20 +159,6 @@ class InventoryWrapper(ModuleWrapper):
     def is_initialized(self) -> bool:
         """Returns True if the inventory is fully initialized."""
         return self._is_initialized
-
-    def global_variables(self) -> dict[str, Any]:
-        """
-        Returns a list of global variables to implicitly add to the global `all` group
-        (before it is actually loaded). Useful to provide global per-inventory
-        variables.
-
-        Returns
-        -------
-        dict[str, Any]
-            Global variables for this inventory
-        """
-        _ = (self)
-        return {}
 
     def available_groups(self) -> set[str]:
         """
@@ -589,14 +571,13 @@ class InventoryWrapper(ModuleWrapper):
             if wrapper.name == "all":
                 # Add predefined global variables before the "all" group module is instanciated
                 setattr(wrapper, "fora_managed", "This file is managed by fora.")
-                for attr, val in self.global_variables().items():
-                    setattr(wrapper, attr, val)
+                for attr, value in self.exported_variables().items():
+                    setattr(wrapper, attr, value)
 
             # Initialize global namespace if an initializer was provided.
             if initializer is not None:
-                for attr, value in vars(initializer).items():
-                    if is_bequestable(attr, value):
-                        setattr(module, attr, value)
+                for attr, value in initializer.exported_variables().items():
+                    setattr(module, attr, value)
 
         # Instanciate module file if it exists, else return default definition
         if module_file is None or not os.path.exists(module_file):
@@ -610,7 +591,7 @@ class InventoryWrapper(ModuleWrapper):
         fora.group = cast(GroupWrapper, None)
         return wrapper
 
-    def load_host(self, name: str, transitive_groups: list[str], initializer: Optional[GroupWrapper]) -> HostWrapper:
+    def load_host(self, name: str, initializer: Optional[GroupWrapper]) -> HostWrapper:
         """
         Creates a new instance of the given host.
 
@@ -618,8 +599,6 @@ class InventoryWrapper(ModuleWrapper):
         ----------
         name
             The host to instanciate.
-        transitive_groups
-            All groups that the host actually belongs to, due to transitive dependencies.
         initializer
             A previously loaded host module that should be used to initialize
             this module's global variables before its code is executed.
@@ -634,7 +613,7 @@ class InventoryWrapper(ModuleWrapper):
             raise ValueError("Invalid instanciation request of unknown host. Ensure that the host has been defined in the inventory.")
 
         assert declaration.name is not None
-        wrapper = HostWrapper(self, declaration.name, declaration.url, groups=transitive_groups)
+        wrapper = HostWrapper(self, declaration.name, declaration.url, groups=declaration.groups)
         module_file = self.host_module_file(declaration.name) if declaration.file is None else os.path.join(self.base_dir(), declaration.file)
 
         # pylint: disable=import-outside-toplevel
@@ -645,9 +624,8 @@ class InventoryWrapper(ModuleWrapper):
 
             # Initialize global namespace if an initializer was provided.
             if initializer is not None:
-                for attr, value in vars(initializer).items():
-                    if is_bequestable(attr, value):
-                        setattr(module, attr, value)
+                for attr, value in initializer.exported_variables().items():
+                    setattr(module, attr, value)
 
         # Instanciate module file if it exists, else return default definition
         if module_file is None or not os.path.exists(module_file):
@@ -709,11 +687,10 @@ class InventoryWrapper(ModuleWrapper):
         HostWrapper
             The instanciated host.
         """
-        # We begin by figuring out all relevant groups for this host. This simply
-        # are all transitive dependencies (`group.after`) of all direct groups of this host.
+        # We begin by figuring out all relevant groups for this host in the correct order.
         assert host in self._host_decls
-        transitive_groups = transitive_dependencies(set(self._host_decls[host].groups), lambda g: set(self._group_decls[g].after))
-        groups_in_order = filter(transitive_groups.__contains__, self._topological_order)
+        groups = set(self._host_decls[host].groups)
+        groups_in_order = filter(groups.__contains__, self._topological_order)
 
         # Next, we iterate through all groups in topological order, and load the
         # respective group with its globals initialized to the result from loading
@@ -723,7 +700,7 @@ class InventoryWrapper(ModuleWrapper):
 
         # Additionally, we will track for each variable where it was initially defined,
         # and each point where it was changed. This allows us to detect when a group module
-        # overwrites a variable witout having an (transitive) dependency to the module
+        # overwrites a variable witout having a (transitive) dependency to the module
         # which defined this variable before. This would result in an arbitrary ordering
         # of those two modules in the topological order, so the resulting variable would be
         # ambiguous. As a side effect we can later store this history on the host wrapper,
@@ -735,9 +712,6 @@ class InventoryWrapper(ModuleWrapper):
         conflicts: list[tuple[Literal["definition", "modification"], ModuleWrapper, Literal["definition", "modification"], ModuleWrapper, str]] = []
 
         def record_variable_change(actor: ModuleWrapper, initializer: Optional[ModuleWrapper], attr: str, value: Any, record_conflicts_group: Optional[GroupWrapper] = None) -> None:
-            if not is_bequestable(attr, value):
-                return
-
             # If the variable changed identity compared to the value it was initialized with,
             # it was overwritten (or it was newly defined). We want to record this in our
             # definition history. We also compare against a snapshot of the value to detect
@@ -773,7 +747,7 @@ class InventoryWrapper(ModuleWrapper):
 
         for group in groups_in_order:
             group_wrapper = self.load_group(group, initializer)
-            for attr, value in vars(group_wrapper).items():
+            for attr, value in group_wrapper.exported_variables().items():
                 record_variable_change(group_wrapper, initializer, attr, value, record_conflicts_group=group_wrapper)
 
             # Use the newly loaded group as the initializer for the next group
@@ -785,10 +759,10 @@ class InventoryWrapper(ModuleWrapper):
             raise ValueError("Conflict in variable assignment from two groups with ambiguous ordering. Insert dependency or remove one definition.")
 
         # Finally instanciate the actual host.
-        host_wrapper = self.load_host(host, list(transitive_groups), initializer)
+        host_wrapper = self.load_host(host, initializer)
         # Update the variable action history one more time to include
         # definitions from the host module.
-        for attr, value in vars(host_wrapper).items():
+        for attr, value in host_wrapper.exported_variables().items():
             record_variable_change(host_wrapper, initializer, attr, value)
 
         # Transfer the variable action history to the host wrapper,

@@ -219,10 +219,9 @@ def init_structure_staging_prod() -> None:
     _write_file("inventories/staging.py", dedent("""\
             import os
 
-            # These are implicit variables that will be defined on the `all` group.
-            # Useful to define global variables from the inventory
-            def global_variables():
-                return dict(api_key=os.getenv("API_KEY_STAGING"))
+            # Global variables (and functions) that are not inventory-related
+            # will automatically be exported to the `all` group.
+            api_key = os.getenv("API_KEY_STAGING")
 
             hosts = [dict(url="staging1.example.com", file="hosts/example.py", groups=["staging"]),
                      dict(url="staging2.example.com", file="hosts/example.py", groups=["staging"])]
@@ -230,10 +229,9 @@ def init_structure_staging_prod() -> None:
     _write_file("inventories/prod.py", dedent("""\
             import os
 
-            # These are implicit variables that will be defined on the `all` group.
-            # Useful to define global variables from the inventory
-            def global_variables():
-                return dict(api_key=os.getenv("API_KEY_PROD"))
+            # Global variables (and functions) that are not inventory-related
+            # will automatically be exported to the `all` group.
+            api_key = os.getenv("API_KEY_PROD")
 
             hosts = [dict(url="prod1.example.com", file="hosts/example.py", groups=["prod"]),
                      dict(url="prod2.example.com", file="hosts/example.py", groups=["prod"]),

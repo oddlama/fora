@@ -340,9 +340,8 @@ def test_files_template_content():
     with pytest.raises(ValueError, match="Error while templating"):
         files.template_content(dest="/tmp/__pytest_fora/testtemplcontent", content="{{ undefined_var }}", mode="644")
 
-    # Test host override by trying to access .name which is not defined when overridden.
-    with pytest.raises(ValueError, match="Error while templating"):
-        files.template_content(dest="/tmp/__pytest_fora/testtemplcontent", content="{{ host.name }}", context=dict(host=""), mode="644")
+    # Test host override by trying to access .name which must not be overwritten.
+    files.template_content(dest="/tmp/__pytest_fora/testtemplcontent", content="{{ host.name }}", context=dict(host=""), mode="644")
 
 def test_files_template(request):
     files.template(src="test/templates/test.j2", dest="/tmp/__pytest_fora/testtempl", context=dict(myvar="graio208hfae"), mode="644")

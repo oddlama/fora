@@ -132,9 +132,10 @@ def show_inventory(inventory: str) -> None:
     for i in pretty_host_names.values():
         print(f"  {i}")
 
-    if len(fora.inventory.global_variables()) > 0:
+    global_vars = fora.inventory.exported_variables()
+    if len(global_vars) > 0:
         print(f"{col_blue}variables{col_reset}")
-        for attr, value in fora.inventory.global_variables().items():
+        for attr, value in global_vars.items():
             print(f"{col_green}{attr}{col_reset}\t(type {type(value)}) = {value}")
 
     for name, host in fora.inventory.loaded_hosts.items():

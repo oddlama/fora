@@ -87,6 +87,24 @@ class ModuleWrapper:
         else:
             module.__setattr__(attr, value)
 
+    def is_exported_variable(self, attr: str, value: Any) -> bool:
+        """Returns True if the the given variable doesn't inherently belong to this group."""
+        return not (attr.startswith("_")
+                or attr in type(self).__annotations__
+                or attr in type(self).__dict__
+                or isinstance(value, ModuleType))
+
+    def exported_variables(self):
+        """
+        Returns a list of exported variables, which are variables that don't inherently belong to this group.
+
+        Returns
+        -------
+        dict[str, Any]
+            Global exported variables of the wrapped module
+        """
+        return {attr: value for attr, value in vars(self).items() if self.is_exported_variable(attr, value)}
+
     def is_overloaded(self, attr: str) -> Optional[bool]:
         """Returns NonoTrue if the given attribute exists as a variable on this wrapper but is overloaded by the wrapped module,
         False if the attribute exists on this wrapper but isn't overloaded and None if the attribute doesn't exist on this wrapper."""
@@ -274,12 +292,9 @@ class HostWrapper(ModuleWrapper):
         # First, add all variable from the current script
         import fora
         if fora.script is not None:
-            # Add variables from the script that are neither private nor part
-            # of a script's standard variables
-            dvars.update({attr: v for attr, v in vars(fora.script).items() if
-                        is_normal_var(attr, v)
-                    and attr not in ScriptWrapper.__annotations__
-                    and attr not in ScriptWrapper.__dict__})
+            # Add variables from the script that are exported, i.e. not private
+            # and notr part of a script's standard variables
+            dvars.update(fora.script.exported_variables())
 
         # Lastly add all host variables, as they have the highest priority.
         dvars.update({attr: v for attr, v in vars(self).items() if is_normal_var(attr, v)})
