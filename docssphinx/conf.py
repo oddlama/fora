@@ -14,6 +14,44 @@ import os
 import sys
 sys.path.insert(0, os.path.abspath("../src/fora"))
 
+import sphinx_markdown_builder
+from sphinx_markdown_builder.markdown_writer import MarkdownTranslator
+
+class GitbookMarkdownTranslator(MarkdownTranslator):
+    def visit_Text(self, node):
+        text = node.astext().replace("\r\n", "\n")
+        text = text.replace("\n", "\n" + "    " * (self.depth.depth - 1))
+        if self._escape_text:
+            text = self.escape_chars(text)
+        self.add(text)
+
+    def depart_Text(self, node):
+        pass
+
+    def visit_field_name(self, node):
+        _ = (node)
+        if ("class" in node.attributes and node.attributes["class"]):
+            self.add("##### ")
+        else:
+            self.add("#### ")
+
+    def depart_field_name(self, node):
+        _ = (node)
+        self.add("\n")
+
+    def visit_definition(self, node):
+        _ = (node)
+        self.add("\n")
+
+    def depart_definition(self, node):
+        _ = (node)
+        pass
+
+    visit_field_body = visit_definition
+    depart_field_body = depart_definition
+
+sphinx_markdown_builder.MarkdownBuilder.default_translator_class = GitbookMarkdownTranslator
+
 
 # -- Project information -----------------------------------------------------
 
