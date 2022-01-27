@@ -1,13 +1,19 @@
 import ast
 from dataclasses import dataclass, field
 from itertools import zip_longest
-from typing import Any, Callable, ContextManager, Optional
+from typing import Any, Callable, ContextManager, Optional, Union
 
 from astdown.docstring import DocstringSection, parse_numpy_docstring
 from astdown.loader import ModuleAst
 
-include_annotations_in_signature = True
-include_annotations_in_parameter_descriptions = False
+from rich import print as rprint
+from rich.markup import escape as rescape
+def print(msg: Any, *args, **kwargs):
+    rprint(rescape(msg) if isinstance(msg, str) else msg, *args, **kwargs)
+
+separate_each_parameter_in_function = False
+include_types_in_signature = True
+include_types_in_parameter_descriptions = False
 include_defaults_in_parameter_descriptions = False
 max_function_signature_width = 76
 
@@ -93,14 +99,17 @@ class MarkdownWriter:
                 self.needs_bullet_point = False
         return _DelegateContextManager(_enter, _exit)
 
-def function_def_to_markdown(markdown: MarkdownWriter, func: ast.FunctionDef, module: ModuleAst) -> None:
+def function_def_to_markdown(markdown: MarkdownWriter, func: ast.FunctionDef, parent_basename: Optional[str]) -> None:
     if len(func.args.posonlyargs) > 0:
         raise NotImplementedError(f"functions with 'posonlyargs' are not supported.")
 
     # Word tokens that need to be joined together, but should be wrapped
     # before overflowing to the right. If the required alignment width
     # becomes too high, we fall back to simple fixed alignment.
-    initial_str = f"def {module.basename}.{func.name}("
+    if parent_basename is None:
+        initial_str = f"def {func.name}("
+    else:
+        initial_str = f"def {parent_basename}.{func.name}("
     align_width = len(initial_str)
     if align_width > 32:
         align_width = 8
@@ -108,7 +117,7 @@ def function_def_to_markdown(markdown: MarkdownWriter, func: ast.FunctionDef, mo
     def _arg_to_str(arg: ast.arg, default: Optional[ast.expr] = None, prefix: str = ""):
         arg_token = prefix + arg.arg
         equals_separator = "="
-        if arg.annotation is not None and include_annotations_in_signature:
+        if arg.annotation is not None and include_types_in_signature:
             arg_token += f": {ast.unparse(arg.annotation) or ''}"
             equals_separator = " = "
         if default is not None:
@@ -131,7 +140,12 @@ def function_def_to_markdown(markdown: MarkdownWriter, func: ast.FunctionDef, mo
     # Append commata to arguments followed by arguments.
     for i,_ in enumerate(tokens[:-1]):
         tokens[i] += ", "
-    tokens.append("):")
+
+    # Return type or end.
+    if func.returns is not None and include_types_in_signature:
+        tokens.append(f") -> {ast.unparse(func.returns)}:")
+    else:
+        tokens.append(f"):")
 
     markdown.add_line("```python")
     line = initial_str
@@ -148,6 +162,8 @@ def function_def_to_markdown(markdown: MarkdownWriter, func: ast.FunctionDef, mo
         if line == "":
             line += align_width * " "
         line += t
+        if separate_each_parameter_in_function:
+            _commit()
 
     _commit()
     markdown.add_line("```")
@@ -168,7 +184,7 @@ def function_parameters_docstring_to_markdown(markdown: MarkdownWriter, func: as
             arg, default = all_args.get(name) or (None, None)
             if arg is not None:
                 content = f"**{arg.arg}**"
-                if arg.annotation is not None and include_annotations_in_parameter_descriptions:
+                if arg.annotation is not None and include_types_in_parameter_descriptions:
                     content += f" (`{ast.unparse(arg.annotation)}`)"
                 if default is not None and include_defaults_in_parameter_descriptions:
                     content += f" (*Default: {ast.unparse(default)}*)"
@@ -177,19 +193,19 @@ def function_parameters_docstring_to_markdown(markdown: MarkdownWriter, func: as
             else:
                 markdown.add_content(f"**{name}**: {value}")
 
-def function_docstring_section_to_markdown(markdown: MarkdownWriter, func: ast.FunctionDef, section: DocstringSection) -> None:
+def docstring_section_to_markdown(markdown: MarkdownWriter, node: Optional[ast.AST], section: DocstringSection) -> None:
     with markdown.title(section.name):
         with markdown.unordered_list():
-            if section.name.lower() == "parameters":
-                function_parameters_docstring_to_markdown(markdown, func, section.decls)
+            if section.name.lower() == "parameters" and isinstance(node, ast.FunctionDef):
+                function_parameters_docstring_to_markdown(markdown, node, section.decls)
                 return
 
             for name, value in section.decls.items():
                 with markdown.list_item():
                     markdown.add_content(f"**{name}**: {value}")
 
-def function_docstring_to_markdown(markdown: MarkdownWriter, func: ast.FunctionDef, module: ModuleAst) -> None:
-    docstring = parse_numpy_docstring(func, module)
+def docstring_to_markdown(markdown: MarkdownWriter, node: ast.AST, module: ModuleAst) -> None:
+    docstring = parse_numpy_docstring(node, module)
     if docstring is not None:
         if docstring.content is not None:
             markdown.add_content(docstring.content)
@@ -197,27 +213,83 @@ def function_docstring_to_markdown(markdown: MarkdownWriter, func: ast.FunctionD
         for section_id in ["parameters", "returns", "raises"]:
             if section_id in docstring.sections:
                 section = docstring.sections[section_id]
-                function_docstring_section_to_markdown(markdown, func, section)
+                docstring_section_to_markdown(markdown, node, section)
 
-def function_to_markdown(markdown: MarkdownWriter, func: ast.FunctionDef, module: ModuleAst) -> None:
-    function_def_to_markdown(markdown, func, module)
-    function_docstring_to_markdown(markdown, func, module)
+def function_to_markdown(markdown: MarkdownWriter, func: ast.FunctionDef, parent_basename: Optional[str], module: ModuleAst) -> None:
+    title = "<mark style=\"color:red;\">def</mark> "
+    if parent_basename is not None:
+        title += f"{parent_basename}."
+    title += f"{func.name}()"
+    with markdown.title(title):
+        function_def_to_markdown(markdown, func, parent_basename)
+        docstring_to_markdown(markdown, func, module)
 
-def class_to_markdown(markdown: MarkdownWriter, cls: ast.ClassDef, module: ModuleAst) -> None:
-    pass
+def class_to_markdown(markdown: MarkdownWriter, cls: ast.ClassDef, parent_basename: str, module: ModuleAst) -> None:
+    with markdown.title(f"<mark style=\"color:red;\">class</mark> {parent_basename}.{cls.name}"):
+        docstring_to_markdown(markdown, cls, module)
+
+        # Global attributes
+        attributes_to_markdown(markdown, cls.body, None, module)
+
+        # Functions
+        function_defs = [node for node in cls.body if isinstance(node, ast.FunctionDef) and not node.name.startswith("_")]
+        for func in function_defs:
+            function_to_markdown(markdown, func, None, module)
+
+def extract_attributes(nodes: list[ast.stmt]) -> dict[str, tuple[ast.AST, Optional[str], Optional[str]]]:
+    attrs = {}
+    def _add(ass: Union[ast.Assign, ast.AnnAssign], docnode: ast.Constant):
+        if isinstance(ass, ast.AnnAssign) and isinstance(ass.target, ast.Name):
+            if ass.target.id.startswith("_"):
+                return
+            attrs[ass.target.id] = (docnode, None, ast.unparse(ass.value) if ass.value is not None else None)
+        elif isinstance(ass, ast.Assign):
+            for target in ass.targets:
+                if not isinstance(target, ast.Name) or target.id.startswith("_"):
+                    return
+                attrs[target.id] = (docnode, None, ast.unparse(ass.value) if ass.value is not None else None)
+
+    ass_node = None
+    for node in nodes:
+        if isinstance(node, (ast.Assign, ast.AnnAssign)):
+            ass_node = node
+        elif isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str) and ass_node is not None:
+            _add(ass_node, node.value)
+        else:
+            ass_node = None
+    return attrs
+
+def attributes_to_markdown(markdown: MarkdownWriter, nodes: list[ast.stmt], parent_basename: Optional[str], module: ModuleAst) -> None:
+    attributes = extract_attributes(nodes)
+    if len(attributes) > 0:
+        with markdown.title(f"Attributes"):
+            for name, (docnode, annotation, value) in attributes.items():
+                attr_name = name if parent_basename is None else f"{parent_basename}.{name}"
+                with markdown.title(f"<mark style=\"color:red;\">attr</mark> {attr_name}"):
+                    markdown.add_line("```python")
+                    repr = f"{attr_name}"
+                    if annotation is not None:
+                        repr += f": {annotation}"
+                    if value is not None:
+                        repr += f" = {value}"
+                    markdown.add_line(repr)
+                    markdown.add_line("```")
+                    docstring_to_markdown(markdown, docnode, module)
 
 def module_to_markdown(markdown: MarkdownWriter, module: ModuleAst) -> None:
     with markdown.title(module.name):
         # Submodules
+        # TODO
+
+        # Global attributes
+        attributes_to_markdown(markdown, module.ast.body, module.basename, module)
 
         # Classes
         class_defs = [node for node in module.ast.body if isinstance(node, ast.ClassDef) and not node.name.startswith("_")]
         for cls in class_defs:
-            with markdown.title(f"class {module.basename}.{cls.name}"):
-                class_to_markdown(markdown, cls, module)
+            class_to_markdown(markdown, cls, module.basename, module)
 
         # Functions
         function_defs = [node for node in module.ast.body if isinstance(node, ast.FunctionDef) and not node.name.startswith("_")]
         for func in function_defs:
-            with markdown.title(f"{module.basename}.{func.name}()"):
-                function_to_markdown(markdown, func, module)
+            function_to_markdown(markdown, func, module.basename, module)

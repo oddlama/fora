@@ -5,12 +5,12 @@ import shutil
 import sys
 from pathlib import Path
 from typing import Any
-from rich import print as rprint
-from rich.markup import escape as rescape
 
 from astdown.loader import load_module_ast
 from astdown.markdown import MarkdownWriter, module_to_markdown
 
+from rich import print as rprint
+from rich.markup import escape as rescape
 def print(msg: Any, *args, **kwargs):
     rprint(rescape(msg) if isinstance(msg, str) else msg, *args, **kwargs)
 
@@ -42,7 +42,7 @@ def main():
 
     # Generate documentation
     markdown = MarkdownWriter()
-    module = load_module_ast("fora.operations.files")
+    module = load_module_ast("fora")
     module_to_markdown(markdown, module)
 
     print(markdown.content.strip())

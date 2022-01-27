@@ -17,8 +17,12 @@ class Docstring:
     sections: dict[str, DocstringSection] = field(default_factory=dict)
 
 def parse_numpy_docstring(node: ast.AST, module: ModuleAst) -> Optional[Docstring]:
-    docstring = ast.get_docstring(node)
-    if docstring is None:
+    docstr = None
+    if isinstance(node, ast.Constant) and isinstance(node.value, str):
+        docstr = node.value
+    else:
+        docstr = ast.get_docstring(node)
+    if docstr is None:
         return None
 
     doc = Docstring()
@@ -38,7 +42,7 @@ def parse_numpy_docstring(node: ast.AST, module: ModuleAst) -> Optional[Docstrin
                 section.decls[decl] = content
             content = ""
 
-    lines = docstring.splitlines()
+    lines = docstr.splitlines()
     skip_next_line = False
     for line, next in zip(lines, lines[1:] + [""]):
         if skip_next_line:
