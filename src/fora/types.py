@@ -283,6 +283,7 @@ class HostWrapper(ModuleWrapper):
         Returns
         -------
         dict[str, Any]
+            The variables of this object.
         """
         # We will add variables from bottom-up so that low-priority
         # variables can be overwritten as expected.
