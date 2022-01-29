@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from astdown.loader import load_module_ast
+from astdown.loader import Module, find_package_or_module
 from astdown.markdown import MarkdownWriter, module_to_markdown
 
 from rich import print as rprint
@@ -27,25 +27,41 @@ def main():
     args = parser.parse_args()
 
     build_path = Path(args.output_dir)
-
     if args.clean:
         # Clean last build
         if build_path.exists():
             shutil.rmtree(build_path)
+    build_path.mkdir(parents=True, exist_ok=True)
 
     # Add args to python module search path
     for p in args.include_path:
         sys.path.insert(0, p)
 
-    # Recursively find all relevant modules
-    # TODO
+    # Find packages and modules
+    stack: list[Module] = []
+    for i in args.modules:
+        module = find_package_or_module(i)
+        if module is None:
+            raise ModuleNotFoundError(f"Could not find source file for module '{i}'")
+        stack.append(module)
+
+    # Deduplicate and flatten
+    modules: dict[str, Module] = {}
+    while len(stack) > 0:
+        m = stack.pop()
+        if m.name in modules:
+            continue
+        modules[m.name] = m
+        stack.extend(m.packages)
+        stack.extend(m.modules)
 
     # Generate documentation
-    markdown = MarkdownWriter()
-    module = load_module_ast("fora")
-    module_to_markdown(markdown, module)
-
-    print(markdown.content.strip())
+    for i,module in enumerate(modules.values()):
+        print(f"[{100*(i+1)/len(modules):6.2f}%] processing {module.name}")
+        markdown = MarkdownWriter()
+        module_to_markdown(markdown, module)
+        with open(build_path / f"{module.name}.md", "w") as f:
+            f.write(markdown.content.strip())
 
 if __name__ == "__main__":
     main()

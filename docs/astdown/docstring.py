@@ -4,7 +4,7 @@ import sys
 from typing import Optional
 from textwrap import dedent
 
-from astdown.loader import ModuleAst
+from astdown.loader import Module
 
 @dataclass
 class DocstringSection:
@@ -16,7 +16,7 @@ class Docstring:
     content: Optional[str] = None
     sections: dict[str, DocstringSection] = field(default_factory=dict)
 
-def parse_numpy_docstring(node: ast.AST, module: ModuleAst) -> Optional[Docstring]:
+def parse_numpy_docstring(node: ast.AST, module: Module) -> Optional[Docstring]:
     docstr = None
     if isinstance(node, ast.Constant) and isinstance(node.value, str):
         docstr = node.value

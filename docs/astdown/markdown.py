@@ -4,7 +4,7 @@ from itertools import zip_longest
 from typing import Any, Callable, ContextManager, Optional, Union
 
 from astdown.docstring import DocstringSection, parse_numpy_docstring
-from astdown.loader import ModuleAst
+from astdown.loader import Module
 
 from rich import print as rprint
 from rich.markup import escape as rescape
@@ -204,7 +204,7 @@ def docstring_section_to_markdown(markdown: MarkdownWriter, node: Optional[ast.A
                 with markdown.list_item():
                     markdown.add_content(f"**{name}**: {value}")
 
-def docstring_to_markdown(markdown: MarkdownWriter, node: ast.AST, module: ModuleAst) -> None:
+def docstring_to_markdown(markdown: MarkdownWriter, node: ast.AST, module: Module) -> None:
     docstring = parse_numpy_docstring(node, module)
     if docstring is not None:
         if docstring.content is not None:
@@ -215,7 +215,7 @@ def docstring_to_markdown(markdown: MarkdownWriter, node: ast.AST, module: Modul
                 section = docstring.sections[section_id]
                 docstring_section_to_markdown(markdown, node, section)
 
-def function_to_markdown(markdown: MarkdownWriter, func: ast.FunctionDef, parent_basename: Optional[str], module: ModuleAst) -> None:
+def function_to_markdown(markdown: MarkdownWriter, func: ast.FunctionDef, parent_basename: Optional[str], module: Module) -> None:
     title = "<mark style=\"color:red;\">def</mark> "
     if parent_basename is not None:
         title += f"{parent_basename}."
@@ -224,7 +224,7 @@ def function_to_markdown(markdown: MarkdownWriter, func: ast.FunctionDef, parent
         function_def_to_markdown(markdown, func, parent_basename)
         docstring_to_markdown(markdown, func, module)
 
-def class_to_markdown(markdown: MarkdownWriter, cls: ast.ClassDef, parent_basename: str, module: ModuleAst) -> None:
+def class_to_markdown(markdown: MarkdownWriter, cls: ast.ClassDef, parent_basename: str, module: Module) -> None:
     with markdown.title(f"<mark style=\"color:red;\">class</mark> {parent_basename}.{cls.name}"):
         docstring_to_markdown(markdown, cls, module)
 
@@ -259,10 +259,10 @@ def extract_attributes(nodes: list[ast.stmt]) -> dict[str, tuple[ast.AST, Option
             ass_node = None
     return attrs
 
-def attributes_to_markdown(markdown: MarkdownWriter, nodes: list[ast.stmt], parent_basename: Optional[str], module: ModuleAst) -> None:
+def attributes_to_markdown(markdown: MarkdownWriter, nodes: list[ast.stmt], parent_basename: Optional[str], module: Module) -> None:
     attributes = extract_attributes(nodes)
     if len(attributes) > 0:
-        with markdown.title(f"Attributes"):
+        with markdown.title("Attributes"):
             for name, (docnode, annotation, value) in attributes.items():
                 attr_name = name if parent_basename is None else f"{parent_basename}.{name}"
                 with markdown.title(f"<mark style=\"color:red;\">attr</mark> {attr_name}"):
@@ -276,10 +276,15 @@ def attributes_to_markdown(markdown: MarkdownWriter, nodes: list[ast.stmt], pare
                     markdown.add_line("```")
                     docstring_to_markdown(markdown, docnode, module)
 
-def module_to_markdown(markdown: MarkdownWriter, module: ModuleAst) -> None:
+def module_to_markdown(markdown: MarkdownWriter, module: Module) -> None:
     with markdown.title(module.name):
         # Submodules
-        # TODO
+        if len(module.modules) > 0:
+            with markdown.title("Submodules"):
+                with markdown.unordered_list():
+                    for submod in module.modules:
+                        with markdown.list_item():
+                            markdown.add_content(f"**{module.basename}.{submod.basename}**: {submod.docstring or '*No description.*'}")
 
         # Global attributes
         attributes_to_markdown(markdown, module.ast.body, module.basename, module)
