@@ -216,16 +216,16 @@ def docstring_to_markdown(markdown: MarkdownWriter, node: ast.AST, module: Modul
                 docstring_section_to_markdown(markdown, node, section)
 
 def function_to_markdown(markdown: MarkdownWriter, func: ast.FunctionDef, parent_basename: Optional[str], module: Module) -> None:
-    title = "<mark style=\"color:red;\">def</mark> "
+    title = "<mark style=\"color:yellow;\">`def`</mark> `"
     if parent_basename is not None:
         title += f"{parent_basename}."
-    title += f"{func.name}()"
+    title += f"{func.name}()`"
     with markdown.title(title):
         function_def_to_markdown(markdown, func, parent_basename)
         docstring_to_markdown(markdown, func, module)
 
 def class_to_markdown(markdown: MarkdownWriter, cls: ast.ClassDef, parent_basename: str, module: Module) -> None:
-    with markdown.title(f"<mark style=\"color:red;\">class</mark> {parent_basename}.{cls.name}"):
+    with markdown.title(f"<mark style=\"color:red;\">`class`</mark>` {parent_basename}.{cls.name}`"):
         docstring_to_markdown(markdown, cls, module)
 
         # Global attributes
@@ -242,7 +242,7 @@ def extract_attributes(nodes: list[ast.stmt]) -> dict[str, tuple[ast.AST, Option
         if isinstance(ass, ast.AnnAssign) and isinstance(ass.target, ast.Name):
             if ass.target.id.startswith("_"):
                 return
-            attrs[ass.target.id] = (docnode, None, ast.unparse(ass.value) if ass.value is not None else None)
+            attrs[ass.target.id] = (docnode, ast.unparse(ass.annotation), ast.unparse(ass.value) if ass.value is not None else None)
         elif isinstance(ass, ast.Assign):
             for target in ass.targets:
                 if not isinstance(target, ast.Name) or target.id.startswith("_"):
@@ -265,7 +265,7 @@ def attributes_to_markdown(markdown: MarkdownWriter, nodes: list[ast.stmt], pare
         with markdown.title("Attributes"):
             for name, (docnode, annotation, value) in attributes.items():
                 attr_name = name if parent_basename is None else f"{parent_basename}.{name}"
-                with markdown.title(f"<mark style=\"color:red;\">attr</mark> {attr_name}"):
+                with markdown.title(f"<mark style=\"color:yellow;\">`attr`</mark>` {attr_name}`"):
                     markdown.add_line("```python")
                     repr = f"{attr_name}"
                     if annotation is not None:
