@@ -278,6 +278,10 @@ def attributes_to_markdown(markdown: MarkdownWriter, nodes: list[ast.stmt], pare
 
 def module_to_markdown(markdown: MarkdownWriter, module: Module) -> None:
     with markdown.title(module.name):
+        module_doc = module.docstring
+        if module_doc is not None:
+            markdown.add_content(module_doc)
+
         # Submodules
         if len(module.modules) > 0:
             with markdown.title("Submodules"):

@@ -4,7 +4,7 @@ import sys
 from typing import Optional
 from textwrap import dedent
 
-from astdown.loader import Module
+from astdown.loader import Module, docstring
 
 @dataclass
 class DocstringSection:
@@ -21,7 +21,7 @@ def parse_numpy_docstring(node: ast.AST, module: Module) -> Optional[Docstring]:
     if isinstance(node, ast.Constant) and isinstance(node.value, str):
         docstr = node.value
     else:
-        docstr = ast.get_docstring(node)
+        docstr = docstring(node, module)
     if docstr is None:
         return None
 
