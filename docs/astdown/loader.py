@@ -39,10 +39,10 @@ class IndexEntry:
             raise ValueError(f"Invalid {self.type=}")
 
         module = self.module or self
-        ref_url = (module.module_url or "")
-        common_path_prefix = os.path.commonpath([ref_url, relative_to]) if relative_to is not None else ""
-        ref_url = ref_url[len(common_path_prefix):] + subref
-        return ref_url.lstrip("/")
+        relative_path = module.module_url or ""
+        if relative_to is not None:
+            relative_path = os.path.relpath(relative_path, start=os.path.dirname(relative_to))
+        return relative_path + subref
 
 def replace_crossrefs(content: str, node: ast.AST, module: Module) -> str:
     """Currently intended to be monkeypatched."""

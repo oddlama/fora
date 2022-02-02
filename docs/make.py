@@ -103,14 +103,19 @@ def main():
         return ref_pattern.sub(functools.partial(_replace_crossref, node=node, module=module), content)
     astdown.loader.replace_crossrefs = _replace_crossrefs
 
-    def _link_to(fqname: str, relative_to: Optional[Union[Module, str]] = None, code: bool = True) -> str:
+    def _link_to(fqname: str, display_name: Optional[str] = None, relative_to: Optional[Union[Module, str]] = None, code: bool = True) -> str:
         idx = index[fqname]
         to = None
         if relative_to is not None:
             to = relative_to.name if isinstance(relative_to, Module) else relative_to
+        if display_name is None:
+            display_name = idx.display_name()
+        assert display_name is not None
+        if not code:
+            display_name = display_name.replace('_', r'\_')
         url = idx.url(to).replace('_', r'\_')
         cm = "`" if code else ""
-        return f"[{cm}{idx.display_name()}{cm}]({url})"
+        return f"[{cm}{display_name}{cm}]({url})"
 
     # Generate documentation
     print("Generating markdown")
@@ -126,9 +131,10 @@ def main():
     # Generate API index
     print("Generating API index")
     markdown = MarkdownWriter()
+    name_overrides = {"fora": "Fora API"}
     def _recursive_list_module(module: Module):
         with markdown.list_item(indent="  "):
-            markdown.add_line(_link_to(module.name, code=False))
+            markdown.add_line(_link_to(module.name, display_name=name_overrides.get(module.name), code=False))
             if len(module.modules) > 0:
                 with markdown.unordered_list(sign="*"):
                     for submod in sorted(module.packages, key=lambda x: x.name):
@@ -137,8 +143,12 @@ def main():
                         with markdown.list_item(indent="  "):
                             markdown.add_line(_link_to(submod.name, code=False))
 
-    with markdown.unordered_list(sign="*"):
-        _recursive_list_module(modules["fora"])
+    with markdown.title("Fora API"):
+        markdown.margin(2)
+        with markdown.unordered_list(sign="*"):
+            with markdown.list_item(indent="  "):
+                markdown.add_line(r"[Operations Index](api/index\_operations.md)")
+            _recursive_list_module(modules["fora"])
 
     with open(build_path / f"API_SUMMARY.md", "w") as f:
         f.write(dedent(

@@ -54,7 +54,7 @@ class MarkdownWriter:
     def add_line(self, line: str):
         indent_prefix = self.indent_str
         if self.needs_bullet_point:
-            indent_prefix = ''.join(self.indents[:-1]) + f" {self.lists[-1]}  "
+            indent_prefix = ''.join(self.indents[:-1]) + self.lists[-1] + " " * (len(self.indents[-1]) - len(self.lists[-1]))
             self.needs_bullet_point = False
 
         self.content += indent_prefix + line
@@ -69,17 +69,17 @@ class MarkdownWriter:
                 self.add_line(line)
         self.margin(1)
 
-    def title(self, title: str) -> ContextManager:
+    def title(self, title: str, additional_depth: int = 1) -> ContextManager:
         def _enter():
-            self.title_depth += 1
+            self.title_depth += additional_depth
             self.margin(1)
             self.add_line("#" * self.title_depth + " " + title)
             self.margin(1)
         def _exit():
-            self.title_depth -= 1
+            self.title_depth -= additional_depth
         return _DelegateContextManager(_enter, _exit)
 
-    def unordered_list(self, sign: str = "-") -> ContextManager:
+    def unordered_list(self, sign: str = " -") -> ContextManager:
         def _enter():
             self.margin(1)
             self.lists.append(sign)
@@ -193,6 +193,7 @@ def function_parameters_docstring_to_markdown(markdown: MarkdownWriter, func: as
                 content += f": {value}"
                 markdown.add_content(content)
             else:
+                # TODO link to name if name is a type
                 markdown.add_content(f"**{name}**: {value}")
 
 def docstring_section_to_markdown(markdown: MarkdownWriter, node: Optional[ast.AST], section: DocstringSection) -> None:
