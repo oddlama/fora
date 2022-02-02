@@ -7,7 +7,42 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal, Optional
 
-IndexType = tuple[Literal["module", "function", "attribute", "class", "class_function", "class_attribute"], str, str, ast.AST]
+@dataclass
+class IndexEntry:
+    type: Literal["module", "function", "attribute", "class"]
+    fqname: str
+    name: str
+    parent: Optional[IndexEntry]
+    module: Optional[IndexEntry]
+    module_url: Optional[str]
+    node: ast.AST
+
+    def short_name(self):
+        return '.'.join(self.fqname.split(".")[-2:])
+
+    def display_name(self):
+        dn = self.short_name()
+        if self.type == "function":
+            dn += "()"
+        return dn
+
+    def url(self, relative_to: Optional[str] = None):
+        if self.type == "module":
+            subref = ""
+        elif self.type == "function":
+            subref = f"#def-{self.short_name()}"
+        elif self.type == "class":
+            subref = f"#class-{self.short_name()}"
+        elif self.type == "attribute":
+            subref = f"#attr-{self.short_name()}"
+        else:
+            raise ValueError(f"Invalid {self.type=}")
+
+        module = self.module or self
+        ref_url = (module.module_url or "")
+        common_path_prefix = os.path.commonpath([ref_url, relative_to]) if relative_to is not None else ""
+        ref_url = ref_url[len(common_path_prefix):] + subref
+        return ref_url.lstrip("/")
 
 def replace_crossrefs(content: str, node: ast.AST, module: Module) -> str:
     """Currently intended to be monkeypatched."""
@@ -34,6 +69,7 @@ class Module:
     path: str
     modules: list[Module] = field(default_factory=list)
     packages: list[Module] = field(default_factory=list)
+    index: Optional[dict[str, IndexEntry]] = None
     _ast: Optional[AstModule] = None
 
     @property
@@ -51,41 +87,46 @@ class Module:
     def docstring(self) -> Optional[str]:
         return docstring(self.ast, self)
 
-    def index(self) -> dict[str, IndexType]:
-        index: dict[str, IndexType] = {}
-        index[self.name] = ("module", self.name, "", self.ast)
+    def generate_index(self, url: str) -> None:
+        index: dict[str, IndexEntry] = {}
+        index[self.name] = module_index = IndexEntry("module", self.name, self.name, None, None, url, self.ast)
 
-        for node in self.ast.body:
-            # Classes
-            if isinstance(node, ast.ClassDef):
-                index[f"{self.name}.{node.name}"] = ("class", self.name, node.name, node)
+        def _fqname(parent: IndexEntry, name: str):
+            return f"{parent.fqname}.{name}"
 
-                for class_node in node.body:
-                    # Functions
-                    if isinstance(class_node, ast.FunctionDef):
-                        index[f"{self.name}.{node.name}.{class_node.name}"] = ("class_function", self.name, f"{node.name}.{class_node.name}", class_node)
+        def _index_functions(body: list[ast.stmt], parent: IndexEntry):
+            for node in body:
+                # Functions
+                if isinstance(node, ast.FunctionDef):
+                    fqname = _fqname(parent, node.name)
+                    index[fqname] = IndexEntry("function", fqname, node.name, parent, module_index, None, node)
 
-                    # Attributes
-                    if isinstance(class_node, ast.AnnAssign) and isinstance(class_node.target, ast.Name):
-                        index[f"{self.name}.{node.name}.{class_node.target.id}"] = ("class_attribute", self.name, f"{node.name}.{class_node.target.id}", class_node)
-                    if isinstance(class_node, ast.Assign):
-                        for target in class_node.targets:
-                            if isinstance(target, ast.Name):
-                                index[f"{self.name}.{node.name}.{target.id}"] = ("class_attribute", self.name, f"{node.name}.{target.id}", class_node)
+        def _index_attributes(body: list[ast.stmt], parent: IndexEntry):
+            for node in body:
+                # Attributes
+                if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+                    fqname = _fqname(parent, node.target.id)
+                    index[fqname] = IndexEntry("attribute", fqname, node.target.id, parent, module_index, None, node)
+                if isinstance(node, ast.Assign):
+                    for target in node.targets:
+                        if isinstance(target, ast.Name):
+                            fqname = _fqname(parent, target.id)
+                            index[fqname] = IndexEntry("attribute", fqname, target.id, parent, module_index, None, node)
 
-            # Functions
-            if isinstance(node, ast.FunctionDef):
-                index[f"{self.name}.{node.name}"] = ("function", self.name, node.name, node)
+        def _index_classes(body: list[ast.stmt], parent: IndexEntry):
+            for node in body:
+                if isinstance(node, ast.ClassDef):
+                    fqname = _fqname(parent, node.name)
+                    index[fqname] = class_index = IndexEntry("class", fqname, node.name, parent, module_index, None, node)
+                    _index_functions(node.body, class_index)
+                    _index_attributes(node.body, class_index)
+                    _index_classes(node.body, class_index)
 
-            # Attributes
-            if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-                index[f"{self.name}.{node.target.id}"] = ("attribute", self.name, node.target.id, node)
-            if isinstance(node, ast.Assign):
-                for target in node.targets:
-                    if isinstance(target, ast.Name):
-                        index[f"{self.name}.{target.id}"] = ("attribute", self.name, target.id, node)
+        _index_functions(self.ast.body, module_index)
+        _index_attributes(self.ast.body, module_index)
+        _index_classes(self.ast.body, module_index)
 
-        return index
+        self.index = index
 
 def find_module(module_name: str) -> Optional[str]:
     parts = module_name.split('.')

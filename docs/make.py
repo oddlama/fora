@@ -7,7 +7,8 @@ import re
 import shutil
 import sys
 from pathlib import Path
-from typing import Any
+from textwrap import dedent
+from typing import Any, Optional, Union
 
 import astdown.loader
 from astdown.loader import Module, find_package_or_module, short_docstring
@@ -64,11 +65,18 @@ def main():
         stack.extend(m.packages)
         stack.extend(m.modules)
 
+    def _to_path(module: Module) -> str:
+        #if len(module.modules) > 0 or len(module.packages) > 0:
+        #    return f"{module.name.replace('.', '/')}/__init__.md"
+        #else:
+        return f"{module.name.replace('.', '/')}.md"
+
     # Index references
     print("Indexing references")
     index = {}
     for module in modules.values():
-        index.update(module.index())
+        module.generate_index(ref_prefix + _to_path(module))
+        index.update(module.index or {})
 
     # Register cross-reference replacer
     def _replace_crossref(match: Any, node: ast.AST, module: Module) -> str:
@@ -84,25 +92,25 @@ def main():
             if "." in fqname:
                 print(f"warning: Skipping invalid reference '{match.group(1)}' in {module.path}:{node.lineno}", file=sys.stderr)
             return match.group(0)
-        _, mod_name, node_name, node = index[fqname]
-        subref = f"#{node_name}" if node_name else ""
-        short_name = f"{mod_name}.{node_name}" if node_name else mod_name
-        short_name = '.'.join(short_name.split(".")[-2:])
-        if isinstance(node, ast.FunctionDef):
-            short_name += "()"
-        mod = modules[mod_name]
-        if len(mod.modules) > 0 or len(mod.packages) > 0:
-            ref_path = f"{mod_name.replace('.', '/')}/__init__.md"
-        else:
-            ref_path = f"{mod_name.replace('.', '/')}.md"
-        ref = ref_prefix + ref_path + subref
-        ref = ref.replace("_", r"\_")
-        return f"[`{short_name}`]({ref})"
+
+        idx = index[fqname]
+        module_idx = index[module.name]
+        url = idx.url(relative_to=module_idx.url()).replace('_', r'\_')
+        return f"[`{idx.display_name()}`]({url})"
 
     ref_pattern = re.compile(r"(?<!\[)`([a-zA-Z_0-9.]*)`")
     def _replace_crossrefs(content: str, node: ast.AST, module: Module) -> str:
         return ref_pattern.sub(functools.partial(_replace_crossref, node=node, module=module), content)
     astdown.loader.replace_crossrefs = _replace_crossrefs
+
+    def _link_to(fqname: str, relative_to: Optional[Union[Module, str]] = None, code: bool = True) -> str:
+        idx = index[fqname]
+        to = None
+        if relative_to is not None:
+            to = relative_to.name if isinstance(relative_to, Module) else relative_to
+        url = idx.url(to).replace('_', r'\_')
+        cm = "`" if code else ""
+        return f"[{cm}{idx.display_name()}{cm}]({url})"
 
     # Generate documentation
     print("Generating markdown")
@@ -110,10 +118,7 @@ def main():
         print(f"[{100*(i+1)/len(modules):6.2f}%] Processing {module.name}")
         markdown = MarkdownWriter()
         module_to_markdown(markdown, module)
-        if len(module.modules) > 0 or len(module.packages) > 0:
-            file_path = build_path / f"{module.name.replace('.', '/')}/__init__.md"
-        else:
-            file_path = build_path / f"{module.name.replace('.', '/')}.md"
+        file_path = build_path / _to_path(module)
         file_path.parent.mkdir(parents=True, exist_ok=True)
         with open(file_path, "w") as f:
             f.write(markdown.content.strip("\n") + "\n")
@@ -123,20 +128,24 @@ def main():
     markdown = MarkdownWriter()
     def _recursive_list_module(module: Module):
         with markdown.list_item(indent="  "):
-            markdown.add_line(_replace_crossrefs(f"`{module.name}`", module.ast, module).replace("[`", "[").replace("`]", "]"))
+            markdown.add_line(_link_to(module.name, code=False))
             if len(module.modules) > 0:
                 with markdown.unordered_list(sign="*"):
                     for submod in sorted(module.packages, key=lambda x: x.name):
                         _recursive_list_module(submod)
                     for submod in sorted(module.modules, key=lambda x: x.name):
                         with markdown.list_item(indent="  "):
-                            markdown.add_line(_replace_crossrefs(f"`{submod.name}`", submod.ast, submod).replace("[`", "[").replace("`]", "]"))
+                            markdown.add_line(_link_to(submod.name, code=False))
 
     with markdown.unordered_list(sign="*"):
         _recursive_list_module(modules["fora"])
 
     with open(build_path / f"API_SUMMARY.md", "w") as f:
-        f.write(markdown.content.strip("\n").replace("\n\n", "\n") + "\n")
+        f.write(dedent(
+            markdown.content
+                .replace("*  ", "* ")
+                .strip("\n")
+                .replace("\n\n", "\n")) + "\n")
 
     # Generate Operations index
     print("Generating operations index")
@@ -145,15 +154,16 @@ def main():
         for submod in sorted(modules["fora.operations"].modules, key=lambda x: x.name):
             if submod.name in ["fora.operations.api", "fora.operations.utils"]:
                 continue
-            with markdown.title(_replace_crossrefs(f"`{submod.name}`", submod.ast, submod)):
-                for key, (type, mod_name, _, node) in index.items():
+            with markdown.title(index[submod.name].display_name()):
+                assert submod.index is not None
+                for key, idx in submod.index.items():
                     if "._" in key:
                         continue
-                    if not mod_name == submod.name or type != "function":
+                    if idx.type != "function":
                         continue
                     with markdown.unordered_list():
                         with markdown.list_item():
-                            markdown.add_content(_replace_crossrefs(f"`{key}`", node, submod) + f" ‒ {short_docstring(node, submod)}")
+                            markdown.add_content(_link_to(key, relative_to=ref_prefix) + f" ‒ {short_docstring(idx.node, submod)}")
 
     with open(build_path / f"index_operations.md", "w") as f:
         f.write(markdown.content.strip("\n") + "\n")

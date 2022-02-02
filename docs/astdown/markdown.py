@@ -236,7 +236,7 @@ def class_to_markdown(markdown: MarkdownWriter, cls: ast.ClassDef, parent_basena
         # Functions
         function_defs = [node for node in cls.body if isinstance(node, ast.FunctionDef) and not node.name.startswith("_")]
         for func in function_defs:
-            function_to_markdown(markdown, func, None, module)
+            function_to_markdown(markdown, func, cls.name, module)
 
 def extract_attributes(nodes: list[ast.stmt]) -> dict[str, tuple[ast.AST, Optional[str], Optional[str]]]:
     attrs = {}
@@ -290,7 +290,7 @@ def module_to_markdown(markdown: MarkdownWriter, module: Module) -> None:
                 with markdown.unordered_list():
                     for submod in module.packages:
                         with markdown.list_item():
-                            submod_ref = astdown.loader.replace_crossrefs(f"`{module.basename}.{submod.basename}`", submod.ast, submod)
+                            submod_ref = astdown.loader.replace_crossrefs(f"`{module.basename}.{submod.basename}`", submod.ast, module)
                             markdown.add_content(f"{submod_ref} ‒ {short_docstring(submod.ast, submod) or '*No description.*'}")
 
         # Submodules
@@ -299,7 +299,7 @@ def module_to_markdown(markdown: MarkdownWriter, module: Module) -> None:
                 with markdown.unordered_list():
                     for submod in module.modules:
                         with markdown.list_item():
-                            submod_ref = astdown.loader.replace_crossrefs(f"`{module.basename}.{submod.basename}`", submod.ast, submod)
+                            submod_ref = astdown.loader.replace_crossrefs(f"`{module.basename}.{submod.basename}`", submod.ast, module)
                             markdown.add_content(f"{submod_ref} ‒ {short_docstring(submod.ast, submod) or '*No description.*'}")
 
         # Global attributes
@@ -312,5 +312,7 @@ def module_to_markdown(markdown: MarkdownWriter, module: Module) -> None:
 
         # Functions
         function_defs = [node for node in module.ast.body if isinstance(node, ast.FunctionDef) and not node.name.startswith("_")]
-        for func in function_defs:
-            function_to_markdown(markdown, func, module.basename, module)
+        if len(function_defs) > 0:
+            with markdown.title("Functions"):
+                for func in function_defs:
+                    function_to_markdown(markdown, func, module.basename, module)
