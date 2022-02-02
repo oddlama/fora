@@ -103,7 +103,7 @@ def print_indented(msg: str, **kwargs: Any) -> None:
 
 def connection_init(connector: Any) -> None:
     """Prints connection initialization information."""
-    print_indented(f"{col('[1;34m')}host{col('[m')} {connector.host.name} via {col('[1;33m')}{connector.host.url}{col('[m')} ... ", end="", flush=True)
+    print_indented(f"{col('[1;34m')}host{col('[m')} {connector.host.name} via {col('[1;33m')}{connector.host.url}{col('[m')}", flush=True)
 
 def connection_failed(error_msg: str) -> None:
     """Signals that an error has occurred while establishing the connection."""
@@ -112,7 +112,7 @@ def connection_failed(error_msg: str) -> None:
 
 def connection_established() -> None:
     """Signals that the connection has been successfully established."""
-    print(col("[1;32m") + "OK" + col("[m"))
+    #print(col("[1;32m") + "OK" + col("[m"))
 
 
 def run_script(script: str, name: Optional[str] = None) -> None:

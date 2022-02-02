@@ -117,8 +117,8 @@ class InventoryWrapper(ModuleWrapper):
     {% tab title="inventory.py" %}
     ```python
     hosts = [HostDeclaration(url="localhost", groups=["desktops"])),
-                dict(url="host.example.com", name="myhost"),
-                "example.com"]
+             dict(url="host.example.com", name="myhost"),
+             "example.com"]
     ```
     {% endtab %}
     {% endtabs %}
@@ -144,8 +144,8 @@ class InventoryWrapper(ModuleWrapper):
     {% tab title="inventory.py" %}
     ```python
     groups = [GroupDeclaration(name="desktops", after=["archlinux"]),
-                dict(name="servers", after=["archlinux"]),
-                "archlinux"]
+              dict(name="servers", after=["archlinux"]),
+              "archlinux"]
     ```
     {% endtab %}
     {% endtabs %}
