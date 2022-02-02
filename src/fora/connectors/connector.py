@@ -214,7 +214,7 @@ class Connector:
 
     def stat(self, path: str, follow_links: bool = False, sha512sum: bool = False) -> Optional[StatResult]:
         """
-        Runs stat() on the given path on the remote. Follows links if follow_links
+        Runs `os.stat()` on the given path on the remote. Follows links if follow_links
         is true. Includes the sha512sum if desired and if the path is a file.
 
         Returns None if the remote path doesn't exist.

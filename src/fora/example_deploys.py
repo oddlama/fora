@@ -10,7 +10,7 @@ from fora import logger
 from fora.utils import print_status
 
 _inventory_def = dedent("""\
-# Define which hosts belong to this inventory.
+# Defines which hosts belong to this inventory.
 hosts = [
     "local:",                   # Local machine, executed as the user who invokes fora
     # "example",                # Some remote machine via ssh (probably requires matching entry in `.ssh/config`)
@@ -23,7 +23,7 @@ _localhost_def = dedent("""\
 # if the inventory entry is just a name like "localhost"
 # url = "ssh://root@localhost"
 
-# Define variables for this host
+# Define a variable for this host
 somevariable = "this was defined by the host"
 """)
 

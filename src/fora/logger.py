@@ -142,8 +142,10 @@ def decode_escape(data: bytes, encoding: str = 'utf-8') -> str:
 
     Example:
 
-        >>> decode_escape(b'It is Wednesday\\nmy dudes\\r\\n🐸\\xff\\0')
-        'It is Wednesday\\\\nMy Dudes\\\\r\\\\n🐸\\\\xff\\\\0'
+    ```python
+    >>> decode_escape(b'It is Wednesday\\nmy dudes\\r\\n🐸\\xff\\0')
+    'It is Wednesday\\\\nMy Dudes\\\\r\\\\n🐸\\\\xff\\\\0'
+    ```
 
     Parameters
     ----------
@@ -188,9 +190,11 @@ def diff(filename: str, old: Optional[bytes], new: Optional[bytes], color: bool 
     representation, after you aquire the diff and before you apply colors,
     your output should be made printable with a function such as `fora.logger.decode_escape`:
 
-        # First decode and escape
-        line = logger.decode_escape(byteline)
-        # Add coloring afterwards so ANSI escape sequences are not escaped
+    ```python
+    # First decode and escape
+    line = logger.decode_escape(byteline)
+    # Add coloring afterwards so ANSI escape sequences are not escaped
+    ```
 
     Parameters
     ----------

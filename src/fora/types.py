@@ -180,12 +180,16 @@ class GroupWrapper(ModuleWrapper):
     All functions and members from this wrapper will be implicitly available
     on the wrapped group module. This means you can do the following
 
-        print(name)       # Access this group's name
+    ```python
+    print(name)       # Access this group's name
+    ```
 
     instead of having to first import the wrapper API:
 
-        from fora import group as this
-        print(this.name)
+    ```python
+    from fora import group as this
+    print(this.name)
+    ```
     """
 
     name: str
@@ -200,13 +204,17 @@ class HostWrapper(ModuleWrapper):
     All functions and members from this wrapper will be implicitly available
     on the wrapped host module. This means you can do the following
 
-        url = "ssh://root@localhost" # Use this url to connect
-        print(name)                  # Access this hosts's name
+    ```python
+    url = "ssh://root@localhost" # Use this url to connect
+    print(name)                  # Access this hosts's name
+    ```
 
     instead of having to first import the wrapper API:
 
-        from fora import group as this
-        print(this.name)
+    ```python
+    from fora import group as this
+    print(this.name)
+    ```
     """
 
     inventory: InventoryWrapper
@@ -380,14 +388,18 @@ class ScriptWrapper(ModuleWrapper):
         This function is implicitly available on the wrapped script module.
         This means you can do the following
 
-            with defaults(owner="root", file_mode="644", dir_mode="755"):
-                # ... execute some operations
+        ```python
+        with defaults(owner="root", file_mode="644", dir_mode="755"):
+            # ... execute some operations
+        ```
 
         instead of having to first import the wrapper API:
 
-            from fora import script
-            with script.defaults(owner="root", file_mode="644", dir_mode="755"):
-                # ... execute some operations
+        ```python
+        from fora import script
+        with script.defaults(owner="root", file_mode="644", dir_mode="755"):
+            # ... execute some operations
+        ```
         """
         def canonicalize_mode(mode: Optional[str]) -> Optional[str]:
             return None if mode is None else oct(int(mode, 8))[2:]
@@ -428,17 +440,21 @@ class ScriptWrapper(ModuleWrapper):
         This function is implicitly available on the wrapped script module.
         This means you can do the following
 
-            @Params
-            class params:
-                my_parameter: str
+        ```python
+        @Params
+        class params:
+            my_parameter: str
+        ```
 
         instead of having to first import the wrapper API:
 
-            from fora import script
+        ```python
+        from fora import script
 
-            @script.Params
-            class params:
-                my_parameter: str
+        @script.Params
+        class params:
+            my_parameter: str
+        ```
         """
         _ = (self)
         # Find the calling site's module and get the passed parameters from there

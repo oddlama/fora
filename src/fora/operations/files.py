@@ -412,24 +412,30 @@ def upload_dir(src: str,
 
     Given the following source directory:
 
-         example/
-        └ something.conf
+    ```python
+     example/
+    └ something.conf
+    ```
 
     A trailing slash will cause the folder to become a child of the destination directory.
 
-        upload_dir("example", "/var/")
+    ```python
+    upload_dir("example", "/var/")
 
-         /var/
-        └  example/
-          └ something.conf
+     /var/
+    └  example/
+        └ something.conf
+    ```
 
     No trailing slash will cause the folder to become the specified folder.
 
-        upload_dir("example", "/var/myexample")
+    ```python
+    upload_dir("example", "/var/myexample")
 
-         /var/
-        └  myexample/
-          └ something.conf
+     /var/
+    └  myexample/
+        └ something.conf
+    ```
 
     Parameters
     ----------

@@ -201,7 +201,7 @@ def new_op_fail(op_name: str, name: Optional[str], desc: str, error: str) -> Ope
     the callee want's to raise and exception.
 
     This is useful for meta-operations, that have a failure condition before the
-    required sub-operation is determined (e.g. system.package() can call different package
+    required sub-operation is determined (e.g. `system.package` can call different package
     manager's package() operation, but can also fail to find a suitable one).
     """
     op = Operation(op_name=op_name, name=name)

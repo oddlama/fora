@@ -44,7 +44,7 @@ def user(user: str, # pylint: disable=redefined-outer-name,too-many-statements
     password_hash = crypt.crypt(real_pw, crypt.mksalt(crypt.METHOD_SHA512))
     ```
 
-    ### Example:
+    #### Examples
 
     ```python
     system.user(
@@ -220,7 +220,7 @@ def group(group: str, # pylint: disable=redefined-outer-name,too-many-statements
     """
     Creates, modifies or deletes a unix group.
 
-    ### Example:
+    #### Examples
 
     ```python
     system.group(
@@ -303,10 +303,9 @@ def package(packages: list[str],
             name: Optional[str] = None,
             check: bool = True) -> OperationResult:
     """
-    Adds or removes system packages. This operation first detects whether a supported package manager
-    is available on the remote system to execute the operation.
+    Adds or removes system packages by detecting a supported init system to execute the operation.
 
-    ### Example:
+    #### Examples
 
     ```python
     system.package(
@@ -350,10 +349,9 @@ def service(service: str, # pylint: disable=redefined-outer-name
             name: Optional[str] = None,
             check: bool = True) -> OperationResult:
     """
-    Manages a system service. This operation first detects whether a supported init system
-    is available on the remote system to execute the operation.
+    Manages a system service by detecting a supported init system to execute the operation.
 
-    ### Example:
+    #### Examples
 
     ```python
     system.service(
