@@ -21,11 +21,11 @@ def docstring(node: ast.AST, module: Module) -> Optional[str]:
     return replace_crossrefs(docstr, node, module)
 
 def short_docstring(node: ast.AST, module: Module) -> Optional[str]:
-    docstr = ast.get_docstring(node)
-    if docstr is None:
+    content = docstring(node, module)
+    if content is None or content == "":
         return None
-    content = replace_crossrefs(docstr, node, module)
-    first_dot_or_paragraph_end = min(content.find(". "), content.find(".\n"), content.find("\n\n"))
+    locs = [len(content) - 1, content.find(". "), content.find(".\n"), content.find("\n\n")]
+    first_dot_or_paragraph_end = min(l for l in locs if l > 0)
     return content[:first_dot_or_paragraph_end + 1]
 
 @dataclass

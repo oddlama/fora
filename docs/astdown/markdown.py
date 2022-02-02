@@ -3,11 +3,13 @@ from dataclasses import dataclass, field
 from itertools import zip_longest
 from typing import Any, Callable, ContextManager, Optional, Union
 
+import astdown.loader
 from astdown.docstring import DocstringSection, parse_numpy_docstring
-from astdown.loader import Module
+from astdown.loader import Module, short_docstring
 
 from rich import print as rprint
 from rich.markup import escape as rescape
+
 def print(msg: Any, *args, **kwargs):
     rprint(rescape(msg) if isinstance(msg, str) else msg, *args, **kwargs)
 
@@ -77,18 +79,18 @@ class MarkdownWriter:
             self.title_depth -= 1
         return _DelegateContextManager(_enter, _exit)
 
-    def unordered_list(self) -> ContextManager:
+    def unordered_list(self, sign: str = "-") -> ContextManager:
         def _enter():
             self.margin(1)
-            self.lists.append("-")
+            self.lists.append(sign)
         def _exit():
             self.margin(1)
             self.lists.pop()
         return _DelegateContextManager(_enter, _exit)
 
-    def list_item(self) -> ContextManager:
+    def list_item(self, indent="    ") -> ContextManager:
         def _enter():
-            self.indents.append("    ")
+            self.indents.append(indent)
             self._calculate_indent()
             self.needs_bullet_point = True
         def _exit():
@@ -216,7 +218,7 @@ def docstring_to_markdown(markdown: MarkdownWriter, node: ast.AST, module: Modul
                 docstring_section_to_markdown(markdown, node, section)
 
 def function_to_markdown(markdown: MarkdownWriter, func: ast.FunctionDef, parent_basename: Optional[str], module: Module) -> None:
-    title = "<mark style=\"color:yellow;\">`def`</mark> `"
+    title = "<mark style=\"color:yellow;\">def</mark> `"
     if parent_basename is not None:
         title += f"{parent_basename}."
     title += f"{func.name}()`"
@@ -225,7 +227,7 @@ def function_to_markdown(markdown: MarkdownWriter, func: ast.FunctionDef, parent
         docstring_to_markdown(markdown, func, module)
 
 def class_to_markdown(markdown: MarkdownWriter, cls: ast.ClassDef, parent_basename: str, module: Module) -> None:
-    with markdown.title(f"<mark style=\"color:red;\">`class`</mark>` {parent_basename}.{cls.name}`"):
+    with markdown.title(f"<mark style=\"color:red;\">class</mark> `{parent_basename}.{cls.name}`"):
         docstring_to_markdown(markdown, cls, module)
 
         # Global attributes
@@ -265,7 +267,7 @@ def attributes_to_markdown(markdown: MarkdownWriter, nodes: list[ast.stmt], pare
         with markdown.title("Attributes"):
             for name, (docnode, annotation, value) in attributes.items():
                 attr_name = name if parent_basename is None else f"{parent_basename}.{name}"
-                with markdown.title(f"<mark style=\"color:yellow;\">`attr`</mark>` {attr_name}`"):
+                with markdown.title(f"<mark style=\"color:yellow;\">attr</mark> `{attr_name}`"):
                     markdown.add_line("```python")
                     repr = f"{attr_name}"
                     if annotation is not None:
@@ -282,13 +284,23 @@ def module_to_markdown(markdown: MarkdownWriter, module: Module) -> None:
         if module_doc is not None:
             markdown.add_content(module_doc)
 
+        # Subpackages
+        if len(module.packages) > 0:
+            with markdown.title("Subpackages"):
+                with markdown.unordered_list():
+                    for submod in module.packages:
+                        with markdown.list_item():
+                            submod_ref = astdown.loader.replace_crossrefs(f"`{module.basename}.{submod.basename}`", submod.ast, submod)
+                            markdown.add_content(f"{submod_ref} ‒ {short_docstring(submod.ast, submod) or '*No description.*'}")
+
         # Submodules
         if len(module.modules) > 0:
             with markdown.title("Submodules"):
                 with markdown.unordered_list():
                     for submod in module.modules:
                         with markdown.list_item():
-                            markdown.add_content(f"**{module.basename}.{submod.basename}**: {submod.docstring or '*No description.*'}")
+                            submod_ref = astdown.loader.replace_crossrefs(f"`{module.basename}.{submod.basename}`", submod.ast, submod)
+                            markdown.add_content(f"{submod_ref} ‒ {short_docstring(submod.ast, submod) or '*No description.*'}")
 
         # Global attributes
         attributes_to_markdown(markdown, module.ast.body, module.basename, module)

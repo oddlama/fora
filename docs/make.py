@@ -33,6 +33,7 @@ def main():
 
     # TODO this is only for fora. make the tool generic at some point
     args.modules = ["fora"]
+    ref_prefix = "api/"
 
     build_path = Path(args.output_dir)
     if args.clean:
@@ -89,7 +90,14 @@ def main():
         short_name = '.'.join(short_name.split(".")[-2:])
         if isinstance(node, ast.FunctionDef):
             short_name += "()"
-        return f"[`{short_name}`]({mod_name.replace('.', '/')}.md{subref})"
+        mod = modules[mod_name]
+        if len(mod.modules) > 0 or len(mod.packages) > 0:
+            ref_path = f"{mod_name.replace('.', '/')}/__init__.md"
+        else:
+            ref_path = f"{mod_name.replace('.', '/')}.md"
+        ref = ref_prefix + ref_path + subref
+        ref = ref.replace("_", r"\_")
+        return f"[`{short_name}`]({ref})"
 
     ref_pattern = re.compile(r"(?<!\[)`([a-zA-Z_0-9.]*)`")
     def _replace_crossrefs(content: str, node: ast.AST, module: Module) -> str:
@@ -108,7 +116,27 @@ def main():
             file_path = build_path / f"{module.name.replace('.', '/')}.md"
         file_path.parent.mkdir(parents=True, exist_ok=True)
         with open(file_path, "w") as f:
-            f.write(markdown.content.strip())
+            f.write(markdown.content.strip("\n") + "\n")
+
+    # Generate API index
+    print("Generating API index")
+    markdown = MarkdownWriter()
+    def _recursive_list_module(module: Module):
+        with markdown.list_item(indent="  "):
+            markdown.add_line(_replace_crossrefs(f"`{module.name}`", module.ast, module).replace("[`", "[").replace("`]", "]"))
+            if len(module.modules) > 0:
+                with markdown.unordered_list(sign="*"):
+                    for submod in sorted(module.packages, key=lambda x: x.name):
+                        _recursive_list_module(submod)
+                    for submod in sorted(module.modules, key=lambda x: x.name):
+                        with markdown.list_item(indent="  "):
+                            markdown.add_line(_replace_crossrefs(f"`{submod.name}`", submod.ast, submod).replace("[`", "[").replace("`]", "]"))
+
+    with markdown.unordered_list(sign="*"):
+        _recursive_list_module(modules["fora"])
+
+    with open(build_path / f"API_SUMMARY.md", "w") as f:
+        f.write(markdown.content.strip("\n").replace("\n\n", "\n") + "\n")
 
     # Generate Operations index
     print("Generating operations index")
@@ -128,7 +156,7 @@ def main():
                             markdown.add_content(_replace_crossrefs(f"`{key}`", node, submod) + f" ‒ {short_docstring(node, submod)}")
 
     with open(build_path / f"index_operations.md", "w") as f:
-        f.write(markdown.content.strip() + "\n")
+        f.write(markdown.content.strip("\n") + "\n")
 
 if __name__ == "__main__":
     main()
