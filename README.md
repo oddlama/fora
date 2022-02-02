@@ -8,63 +8,46 @@
    <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" title="MIT License"></a>
 </p>
 
-**ATTENTION: This project is currently in beta development. The API may still change at anytime.**
+## What is Fora?
 
-## About
+Fora is an infrastructure and configuration management tool inspired by [Ansible](https://www.ansible.com) and [pyinfa](https://pyinfra.com). It can be used for machine provisioning and configuration management. See [how it differs](outlining-the-differences.md#how-is-fora-different-from-existing-tools) from existing tools.
 
-Why?
+## Installation & Quickstart
 
-- Fast execution (single ssh connection per host)
-- Execution on multiple hosts is currently not parallelized
-- Intended for writing small and clean deploys. (Need to configure 1000 hosts? this is probably the wrong tool.)
-- Agentless.
-- Lightweight. (everything included amounts to just about 2kLOC (compare pyinfra 10kLOC, ansible ???)
-- No surprises (for loops work like they should, no magic applied).
-   - Debugging experiece is just like writing python as usual.
-- Fully typed
-
-This looks similar to pyinfra. What are the differences?
-
-We like pyinfra and encourage using it. It is probably the better tool for large deploys.
-What sets this project apart is.
-Developer oriented.
-Main goal was to create a minimal and predictable scripting environment for remote hosts.
-scripts are executed in-order, once for each host, as one would expect.
-It's easy to write reusable scripts.
-Diff output good.
-
-Fora is a infrastructure and configuration management tool inspired by ansible.
-
-- Requires python3.9 on all managed systems.
-- Functions similar to ansible, but lets you write your deploys in pure python
-
-## Installation
-
-Fora requires `python>=3.9`.
-
-## Quick example
-
-Here is a simple `deploy.py` which creates a temporary directory and uploads a templated file.
-
-```python
-from fora.operations import files
-
-files.directory(name="Create a temporary directory",
-    path="/tmp/hello")
-
-files.template_content(name="Save templated content to the directory",
-    content="{{fora_managed}}\nHello from host {{host.name}}\n",
-    dest="/tmp/hello/world")
-```
-
-This script can then be executed on any ssh host.
+You can install Fora with pip:
 
 ```bash
-fora ssh://root@localhost deploy.py
+pip install fora
 ```
 
-Of course you can separately define inventories, groups and hosts for larger deploys.
+Afterwards, you can use it to write scripts that can run operation or commands on a remote host.
 
-## Acknowledgements
+{% tabs %}
+{% tab title="deploy.py" %}
+```python
+from fora.operations import files, system
 
-The fora icon is slightly modified version of an image made by [Freepik](https://www.freepik.com) from [Flaticon](https://www.flaticon.com/).
+files.directory(
+    name="Create a temporary directory",
+    path="/tmp/hello")
+
+system.package(
+    name="Install neovim",
+    package="neovim")
+```
+{% endtab %}
+{% endtabs %}
+
+These scripts are executed against an inventory, or a specific remote host (usually via SSH).
+
+```bash
+fora root@example.com deploy.py
+```
+
+To start with your own (more complex) deploy, you can have Fora create a scaffolding in an empty directory. There are [different scaffoldings](usage/introduction/#deploy-structure) available for different use-cases.
+
+```bash
+fora --init minimal
+```
+
+Fora can do a lot more than this, which is explained in the [introduction](usage/introduction/ "mention") section. If you are interested in how Fora is different from existing tools, have a look at [outlining-the-differences.md](outlining-the-differences.md "mention").
