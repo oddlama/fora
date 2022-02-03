@@ -252,8 +252,9 @@ def main(argv: Optional[list[str]] = None) -> None:
     if args.debug:
         args.verbose = 99
 
-    # Disable color when NO_COLOR is set
-    if os.getenv("NO_COLOR") is not None:
+    # Disable color when NO_COLOR is set, or output is not a TTY
+    is_a_tty = hasattr(sys.stdout, 'isatty') and sys.stdout.isatty()
+    if os.getenv("NO_COLOR") is not None or not is_a_tty:
         args.no_color = True
 
     # Install exception hook to modify traceback, if debug isn't set.
