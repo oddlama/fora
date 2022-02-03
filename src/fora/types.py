@@ -94,7 +94,7 @@ class ModuleWrapper:
                 or attr in type(self).__dict__
                 or isinstance(value, ModuleType))
 
-    def exported_variables(self):
+    def exported_variables(self) -> dict[str, Any]:
         """
         Returns a list of exported variables, which are variables that don't inherently belong to this group.
 

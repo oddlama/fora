@@ -76,7 +76,7 @@ description = check if docs can be built
 deps = pdoc
 basepython = python3.9
 extras = docs
-commands = python docs/make.py -o {toxworkdir}/docs_build
+commands = python docs/make.py -I src/ -o {toxworkdir}/docs_build
 
 [testenv:coverage]
 description = [run after tests]: combine coverage data and create report
