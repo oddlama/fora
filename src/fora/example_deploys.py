@@ -123,7 +123,7 @@ def init_structure_minimal() -> None:
         from fora import host
         from fora.operations import files
 
-        files.content(
+        files.upload_content(
             name="A temporary example file",
             content=f"Hello from {host.name}, also remember that {host.somevariable=}!",
             dest="/tmp/hello_world")
