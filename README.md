@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="auto" height="120" src="./docs/fora.png">
+   <a href="https://oddlama.gitbook.io/fora"><img width="auto" height="120" src="./docs/fora.png"></a>
 </p>
 
 <p align="center">
