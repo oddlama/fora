@@ -586,9 +586,9 @@ class InventoryWrapper(ModuleWrapper):
 
             if wrapper.name == "all":
                 # Add predefined global variables before the "all" group module is instanciated
-                setattr(wrapper, "fora_managed", "This file is managed by fora.")
+                setattr(module, "fora_managed", "This file is managed by fora.")
                 for attr, value in self.exported_variables().items():
-                    setattr(wrapper, attr, value)
+                    setattr(module, attr, value)
 
             # Initialize global namespace if an initializer was provided.
             if initializer is not None:
