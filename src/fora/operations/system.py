@@ -358,12 +358,12 @@ def service(service: str, # pylint: disable=redefined-outer-name
         name="Enable sshd to start on boot, and ensure it is started now",
         service="sshd",
         state="started",
-        enable=True)
+        enabled=True)
 
     system.service(
         name="Just enable sshd to start on boot, but don't change anything about its current state",
         service="sshd",
-        enable=True)
+        enabled=True)
 
     system.service(
         name="Restart the nginx service now",
