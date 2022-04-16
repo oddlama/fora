@@ -52,7 +52,8 @@ def main_run(args: argparse.Namespace) -> None:
     # - fatal errors must be delayed until all executions are fininshed.
 
     # Instanciate (run) the given script for each selected host
-    for host in fora.inventory.loaded_hosts.values():
+    for k in selected_hosts:
+        host = fora.inventory.loaded_hosts[k]
         with open_connection(host):
             fora.host = host
             run_script(args.script, inspect.getouterframes(inspect.currentframe())[0], name="cmdline")
