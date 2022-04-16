@@ -47,7 +47,7 @@ class SshConnector(TunnelConnector):
         command = ["ssh"]
         command.extend(self.ssh_opts)
         command.append(self.url)
-        command.append(f"env python3 -c \"$(echo '{tunnel_dispatcher_gz_b64}' | base64 -d | openssl zlib -d)\" {param_debug}")
+        command.append(f"env python3 -c \"$(echo '{tunnel_dispatcher_gz_b64}' | base64 -d | python -c 'import zlib,sys;sys.stdout.buffer.write(zlib.decompress(sys.stdin.buffer.read()))')\" {param_debug}")
 
         return command
 
