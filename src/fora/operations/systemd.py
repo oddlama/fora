@@ -37,9 +37,9 @@ def daemon_reload(user_mode: bool = False,
 
     if not fora.args.dry:
         if user_mode:
-            conn.run(["systemctl", "--user", "daemon_reload"])
+            conn.run(["systemctl", "--user", "daemon-reload"])
         else:
-            conn.run(["systemctl", "daemon_reload"])
+            conn.run(["systemctl", "daemon-reload"])
 
     return op.success()
 
