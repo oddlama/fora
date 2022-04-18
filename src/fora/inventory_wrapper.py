@@ -57,6 +57,23 @@ class HostDeclaration:
     regardless of whether it is part of this list.
     """
 
+    vars: dict[str, Any] = field(default_factory=dict)
+    """
+    Additional variables to define on the host.
+    Contrary to variables defined in the corresponding host module,
+    these will be defined early, before when evaluating group definitions.
+
+    A common use-case is to define key properties of the host directly in the inventory.
+    Example: You have 10 virtual machines with similar network configuration - just the MAC
+    and IP addresses differ. A group `vm-instances` is used to define the network configuration,
+    but it should have easy access to these central variables. Defining a variable in
+    the host module is too late, and will not be visible in the group definition,
+    and a global dictionary indexed by hostname is cumbersome and could be considered a
+    bad practice because defining a host-specific variable in a group is unclean.
+    By utilizing the host's `vars` dict in the inventory, the variables will be visible
+    in the group and will also be cleanly defined.
+    """
+
 @dataclass
 class GroupDeclaration:
     """A declaration of a group in an inventory."""
@@ -414,9 +431,12 @@ class InventoryWrapper(ModuleWrapper):
 
             self._group_decls[decl.name] = decl
 
+        # Ensure "early-explicits" group is defined.
+        self._group_decls["early-explicits"] = GroupDeclaration(name="early-explicits")
+
         # Ensure "all" group is defined.
         if "all" not in self._group_decls:
-            self._group_decls["all"] = GroupDeclaration(name="all")
+            self._group_decls["all"] = GroupDeclaration(name="all", after=["early-explicits"])
 
     def _ensure_used_groups_are_declared(self) -> None:
         """
@@ -710,8 +730,8 @@ class InventoryWrapper(ModuleWrapper):
 
         # Next, we iterate through all groups in topological order, and load the
         # respective group with its globals initialized to the result from loading
-        # the previous group. The initial group (probably the "all" group) gets no
-        # special pre-defined globals.
+        # the previous group. The first and initial group that will be loaded
+        # is the early-explicits group and it will start clean without any initializer.
         initializer: Optional[GroupWrapper] = None
 
         # Additionally, we will track for each variable where it was initially defined,
@@ -760,6 +780,18 @@ class InventoryWrapper(ModuleWrapper):
 
                 # Record this change for later analyses
                 variable_action_history.setdefault(attr, []).append(VariableActionSnapshot(cur_action, actor, copy(value)))
+
+        # Create a transient group reflecting the already known variables of the host:
+        # Aggregate any variables explicitly defined by the inventory for this host (HostDeclaration.vars).
+        early_explicits = GroupWrapper("early-explicits")
+        explicits = SimpleNamespace()
+        early_explicits.wrap(explicits)
+        for attr, value in self._host_decls[host].vars.items():
+            setattr(explicits, attr, value)
+            record_variable_change(early_explicits, initializer, attr, value, record_conflicts_group=early_explicits)
+
+        # Use the early_explicits as the initializer for the first real group
+        initializer = early_explicits
 
         for group in groups_in_order:
             group_wrapper = self.load_group(group, initializer)
