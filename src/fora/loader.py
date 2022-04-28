@@ -2,6 +2,7 @@
 
 import inspect
 import os
+import subprocess
 from types import ModuleType
 from typing import Union, Any, Optional
 
@@ -10,7 +11,7 @@ import fora
 from fora import logger
 from fora.inventory_wrapper import InventoryWrapper
 from fora.types import ScriptWrapper
-from fora.utils import FatalError, load_py_module
+from fora.utils import FatalError, load_py_module, print_process_error
 
 script_stack: list[tuple[ScriptWrapper, inspect.FrameInfo]] = []
 """A stack of all currently executed scripts ((name, file), frame)."""
@@ -133,6 +134,10 @@ def run_script(script: str,
                 os.chdir(previous_working_directory)
                 fora.script = previous_script
         except Exception as e:
+            if isinstance(e, subprocess.CalledProcessError) and not hasattr(e, "__fora_already_printed"):
+                print_process_error(e)
+                setattr(e, "__fora_already_printed", True)
+
             # Save the current script_stack in any exception thrown from this context
             # for later use in any exception handler.
             if not hasattr(e, 'script_stack'):

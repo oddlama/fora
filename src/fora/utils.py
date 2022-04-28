@@ -11,6 +11,7 @@ import inspect
 import os
 import pkgutil
 import shutil
+import subprocess
 import sys
 import traceback
 import uuid
@@ -317,3 +318,28 @@ def check_host_active() -> None:
         raise FatalError("Invalid attempt to call operation before inventory was loaded! Did you maybe swap the inventory and deploy file on the command line?")
     if fora.host is None:
         raise FatalError("Invalid attempt to call operation while no host is active!")
+
+def print_process_error(err: subprocess.CalledProcessError) -> None:
+    """
+    Pretty-prints the output of a failed process.
+
+    Parameters
+    ----------
+    err
+        The error
+    """
+    # Print output of failed command for debugging
+    col_red    = col("\033[1;31m")
+    col_yellow = col("\033[1;33m")
+    col_reset  = col("\033[m")
+    col_darker = col("\033[90m")
+    print_fullwith(["──────── ",
+        col_red, "command", col_reset, " ",
+        str(err.cmd), " ",
+        col_red, "failed", col_reset, " ",
+        f"with code {err.returncode} ]"], file=sys.stderr)
+    print_fullwith(["──────── ", col_yellow, "stdout", col_reset, col_darker, " (special characters escaped) ", col_reset], file=sys.stderr)
+    print(err.stdout.decode("utf-8", errors="backslashreplace"), file=sys.stderr)
+    print_fullwith(["──────── ", col_yellow, "stderr", col_reset, col_darker, " (special characters escaped) ", col_reset], file=sys.stderr)
+    print(err.stderr.decode("utf-8", errors="backslashreplace"), file=sys.stderr)
+    print_fullwith(["──────── ", col_yellow, "end", col_reset, col_darker, " ", col_reset], file=sys.stderr)

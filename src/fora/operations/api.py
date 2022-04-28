@@ -11,7 +11,7 @@ from types import TracebackType, FrameType
 import fora
 from fora import logger
 from fora.types import RemoteDefaultsContext
-from fora.utils import check_host_active, print_fullwith
+from fora.utils import check_host_active, print_process_error
 
 class OperationError(Exception):
     """An exception that indicates an error while executing an operation."""
@@ -268,23 +268,7 @@ def operation(op_name: str): # type: ignore[no-untyped-def]
                 raise e.with_traceback(_calling_site_traceback())
             except subprocess.CalledProcessError as e:
                 ret = op.failure(str(e))
-
-                # Print output of failed command for debugging
-                col_red    = logger.col("\033[1;31m")
-                col_yellow = logger.col("\033[1;33m")
-                col_reset  = logger.col("\033[m")
-                col_darker = logger.col("\033[90m")
-                print_fullwith(["──────── ",
-                    col_red, "command", col_reset, " ",
-                    str(e.cmd), " ",
-                    col_red, "failed", col_reset, " ",
-                    f"with code {e.returncode} ]"], file=sys.stderr)
-                print_fullwith(["──────── ", col_yellow, "stdout", col_reset, col_darker, " (special characters escaped) ", col_reset], file=sys.stderr)
-                print(e.stdout.decode("utf-8", errors="backslashreplace"), file=sys.stderr)
-                print_fullwith(["──────── ", col_yellow, "stderr", col_reset, col_darker, " (special characters escaped) ", col_reset], file=sys.stderr)
-                print(e.stderr.decode("utf-8", errors="backslashreplace"), file=sys.stderr)
-                print_fullwith(["──────── ", col_yellow, "end", col_reset, col_darker, " ", col_reset], file=sys.stderr)
-
+                print_process_error(e)
                 if fora.args.debug:
                     raise
                 raise e.with_traceback(_calling_site_traceback())
