@@ -138,6 +138,7 @@ def load_py_module(file: str, pre_exec: Optional[Callable[[ModuleType], None]] =
         raise ValueError(f"Failed to load module from file '{file}'")
 
     mod = importlib.util.module_from_spec(spec)
+    setattr(mod, "__path__", os.path.realpath(os.path.dirname(file)))
     # Run pre_exec callback after the module is loaded but before it is executed
     if pre_exec is not None:
         pre_exec(mod)

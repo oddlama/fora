@@ -214,10 +214,10 @@ class InventoryWrapper(ModuleWrapper):
             The available group definitions.
         """
         # Find group files relative to the inventory module
-        if self.module is None or self.module.__file__ is None:
-            raise RuntimeError("Cannot return base directory for an inventory module without an associated module file.")
+        if self.module is None or getattr(self.module, '__path__', None) is None:
+            raise RuntimeError("Cannot find base directory for an inventory module without an associated path.")
 
-        group_files_glob = os.path.join(os.path.dirname(self.module.__file__), self.groups_dir, "*.py")
+        group_files_glob = os.path.join(self.module.__path__, self.groups_dir, "*.py")
         return set(os.path.splitext(os.path.basename(file))[0] for file in glob(group_files_glob))
 
     def base_dir(self) -> str:
@@ -235,9 +235,9 @@ class InventoryWrapper(ModuleWrapper):
         str
             The absolute base directory path.
         """
-        if self.module is None or self.module.__file__ is None:
-            raise RuntimeError("Cannot return base directory for an inventory module without an associated module file.")
-        return os.path.realpath(os.path.dirname(self.module.__file__))
+        if self.module is None or getattr(self.module, '__path__', None) is None:
+            raise RuntimeError("Cannot find base directory for an inventory module without an associated path.")
+        return os.path.realpath(self.module.__path__)
 
     def base_remote_settings(self) -> RemoteSettings:
         """

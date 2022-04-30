@@ -167,9 +167,9 @@ class ModuleWrapper:
         str
             The file.
         """
-        if self.module is None or not hasattr(self.module, "__file__") or self.module.__file__ is None:
+        if self.module is None or getattr(self.module, "__path__", None) is None:
             return "<internal>"
-        return self.module.__file__
+        return self.module.__path__
 
 @dataclass
 class GroupWrapper(ModuleWrapper):
