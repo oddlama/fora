@@ -268,7 +268,9 @@ def operation(op_name: str): # type: ignore[no-untyped-def]
                 raise e.with_traceback(_calling_site_traceback())
             except subprocess.CalledProcessError as e:
                 ret = op.failure(str(e))
-                print_process_error(e)
+                if not hasattr(e, "__fora_already_printed"):
+                    print_process_error(e)
+                    setattr(e, "__fora_already_printed", True)
                 if fora.args.debug:
                     raise
                 raise e.with_traceback(_calling_site_traceback())
