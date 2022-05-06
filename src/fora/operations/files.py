@@ -275,21 +275,22 @@ def link(path: str,
     conn = fora.host.connection
     with op.defaults(owner=owner, group=group) as attr:
         if present:
-            op.final_state(exists=True, owner=attr.owner, group=attr.group, touched=touch)
+            op.final_state(exists=True, target=target, owner=attr.owner, group=attr.group, touched=touch)
         else:
-            op.final_state(exists=False, owner=None, group=None, touched=False)
+            op.final_state(exists=False, target=None, owner=None, group=None, touched=False)
 
         # Examine current state
         stat = conn.stat(path)
         if stat is None:
             # The link doesn't exist
-            op.initial_state(exists=False, owner=None, group=None, touched=False)
+            op.initial_state(exists=False, target=None, owner=None, group=None, touched=False)
         else:
             if stat.type != "link":
                 return op.failure(f"path '{path}' exists but is not a link!")
 
-            # The link exists but may have different attributes
-            op.initial_state(exists=True, owner=stat.owner, group=stat.group, touched=False)
+            existing_target = conn.run(["readlink", "-n", path])
+            # The link exists but may have a different target or different attributes
+            op.initial_state(exists=True, target=(existing_target.stdout or b"").decode(), owner=stat.owner, group=stat.group, touched=False)
 
         # Return success if nothing needs to be changed
         if op.unchanged():
@@ -299,8 +300,8 @@ def link(path: str,
         if not fora.args.dry:
             if present:
                 # Create link if it doesn't exist
-                if op.changed("exists"):
-                    conn.run(["ln", "-s", "--", target, path])
+                if op.changed("target"):
+                    conn.run(["ln", "-sf", "--", target, path])
 
                 # Set correct owner and group, if needed
                 if op.changed("owner") or op.changed("group"):
