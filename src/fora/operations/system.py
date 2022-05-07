@@ -118,15 +118,16 @@ def user(user: str, # pylint: disable=redefined-outer-name,too-many-statements
     if current is None:
         op.initial_state(exists=False, uid=None, group=None, groups=[], comment=None, home=None, shell=None, password_hash=None)
     else:
-        op.initial_state(exists=True, uid=current.uid, group=current.group, groups=current.groups, comment=current.gecos, home=current.home, shell=current.shell, password_hash=current.password_hash)
+        op.initial_state(exists=True, uid=current.uid, group=current.group, groups=sorted(current.groups), comment=current.gecos, home=current.home, shell=current.shell, password_hash=current.password_hash)
 
     # Calculate target state. None means no-desired-value (i.e. keep as-is or use default on creation)
     target_uid = uid or (current.uid if current else None)
     target_group = group or (current.group if current else None)
     if append_groups:
-        target_groups = sorted(list(set((groups or []) + (current.groups if current else []))))
+        target_groups = set((groups or []) + (current.groups if current else []))
     else:
         target_groups = groups or (current.groups if current else [])
+    target_groups = sorted(list(target_groups))
     target_password_hash = password_hash or (current.password_hash if current else None)
     target_comment = comment or (current.gecos if current else None)
     target_home = home or (current.home if current else '/dev/null')
