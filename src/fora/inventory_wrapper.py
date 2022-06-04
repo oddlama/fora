@@ -61,7 +61,7 @@ class HostDeclaration:
     """
     Additional variables to define on the host.
     Contrary to variables defined in the corresponding host module,
-    these will be defined early, before when evaluating group definitions.
+    these will be defined early i.e. before evaluating group definitions.
 
     A common use-case is to define key properties of the host directly in the inventory.
     Example: You have 10 virtual machines with similar network configuration - just the MAC
@@ -786,6 +786,10 @@ class InventoryWrapper(ModuleWrapper):
         early_explicits = GroupWrapper("early-explicits")
         explicits = SimpleNamespace()
         early_explicits.wrap(explicits)
+        # Expose the corresponding host
+        early_explicits.host = self._host_decls[host]
+        record_variable_change(early_explicits, initializer, "host", early_explicits.host, record_conflicts_group=early_explicits)
+        # Expose explicitly configured variables from the host
         for attr, value in self._host_decls[host].vars.items():
             setattr(explicits, attr, value)
             record_variable_change(early_explicits, initializer, attr, value, record_conflicts_group=early_explicits)
