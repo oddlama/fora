@@ -16,7 +16,8 @@ from fora.operations.utils import check_absolute_path, save_content
 
 _jinja2_env: Environment = Environment(
     autoescape=False,
-    undefined=StrictUndefined)
+    undefined=StrictUndefined,
+    extensions=["jinja2.ext.loopcontrols"])
 """The jinja2 environment used for templating."""
 
 def _render_template(templ: Template, context: Optional[dict]) -> bytes:
