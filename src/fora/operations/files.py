@@ -49,7 +49,7 @@ def _render_template(templ: Template, context: Optional[dict]) -> bytes:
     if context is not None:
         dvars.update(context)
     dvars["host"] = fora.host
-    dvars["inventory"] = fora.host
+    dvars["inventory"] = fora.inventory
     return templ.render(dvars).encode("utf-8")
 
 @operation("dir")
